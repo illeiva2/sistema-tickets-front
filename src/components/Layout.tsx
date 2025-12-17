@@ -39,11 +39,10 @@ const NavLink = ({
   return (
     <Link
       to={to}
-      className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${
-        isActive
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-      }`}
+      className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${isActive
+        ? "bg-primary text-primary-foreground shadow-sm"
+        : "text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
+        }`}
     >
       {icon}
       <span>{children}</span>
@@ -174,7 +173,7 @@ const Layout: React.FC = () => {
   // Dark mode toggle (simple)
   const [dark, setDark] = React.useState<boolean>(
     typeof document !== "undefined" &&
-      document.documentElement.classList.contains("dark"),
+    document.documentElement.classList.contains("dark"),
   );
   React.useEffect(() => {
     if (dark) {
@@ -188,7 +187,7 @@ const Layout: React.FC = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75 shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between bg-blue-200">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between bg-blue-200 dark:bg-gray-900 border-b dark:border-gray-800 transition-colors">
           <div className="flex items-center space-x-6">
             <h1 className="text-xl font-bold text-primary tracking-tight">
               Empresa Tickets

@@ -44,6 +44,50 @@ const TicketDetailPage: React.FC = () => {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeComment, setCloseComment] = useState("");
 
+  // Estado para el modal de edición
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    description: "",
+    priority: "MEDIUM",
+    status: "OPEN"
+  });
+
+  // Función para abrir el modal de edición con los datos actuales
+  const openEditModal = () => {
+    if (ticket) {
+      setEditFormData({
+        title: ticket.title || "",
+        description: ticket.description || "",
+        priority: ticket.priority || "MEDIUM",
+        status: ticket.status || "OPEN"
+      });
+      setShowEditModal(true);
+    }
+  };
+
+  // Función para actualizar el ticket
+  const handleUpdateTicket = async () => {
+    try {
+      setSaving(true);
+      const response = await api.patch(`/api/tickets/${id}`, editFormData);
+
+      if (response.data.success) {
+        toast.success("Ticket actualizado correctamente");
+        setTicket((prev: any) => ({
+          ...(prev || {}),
+          ...(response.data.data || {})
+        }));
+        setShowEditModal(false);
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || "Error al actualizar el ticket";
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Función para formatear el número del ticket
   const formatTicketNumber = (ticketNumber: number) => {
     return ticketNumber.toString().padStart(5, "0");
@@ -206,8 +250,7 @@ const TicketDetailPage: React.FC = () => {
               className="px-2 py-1 text-sm"
               size="sm"
               onClick={() => {
-                // TODO: Implementar modal de edición
-                alert("Funcionalidad de edición en desarrollo");
+                openEditModal();
               }}
             >
               <Edit size={16} className="mr-2" />
@@ -297,7 +340,7 @@ const TicketDetailPage: React.FC = () => {
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Escribe un comentario..."
-                  className="flex-1 px-3 pb-2"
+                  className="flex-1 px-3 pb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                 />
                 <Button
                   disabled={adding || !commentText.trim()}
@@ -371,7 +414,7 @@ const TicketDetailPage: React.FC = () => {
                   ) : (
                     <>
                       <select
-                        className="px-2 py-1 border rounded-md text-sm"
+                        className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                         value={ticket?.status || "OPEN"}
                         onChange={async (e) => {
                           if (!ticket) return;
@@ -422,7 +465,7 @@ const TicketDetailPage: React.FC = () => {
                     </Badge>
                   ) : (
                     <select
-                      className="px-2 py-1 border rounded-md text-sm"
+                      className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.priority || "MEDIUM"}
                       onChange={async (e) => {
                         if (!ticket) return;
@@ -458,7 +501,7 @@ const TicketDetailPage: React.FC = () => {
                   <User size={14} />
                   {user?.role === "ADMIN" ? (
                     <select
-                      className="px-2 py-1 border rounded-md text-sm"
+                      className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.assignee?.id || ""}
                       onChange={async (e) => {
                         if (!ticket) return;
@@ -616,6 +659,94 @@ const TicketDetailPage: React.FC = () => {
                 disabled={!closeComment.trim() || saving}
               >
                 {saving ? "Cerrando..." : "Cerrar Ticket"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para editar ticket */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 my-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Editar Ticket
+            </h3>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Título
+                </label>
+                <Input
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                  placeholder="Título del ticket"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Descripción
+                </label>
+                <textarea
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  placeholder="Descripción detallada"
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md min-h-[100px] focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Prioridad
+                  </label>
+                  <select
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
+                    value={editFormData.priority}
+                    onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                  >
+                    <option value="LOW">Baja</option>
+                    <option value="MEDIUM">Media</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Estado
+                  </label>
+                  <select
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                  >
+                    <option value="OPEN">Abierto</option>
+                    <option value="IN_PROGRESS">En Progreso</option>
+                    <option value="RESOLVED">Resuelto</option>
+                    <option value="CLOSED">Cerrado</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <Button
+                onClick={() => setShowEditModal(false)}
+                variant="outline"
+                className="flex-1"
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpdateTicket}
+                className="flex-1"
+                disabled={!editFormData.title.trim() || !editFormData.description.trim() || saving}
+              >
+                {saving ? "Guardando..." : "Guardar Cambios"}
               </Button>
             </div>
           </div>

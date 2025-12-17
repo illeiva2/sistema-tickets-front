@@ -293,74 +293,82 @@ export const AdvancedFilePreview: React.FC<AdvancedFilePreviewProps> = ({
     <Card className={`${className}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 min-w-0 w-full">
             {getFileIcon(fileType)}
-            <div>
-              <CardTitle className="text-lg">{displayName}</CardTitle>
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-lg truncate" title={displayName}>
+                {displayName}
+              </CardTitle>
               <div className="flex items-center space-x-2 mt-1">
                 <Badge
                   variant="secondary"
-                  className="px-3 py-1 text-sm font-medium"
+                  className="px-2 py-0.5 text-xs font-medium shrink-0"
                 >
                   {fileType}
                 </Badge>
-                <span className="text-sm text-muted-foreground">{size}</span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {size}
+                </span>
               </div>
             </div>
           </div>
-
-          {showActions && (
-            <div className="flex items-center space-x-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowMetadata(!showMetadata)}
-                title="Ver metadatos"
-              >
-                <Search size={16} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowOrganize(!showOrganize)}
-                title="Organizar archivo"
-              >
-                <Folder size={16} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handlePreview}
-                title={canPreview ? "Vista previa" : "Abrir archivo"}
-              >
-                <Eye size={16} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDownload}
-                title="Descargar"
-              >
-                <Download size={16} />
-              </Button>
-
-              {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onDelete(attachment.id)}
-                  title="Eliminar"
-                  className="text-destructive hover:text-destructive"
-                >
-                  <X size={16} />
-                </Button>
-              )}
-            </div>
-          )}
         </div>
+
+        {showActions && (
+          <div className="flex items-center w-full gap-2 mt-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-8 px-0"
+              onClick={() => setShowMetadata(!showMetadata)}
+              title="Ver metadatos"
+            >
+              <Search size={16} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-8 px-0"
+              onClick={() => setShowOrganize(!showOrganize)}
+              title="Organizar archivo"
+            >
+              <Folder size={16} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-8 px-0"
+              onClick={handlePreview}
+              title="Vista previa"
+            >
+              <Eye size={16} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-8 px-0"
+              onClick={handleDownload}
+              title="Descargar"
+            >
+              <Download size={16} />
+            </Button>
+
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-1 h-8 px-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => onDelete(attachment.id)}
+                title="Eliminar"
+              >
+                <X size={16} />
+              </Button>
+            )}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">

@@ -11,8 +11,7 @@ import {
   CardContent,
 } from "@/components/ui";
 import { useAuth } from "../hooks";
-import { Chrome, Trash2, AlertCircle, Info, UserPlus, Mail, Lock } from "lucide-react";
-import { clearAuthData } from "../utils/clearAuth";
+import { Chrome, AlertCircle, Info, UserPlus, Mail, Lock } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -52,10 +51,7 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleClearAuth = () => {
-    clearAuthData();
-    window.location.reload();
-  };
+
 
   const handleGoogleLogin = async () => {
     try {
@@ -114,11 +110,10 @@ const LoginPage: React.FC = () => {
             {/* Error message */}
             {error && (
               <div
-                className={`p-3 rounded-md text-sm ${
-                  isGoogleUser
-                    ? "bg-blue-50 border border-blue-200 text-blue-800"
-                    : "bg-red-50 border border-red-200 text-red-800"
-                }`}
+                className={`p-3 rounded-md text-sm ${isGoogleUser
+                  ? "bg-blue-50 border border-blue-200 text-blue-800"
+                  : "bg-red-50 border border-red-200 text-red-800"
+                  }`}
               >
                 <div className="flex items-start gap-2">
                   {isGoogleUser ? (
@@ -217,19 +212,7 @@ const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {/* Debug button - solo en desarrollo */}
-            {import.meta.env.DEV && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleClearAuth}
-                className="w-full mt-2 text-xs text-gray-500 hover:text-red-600"
-              >
-                <Trash2 className="mr-2 h-3 w-3" />
-                Limpiar datos de autenticación (Debug)
-              </Button>
-            )}
+
           </div>
         </CardContent>
       </Card>

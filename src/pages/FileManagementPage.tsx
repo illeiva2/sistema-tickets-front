@@ -19,6 +19,8 @@ import {
   Image,
   Archive,
   Code,
+  Eye,
+  Download,
 } from "lucide-react";
 import api from "../lib/api";
 import toast from "react-hot-toast";
@@ -43,6 +45,13 @@ interface FileTag {
   updatedAt: Date;
 }
 
+interface FileOrganization {
+  id: string;
+  categoryId: string | null;
+  tags: string[];
+  customPath: string | null;
+}
+
 interface FileInfo {
   id: string;
   fileName: string;
@@ -50,8 +59,8 @@ interface FileInfo {
   sizeBytes: number;
   storageUrl: string;
   createdAt: Date;
-  category?: FileCategory | null;
-  tags: FileTag[];
+  ticketId: string;
+  organization: FileOrganization | null;
 }
 
 export const FileManagementPage: React.FC = () => {
@@ -98,6 +107,11 @@ export const FileManagementPage: React.FC = () => {
 
       setCategories(categoriesRes.data.data || []);
       setTags(tagsRes.data.data || []);
+
+      console.log("🔍 API Response - Files:", filesRes.data);
+      console.log("🔍 API Response - Categories:", categoriesRes.data);
+      console.log("🔍 API Response - Tags:", tagsRes.data);
+
       setFiles(filesRes.data.data || []);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -452,47 +466,120 @@ export const FileManagementPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {files.map((file) => (
-              <div
-                key={file.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
-              >
-                <div className="flex items-center space-x-3">
-                  {getFileIcon(file.mimeType)}
-                  <div>
-                    <div className="font-medium">{file.fileName}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {formatFileSize(file.sizeBytes)} • {file.mimeType}
+            {files.map((file) => {
+              // Resolver categoría
+              const categoryId = file.organization?.categoryId;
+              const category = categoryId
+                ? categories.find((c) => c.id === categoryId)
+                : null;
+
+              // Resolver etiquetas
+              const fileTagIds = file.organization?.tags || [];
+              const fileTags = tags.filter((t) => fileTagIds.includes(t.id));
+
+              const handleDownload = async () => {
+                try {
+                  const storedFileName = file.storageUrl.split("/").pop() || file.fileName;
+                  const response = await api.get(`/api/files/${encodeURIComponent(storedFileName)}`, {
+                    responseType: "blob",
+                  });
+                  const blob = new Blob([response.data]);
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = file.fileName;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error("Error downloading:", error);
+                  toast.error("Error al descargar el archivo");
+                }
+              };
+
+              const handlePreview = async () => {
+                try {
+                  const storedFileName = file.storageUrl.split("/").pop() || file.fileName;
+                  const response = await api.get(`/api/files/${encodeURIComponent(storedFileName)}`, { responseType: 'blob' });
+                  const blob = new Blob([response.data], { type: file.mimeType });
+                  const url = window.URL.createObjectURL(blob);
+                  window.open(url, '_blank');
+                  setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                } catch (e) {
+                  toast.error("No se pudo previsualizar");
+                }
+              };
+
+              return (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    {getFileIcon(file.mimeType)}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate" title={file.fileName}>
+                        {file.fileName}
+                      </div>
+                      <div className="text-sm text-muted-foreground flex items-center space-x-2">
+                        <span>{formatFileSize(file.sizeBytes)}</span>
+                        <span>•</span>
+                        <span className="truncate">{file.mimeType}</span>
+                        <span>•</span>
+                        <span>{new Date(file.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {file.category && (
-                    <Badge
-                      variant="secondary"
-                      style={{
-                        backgroundColor: file.category.color,
-                        color: "white",
-                      }}
-                      className="px-3 py-1 text-sm font-medium"
-                    >
-                      {file.category.icon} {file.category.name}
-                    </Badge>
-                  )}
-                  {file.tags &&
-                    file.tags.map((tag) => (
+
+                  <div className="flex items-center space-x-2 ml-4">
+                    {category && (
+                      <Badge
+                        variant="secondary"
+                        style={{
+                          backgroundColor: category.color + "20", // 20% opacity for bg
+                          color: category.color,
+                          borderColor: category.color,
+                        }}
+                        className="px-2 py-0.5 text-xs font-medium border"
+                      >
+                        {category.icon} {category.name}
+                      </Badge>
+                    )}
+
+                    {fileTags.map((tag) => (
                       <Badge
                         key={tag.id}
                         variant="outline"
                         style={{ borderColor: tag.color, color: tag.color }}
-                        className="px-3 py-1 text-sm font-medium"
+                        className="px-2 py-0.5 text-xs font-medium"
                       >
                         {tag.name}
                       </Badge>
                     ))}
+
+                    <div className="flex items-center space-x-1 ml-2 pl-2 border-l">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handlePreview}
+                        title="Ver"
+                      >
+                        <Eye size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDownload}
+                        title="Descargar"
+                      >
+                        <Download size={16} />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {files.length === 0 && (
               <div className="text-center text-muted-foreground py-4">
                 No se encontraron archivos

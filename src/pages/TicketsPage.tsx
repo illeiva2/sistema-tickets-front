@@ -160,7 +160,7 @@ const TicketsPage: React.FC = () => {
                 placeholder="Buscar tickets..."
                 value={filters.q || ""}
                 onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-                className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
               />
             </div>
             <select
@@ -168,7 +168,7 @@ const TicketsPage: React.FC = () => {
               onChange={(e) =>
                 setFilters({ ...filters, status: e.target.value })
               }
-              className="px-3 py-2 border rounded-md dark:text-gray-400 text-gray-5000 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="px-3 py-2 border rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="">Todos los estados</option>
               <option value="OPEN">Abierto</option>
@@ -181,7 +181,7 @@ const TicketsPage: React.FC = () => {
               onChange={(e) =>
                 setFilters({ ...filters, priority: e.target.value })
               }
-              className="px-3 py-2 border rounded-md dark:text-gray-400 text-gray-5000 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="px-3 py-2 border rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="">Todas las prioridades</option>
               <option value="LOW">Baja</option>
@@ -195,7 +195,7 @@ const TicketsPage: React.FC = () => {
               onChange={(e) =>
                 setFilters({ ...filters, sortBy: e.target.value as any })
               }
-              className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 dark:text-gray-400 text-gray-5000 focus:ring-primary"
+              className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="createdAt">Fecha creación</option>
               <option value="updatedAt">Fecha actualización</option>
@@ -208,7 +208,7 @@ const TicketsPage: React.FC = () => {
               onChange={(e) =>
                 setFilters({ ...filters, sortDir: e.target.value as any })
               }
-              className="px-3 py-2 border rounded-md dark:text-gray-400 text-gray-5000 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="px-3 py-2 border rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
@@ -267,7 +267,7 @@ const TicketsPage: React.FC = () => {
             <div className="space-y-6">
               {/* Tickets Abiertos */}
               <div>
-                <h3 className="text-lg font-semibold mb-3 text-blue-600 border-b border-blue-200 pb-2">
+                <h3 className="text-lg font-semibold mb-3 text-blue-600 border-b border-blue-200 pb-2 dark:text-blue-400 dark:border-blue-800">
                   Tickets Abiertos (
                   {tickets.filter((t) => t.status !== "CLOSED").length})
                 </h3>
@@ -277,7 +277,7 @@ const TicketsPage: React.FC = () => {
                     .map((ticket) => (
                       <div
                         key={ticket.id}
-                        className="border rounded-lg p-3 hover:shadow-md transition-shadow bg-white"
+                        className="border rounded-lg p-3 hover:shadow-md transition-shadow bg-white dark:bg-gray-800 dark:border-gray-700"
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -290,28 +290,26 @@ const TicketsPage: React.FC = () => {
                                 - {ticket.title}
                               </h3>
                               <span
-                                className={`px-2 py-1 text-xs rounded-full ${
-                                  ticket.priority === "URGENT"
-                                    ? "bg-red-500 text-white"
-                                    : ticket.priority === "HIGH"
-                                      ? "bg-orange-500 text-white"
-                                      : ticket.priority === "MEDIUM"
-                                        ? "bg-yellow-500 text-white"
-                                        : "bg-green-500 text-white"
-                                }`}
+                                className={`px-2 py-1 text-xs rounded-full ${ticket.priority === "URGENT"
+                                  ? "bg-red-500 text-white"
+                                  : ticket.priority === "HIGH"
+                                    ? "bg-orange-500 text-white"
+                                    : ticket.priority === "MEDIUM"
+                                      ? "bg-yellow-500 text-white"
+                                      : "bg-green-500 text-white"
+                                  }`}
                               >
                                 {ticket.priority}
                               </span>
                               <span
-                                className={`px-2 py-1 text-xs rounded-full ${
-                                  ticket.status === "OPEN"
-                                    ? "bg-blue-500 text-white"
-                                    : ticket.status === "IN_PROGRESS"
-                                      ? "bg-purple-500 text-white"
-                                      : ticket.status === "RESOLVED"
-                                        ? "bg-green-500 text-white"
-                                        : "bg-gray-500 text-white"
-                                }`}
+                                className={`px-2 py-1 text-xs rounded-full ${ticket.status === "OPEN"
+                                  ? "bg-blue-500 text-white"
+                                  : ticket.status === "IN_PROGRESS"
+                                    ? "bg-purple-500 text-white"
+                                    : ticket.status === "RESOLVED"
+                                      ? "bg-green-500 text-white"
+                                      : "bg-gray-500 text-white"
+                                  }`}
                               >
                                 {ticket.status}
                               </span>
@@ -351,7 +349,7 @@ const TicketsPage: React.FC = () => {
 
               {/* Tickets Cerrados */}
               <div>
-                <h3 className="text-lg font-semibold mb-3 text-gray-600 border-b border-gray-200 pb-2">
+                <h3 className="text-lg font-semibold mb-3 text-gray-600 border-b border-gray-200 pb-2 dark:text-gray-400 dark:border-gray-700">
                   Tickets Cerrados (
                   {tickets.filter((t) => t.status === "CLOSED").length})
                 </h3>
@@ -361,7 +359,7 @@ const TicketsPage: React.FC = () => {
                     .map((ticket) => (
                       <div
                         key={ticket.id}
-                        className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-gray-50"
+                        className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -400,15 +398,15 @@ const TicketsPage: React.FC = () => {
                             {/* Solo mostrar botón Reabrir para AGENT y ADMIN */}
                             {(user?.role === "AGENT" ||
                               user?.role === "ADMIN") && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleReopenTicket(ticket.id)}
-                                className="text-blue-600 hover:text-blue-700"
-                              >
-                                Reabrir
-                              </Button>
-                            )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleReopenTicket(ticket.id)}
+                                  className="text-blue-600 hover:text-blue-700"
+                                >
+                                  Reabrir
+                                </Button>
+                              )}
                           </div>
                         </div>
                       </div>
@@ -425,7 +423,7 @@ const TicketsPage: React.FC = () => {
                 Items por página:
               </span>
               <select
-                className="px-2 py-1 border rounded-md text-sm"
+                className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                 value={pageSize}
                 onChange={(e) => {
                   const newSize = Number(e.target.value);

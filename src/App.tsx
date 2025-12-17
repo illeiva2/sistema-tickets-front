@@ -15,7 +15,7 @@ import SetupPasswordPage from "./pages/SetupPasswordPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import OAuthHandler from "./components/OAuthHandler";
 import OAuthWrapper from "./components/OAuthWrapper";
-import OAuthDebug from "./components/OAuthDebug";
+
 import ProtectedRoute, { RoleProtectedRoute } from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -25,7 +25,6 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background">
-        <OAuthDebug />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -47,21 +46,21 @@ function App() {
             <Route path="tickets/new" element={<NewTicketPage />} />
             <Route path="tickets/:id" element={<TicketDetailPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
-            <Route 
-              path="files" 
+            <Route
+              path="files"
               element={
                 <RoleProtectedRoute allowedRoles={["ADMIN", "AGENT"]}>
                   <FileManagementPage />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="users" 
+            <Route
+              path="users"
               element={
                 <RoleProtectedRoute allowedRoles={["ADMIN"]}>
                   <UsersPage />
                 </RoleProtectedRoute>
-              } 
+              }
             />
             <Route path="setup-password" element={<SetupPasswordPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />
