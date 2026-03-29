@@ -13,7 +13,6 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  TrendingUp,
   Users,
   AlertTriangle,
   RefreshCcw,
