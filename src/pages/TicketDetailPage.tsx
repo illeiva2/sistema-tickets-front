@@ -552,7 +552,7 @@ const TicketDetailPage: React.FC = () => {
                       <span className="text-sm px-2 py-1 bg-muted rounded-md w-full">
                         {ticket?.assignee?.name || "Sin asignar"}
                       </span>
-                      {user?.role === "AGENT" && !ticket?.assigneeId && (
+                      {user?.role === "AGENT" && !ticket?.assignee && (
                         <Button
                           size="sm"
                           variant="secondary"
