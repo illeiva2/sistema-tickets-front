@@ -41,6 +41,7 @@ const TicketDetailPage: React.FC = () => {
     Array<{ id: string; name: string; email: string }>
   >([]);
   const [saving, setSaving] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeComment, setCloseComment] = useState("");
 
@@ -163,12 +164,13 @@ const TicketDetailPage: React.FC = () => {
 
   // Función para reclamar ticket (auto-asignación)
   const handleClaimTicket = async () => {
+    if (claiming) return; // Prevenir doble click
     try {
-      setSaving(true);
+      setClaiming(true);
       const response = await api.patch(`/api/tickets/${id}/claim`);
 
       if (response.data.success) {
-        toast.success("Te has asignado el ticket correctamente");
+        toast.success("¡Ticket reclamado! Ahora está asignado a ti.");
         setTicket(response.data.data);
       }
     } catch (error: any) {
@@ -176,7 +178,7 @@ const TicketDetailPage: React.FC = () => {
         error.response?.data?.error?.message || "Error al reclamar el ticket";
       toast.error(message);
     } finally {
-      setSaving(false);
+      setClaiming(false);
     }
   };
 
@@ -557,10 +559,36 @@ const TicketDetailPage: React.FC = () => {
                           size="sm"
                           variant="secondary"
                           onClick={handleClaimTicket}
-                          disabled={saving}
-                          className="w-full text-xs"
+                          disabled={claiming}
+                          className="w-full text-xs flex items-center justify-center gap-2"
                         >
-                          {saving ? "Procesando..." : "Reclamar Ticket"}
+                          {claiming ? (
+                            <>
+                              <svg
+                                className="animate-spin h-3 w-3"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8v8H4z"
+                                />
+                              </svg>
+                              Reclamando...
+                            </>
+                          ) : (
+                            "Reclamar Ticket"
+                          )}
                         </Button>
                       )}
                     </div>
