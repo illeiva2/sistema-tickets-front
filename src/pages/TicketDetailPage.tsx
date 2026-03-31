@@ -141,6 +141,21 @@ const TicketDetailPage: React.FC = () => {
       return;
     }
 
+    try {
+      setSaving(true);
+      const response = await api.post(`/api/tickets/${id}/close`, {
+        comment: closeComment.trim()
+      });
+
+      if (response.data.success) {
+        toast.success("Ticket cerrado correctamente");
+        setTicket(response.data.data);
+        setShowCloseModal(false);
+        setCloseComment("");
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || "Error al cerrar el ticket";
+      toast.error(message);
     } finally {
       setSaving(false);
     }
