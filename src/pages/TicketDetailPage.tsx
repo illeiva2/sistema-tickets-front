@@ -141,21 +141,24 @@ const TicketDetailPage: React.FC = () => {
       return;
     }
 
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Función para reclamar ticket (auto-asignación)
+  const handleClaimTicket = async () => {
     try {
       setSaving(true);
-      const response = await api.post(`/api/tickets/${id}/close`, {
-        comment: closeComment.trim(),
-      });
+      const response = await api.patch(`/api/tickets/${id}/claim`);
 
       if (response.data.success) {
-        toast.success("Ticket cerrado correctamente");
+        toast.success("Te has asignado el ticket correctamente");
         setTicket(response.data.data);
-        setShowCloseModal(false);
-        setCloseComment("");
       }
     } catch (error: any) {
       const message =
-        error.response?.data?.error?.message || "Error al cerrar el ticket";
+        error.response?.data?.error?.message || "Error al reclamar el ticket";
       toast.error(message);
     } finally {
       setSaving(false);
@@ -530,9 +533,22 @@ const TicketDetailPage: React.FC = () => {
                       ))}
                     </select>
                   ) : (
-                    <span className="text-sm px-2 py-1 bg-muted rounded-md">
-                      {ticket?.assignee?.name || "Sin asignar"}
-                    </span>
+                    <div className="flex flex-col space-y-2 w-full">
+                      <span className="text-sm px-2 py-1 bg-muted rounded-md w-full">
+                        {ticket?.assignee?.name || "Sin asignar"}
+                      </span>
+                      {user?.role === "AGENT" && !ticket?.assigneeId && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={handleClaimTicket}
+                          disabled={saving}
+                          className="w-full text-xs"
+                        >
+                          {saving ? "Procesando..." : "Reclamar Ticket"}
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

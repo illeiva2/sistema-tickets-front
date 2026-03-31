@@ -189,20 +189,6 @@ const TicketsPage: React.FC = () => {
               <option value="HIGH">Alta</option>
               <option value="URGENT">Urgente</option>
             </select>
-            {/* Orden */}
-            <select
-              value={(filters as any).sortBy || "createdAt"}
-              onChange={(e) =>
-                setFilters({ ...filters, sortBy: e.target.value as any })
-              }
-              className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-            >
-              <option value="createdAt">Fecha creación</option>
-              <option value="updatedAt">Fecha actualización</option>
-              <option value="title">Título</option>
-              <option value="priority">Prioridad</option>
-              <option value="status">Estado</option>
-            </select>
             <select
               value={(filters as any).sortDir || "desc"}
               onChange={(e) =>
@@ -213,6 +199,21 @@ const TicketsPage: React.FC = () => {
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
             </select>
+
+            {/* Nuevo filtro de asignación */}
+            {(user?.role === "ADMIN" || user?.role === "AGENT") && (
+              <select
+                value={(filters as any).assigneeId || ""}
+                onChange={(e) =>
+                  setFilters({ ...filters, assigneeId: e.target.value })
+                }
+                className="px-3 py-2 border rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              >
+                <option value="">Cualquier asignación</option>
+                <option value="null">Sin asignar</option>
+                <option value={user.id}>Asignados a mí</option>
+              </select>
+            )}
 
             <Button
               variant="outline"
@@ -333,6 +334,26 @@ const TicketsPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex space-x-2">
+                            {user?.role === "AGENT" && !ticket.assigneeId && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    const resp = await api.patch(`/api/tickets/${ticket.id}/claim`);
+                                    if (resp.data.success) {
+                                      toast.success("Ticket reclamado correctamente");
+                                      fetchTickets({ filters, page, pageSize });
+                                    }
+                                  } catch (error: any) {
+                                    toast.error(error.response?.data?.error?.message || "Error al reclamar ticket");
+                                  }
+                                }}
+                              >
+                                Reclamar
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
