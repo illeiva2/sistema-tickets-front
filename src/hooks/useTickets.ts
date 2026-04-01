@@ -9,6 +9,7 @@ interface Ticket {
   description: string;
   status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  isRead: boolean;
   requesterId: string;
   assigneeId?: string;
   closedAt?: string;
@@ -178,7 +179,15 @@ export const useTickets = () => {
     async (id: string): Promise<Ticket | null> => {
       try {
         const response = await api.get(`/api/tickets/${id}`);
-        return response.data.data;
+        const ticket = response.data.data;
+        // Notificar a otras instancias del hook que este ticket fue leído
+        if (ticket) {
+          window.dispatchEvent(new CustomEvent("ticket:read", { detail: { id } }));
+          setTickets((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, isRead: true } : t)),
+          );
+        }
+        return ticket;
       } catch (error: any) {
         const message =
           error.response?.data?.error?.message || "Error al cargar ticket";

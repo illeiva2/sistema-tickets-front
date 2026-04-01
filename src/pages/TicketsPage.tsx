@@ -313,12 +313,23 @@ const TicketsPage: React.FC = () => {
     setSearchParams(sp, { replace: true });
   }, [filters, page, pageSize, setSearchParams, sortBy, sortDir]);
 
+  // Escuchar cuando se abre el detalle de un ticket para marcarlo como leído en la lista
+  React.useEffect(() => {
+    const handler = () => {
+      fetchTickets({ filters, page, pageSize });
+    };
+    window.addEventListener("ticket:read", handler);
+    return () => window.removeEventListener("ticket:read", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, page, pageSize]);
+
   const activeTickets = tickets?.filter((t: any) => t.status === "OPEN" || t.status === "IN_PROGRESS") ?? [];
   const resolvedTickets = tickets?.filter((t: any) => t.status === "RESOLVED") ?? [];
   const closedTickets = tickets?.filter((t: any) => t.status === "CLOSED") ?? [];
 
   const isAgentOrAdmin = user?.role === "AGENT" || user?.role === "ADMIN";
   const isAgent = user?.role === "AGENT";
+
 
   return (
     <div className="space-y-4">
