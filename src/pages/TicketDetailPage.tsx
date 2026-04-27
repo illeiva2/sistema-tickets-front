@@ -18,6 +18,10 @@ import {
   User,
   Calendar,
   Clock,
+  UserPlus,
+  CheckCircle,
+  Lock,
+  RotateCcw,
 } from "lucide-react";
 import { useTickets, useAuth } from "../hooks";
 import FileUploadZone from "../components/FileUploadZone";
@@ -45,24 +49,27 @@ const TicketDetailPage: React.FC = () => {
   const [claiming, setClaiming] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeComment, setCloseComment] = useState("");
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolveComment, setResolveComment] = useState("");
+  const [showReopenModal, setShowReopenModal] = useState(false);
+  const [reopenComment, setReopenComment] = useState("");
 
-  // Estado para el modal de edición
+  // Estado para el modal de edición. El status ya no se edita aquí: se
+  // controla con los botones de transición (Tomar / Resolver / Cerrar /
+  // Reabrir) en la sidebar de Información.
   const [showEditModal, setShowEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState({
     title: "",
     description: "",
     priority: "MEDIUM",
-    status: "OPEN"
   });
 
-  // Función para abrir el modal de edición con los datos actuales
   const openEditModal = () => {
     if (ticket) {
       setEditFormData({
         title: ticket.title || "",
         description: ticket.description || "",
         priority: ticket.priority || "MEDIUM",
-        status: ticket.status || "OPEN"
       });
       setShowEditModal(true);
     }
@@ -161,13 +168,11 @@ const TicketDetailPage: React.FC = () => {
     }
   };
 
-  // Función para reclamar ticket (auto-asignación)
   const handleClaimTicket = async () => {
-    if (claiming) return; // Prevenir doble click
+    if (claiming) return;
     try {
       setClaiming(true);
       const response = await api.patch(`/api/tickets/${id}/claim`);
-
       if (response.data.success) {
         toast.success("¡Ticket reclamado! Ahora está asignado a ti.");
         setTicket(response.data.data);
@@ -178,6 +183,52 @@ const TicketDetailPage: React.FC = () => {
       toast.error(message);
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const handleResolveTicket = async () => {
+    try {
+      setSaving(true);
+      const response = await api.post(`/api/tickets/${id}/resolve`, {
+        comment: resolveComment.trim() || undefined,
+      });
+      if (response.data.success) {
+        toast.success("Ticket resuelto");
+        setTicket(response.data.data);
+        setShowResolveModal(false);
+        setResolveComment("");
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error?.message || "Error al resolver el ticket";
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReopenTicket = async () => {
+    if (!reopenComment.trim()) {
+      toast.error("Debes proporcionar un comentario para reabrir el ticket");
+      return;
+    }
+    try {
+      setSaving(true);
+      const response = await api.post(`/api/tickets/${id}/reopen`, {
+        comment: reopenComment.trim(),
+      });
+      if (response.data.success) {
+        toast.success("Ticket reabierto");
+        setTicket(response.data.data);
+        setShowReopenModal(false);
+        setReopenComment("");
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error?.message || "Error al reabrir el ticket";
+      toast.error(message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -406,61 +457,113 @@ const TicketDetailPage: React.FC = () => {
                 <label className="text-xs font-medium text-muted-foreground">
                   Estado
                 </label>
-                <div className="flex items-center space-x-2">
-                  {user?.role === "USER" ? (
-                    <div className="flex items-center space-x-2">
-                      <Badge
-                        variant={
-                          ticket?.status === "CLOSED" ? "default" : "secondary"
-                        }
-                        className="px-3 py-1 text-sm font-medium"
-                      >
-                        {statusLabel(ticket?.status)}
-                      </Badge>
-                      {ticket?.status !== "CLOSED" && (
+                <div className="flex flex-col gap-2">
+                  <Badge
+                    variant={
+                      ticket?.status === "CLOSED" ? "default" : "secondary"
+                    }
+                    className="px-3 py-1 text-sm font-medium w-fit"
+                  >
+                    {statusLabel(ticket?.status)}
+                  </Badge>
+                  {(() => {
+                    if (!ticket || !user) return null;
+                    const status = ticket.status;
+                    const role = user.role;
+                    const isRequester = ticket.requester?.id === user.id;
+                    const isStaff = role === "AGENT" || role === "ADMIN";
+                    const buttons: React.ReactNode[] = [];
+
+                    if (
+                      isStaff &&
+                      !ticket.assignee &&
+                      (status === "OPEN" || status === "IN_PROGRESS")
+                    ) {
+                      buttons.push(
                         <Button
+                          key="claim"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleClaimTicket}
+                          disabled={claiming || saving}
+                          className="justify-start"
+                        >
+                          <UserPlus size={14} className="mr-2" />
+                          Tomar ticket
+                        </Button>,
+                      );
+                    }
+
+                    if (
+                      isStaff &&
+                      (status === "OPEN" || status === "IN_PROGRESS")
+                    ) {
+                      buttons.push(
+                        <Button
+                          key="resolve"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowResolveModal(true)}
+                          disabled={saving}
+                          className="justify-start text-emerald-700 hover:text-emerald-800 dark:text-emerald-400"
+                        >
+                          <CheckCircle size={14} className="mr-2" />
+                          Resolver
+                        </Button>,
+                      );
+                    }
+
+                    if (
+                      (status === "IN_PROGRESS" || status === "RESOLVED") &&
+                      (isRequester || role === "ADMIN")
+                    ) {
+                      buttons.push(
+                        <Button
+                          key="close"
                           size="sm"
                           variant="outline"
                           onClick={() => setShowCloseModal(true)}
+                          disabled={saving}
+                          className="justify-start"
                         >
-                          Cerrar Ticket
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <select
-                        className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                        value={ticket?.status || "OPEN"}
-                        onChange={async (e) => {
-                          if (!ticket) return;
-                          setSaving(true);
-                          try {
-                            const resp = await api.patch(
-                              `/api/tickets/${ticket.id}`,
-                              { status: e.target.value },
-                            );
-                            setTicket((prev: any) => ({
-                              ...(prev || {}),
-                              ...(resp.data?.data || {}),
-                            }));
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
-                      >
-                        <option value="OPEN">Abierto</option>
-                        <option value="IN_PROGRESS">En progreso</option>
-                        <option value="RESOLVED">Resuelto</option>
-                        <option value="CLOSED">Cerrado</option>
-                      </select>
-                      {saving && (
-                        <span className="text-xs text-muted-foreground">
-                          Guardando...
-                        </span>
-                      )}
-                    </>
-                  )}
+                          <Lock size={14} className="mr-2" />
+                          Cerrar
+                        </Button>,
+                      );
+                    }
+
+                    if (
+                      isStaff &&
+                      (status === "RESOLVED" || status === "CLOSED")
+                    ) {
+                      buttons.push(
+                        <Button
+                          key="reopen"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowReopenModal(true)}
+                          disabled={saving}
+                          className="justify-start"
+                        >
+                          <RotateCcw size={14} className="mr-2" />
+                          Reabrir
+                        </Button>,
+                      );
+                    }
+
+                    if (buttons.length === 0) return null;
+
+                    return (
+                      <div className="flex flex-col gap-2">
+                        {buttons}
+                        {saving && (
+                          <span className="text-xs text-muted-foreground">
+                            Guardando...
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -677,6 +780,92 @@ const TicketDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Modal para resolver ticket */}
+      {showResolveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Resolver Ticket
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Marcá este ticket como resuelto. Podés agregar una nota
+              opcional describiendo cómo se resolvió.
+            </p>
+
+            <textarea
+              value={resolveComment}
+              onChange={(e) => setResolveComment(e.target.value)}
+              placeholder="Nota de resolución (opcional)…"
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md mb-4 min-h-[100px] resize-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            />
+
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => {
+                  setShowResolveModal(false);
+                  setResolveComment("");
+                }}
+                variant="outline"
+                className="flex-1"
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleResolveTicket}
+                className="flex-1"
+                disabled={saving}
+              >
+                {saving ? "Resolviendo…" : "Resolver"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para reabrir ticket */}
+      {showReopenModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Reabrir Ticket
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Indicá por qué se reabre el ticket. Si tenía agente asignado,
+              vuelve directamente a "En progreso".
+            </p>
+
+            <textarea
+              value={reopenComment}
+              onChange={(e) => setReopenComment(e.target.value)}
+              placeholder="Motivo de la reapertura…"
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md mb-4 min-h-[100px] resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            />
+
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => {
+                  setShowReopenModal(false);
+                  setReopenComment("");
+                }}
+                variant="outline"
+                className="flex-1"
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleReopenTicket}
+                className="flex-1"
+                disabled={!reopenComment.trim() || saving}
+              >
+                {saving ? "Reabriendo…" : "Reabrir"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal para cerrar ticket */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -749,38 +938,20 @@ const TicketDetailPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Prioridad
-                  </label>
-                  <select
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
-                    value={editFormData.priority}
-                    onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
-                  >
-                    <option value="LOW">Baja</option>
-                    <option value="MEDIUM">Media</option>
-                    <option value="HIGH">Alta</option>
-                    <option value="URGENT">Urgente</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Estado
-                  </label>
-                  <select
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                  >
-                    <option value="OPEN">Abierto</option>
-                    <option value="IN_PROGRESS">En Progreso</option>
-                    <option value="RESOLVED">Resuelto</option>
-                    <option value="CLOSED">Cerrado</option>
-                  </select>
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Prioridad
+                </label>
+                <select
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
+                  value={editFormData.priority}
+                  onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                >
+                  <option value="LOW">Baja</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="HIGH">Alta</option>
+                  <option value="URGENT">Urgente</option>
+                </select>
               </div>
             </div>
 
