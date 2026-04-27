@@ -20,12 +20,14 @@ import ProtectedRoute, { RoleProtectedRoute } from "./components/ProtectedRoute"
 import Layout from "./components/Layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
+import { AuthProvider } from "./contexts/AuthContext";
 
 function App() {
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-background">
-        <Routes>
+      <AuthProvider>
+        <div className="min-h-screen bg-background">
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
@@ -65,9 +67,10 @@ function App() {
             <Route path="setup-password" element={<SetupPasswordPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />
           </Route>
-        </Routes>
-        <Toaster position="top-right" />
-      </div>
+          </Routes>
+          <Toaster position="top-right" />
+        </div>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
