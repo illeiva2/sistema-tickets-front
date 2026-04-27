@@ -3,6 +3,7 @@ import axios, {
   AxiosRequestConfig,
   InternalAxiosRequestConfig,
 } from "axios";
+import toast from "react-hot-toast";
 
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -34,6 +35,15 @@ const AUTH_BYPASS_PATHS = [
 type RetryableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
 let refreshPromise: Promise<string> | null = null;
+let lastRateLimitToastAt = 0;
+const RATE_LIMIT_TOAST_COOLDOWN_MS = 5000;
+
+const notifyRateLimited = () => {
+  const now = Date.now();
+  if (now - lastRateLimitToastAt < RATE_LIMIT_TOAST_COOLDOWN_MS) return;
+  lastRateLimitToastAt = now;
+  toast.error("Demasiadas solicitudes, esperá unos segundos.");
+};
 
 const isAuthBypassed = (url: string | undefined) => {
   if (!url) return false;
@@ -78,6 +88,11 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const status = error.response?.status;
     const original = error.config as RetryableConfig | undefined;
+
+    if (status === 429) {
+      notifyRateLimited();
+      return Promise.reject(error);
+    }
 
     if (status === 401 && original && !original._retried && !isAuthBypassed(original.url)) {
       original._retried = true;
