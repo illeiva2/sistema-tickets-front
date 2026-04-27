@@ -24,6 +24,7 @@ import FileUploadZone from "../components/FileUploadZone";
 import AdvancedFilePreview from "../components/AdvancedFilePreview";
 import api from "../lib/api";
 import toast from "react-hot-toast";
+import { statusLabel, priorityLabel } from "../constants/ticketLabels";
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -288,7 +289,7 @@ const TicketDetailPage: React.FC = () => {
                   {ticket?.title || `Ticket ${id}`}
                 </span>
                 <Badge variant="secondary" className="px-2 py-1 text-sm">
-                  {ticket?.status || "OPEN"}
+                  {statusLabel(ticket?.status)}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -414,10 +415,7 @@ const TicketDetailPage: React.FC = () => {
                         }
                         className="px-3 py-1 text-sm font-medium"
                       >
-                        {ticket?.status === "OPEN" && "Abierto"}
-                        {ticket?.status === "IN_PROGRESS" && "En progreso"}
-                        {ticket?.status === "RESOLVED" && "Resuelto"}
-                        {ticket?.status === "CLOSED" && "Cerrado"}
+                        {statusLabel(ticket?.status)}
                       </Badge>
                       {ticket?.status !== "CLOSED" && (
                         <Button
@@ -476,10 +474,7 @@ const TicketDetailPage: React.FC = () => {
                       variant="secondary"
                       className="px-3 py-1 text-sm font-medium"
                     >
-                      {ticket?.priority === "LOW" && "Baja"}
-                      {ticket?.priority === "MEDIUM" && "Media"}
-                      {ticket?.priority === "HIGH" && "Alta"}
-                      {ticket?.priority === "URGENT" && "Urgente"}
+                      {priorityLabel(ticket?.priority)}
                     </Badge>
                   ) : (
                     <select
