@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   Button,
   Card,
@@ -21,9 +22,11 @@ import {
   Code,
   Eye,
   Download,
+  Ticket as TicketIcon,
 } from "lucide-react";
 import api from "../lib/api";
 import toast from "react-hot-toast";
+import { useAuth } from "../hooks";
 
 interface FileCategory {
   id: string;
@@ -64,10 +67,13 @@ interface FileInfo {
 }
 
 export const FileManagementPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const [categories, setCategories] = useState<FileCategory[]>([]);
   const [tags, setTags] = useState<FileTag[]>([]);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FileCategory | null>(
@@ -223,11 +229,11 @@ export const FileManagementPage: React.FC = () => {
     }
   };
 
-  // Buscar archivos
-  const searchFiles = async () => {
+  // Buscar archivos en server (debounced via useEffect en searchQuery).
+  const searchFiles = async (query: string) => {
     try {
       const response = await api.get(
-        `/api/file-organization/search?query=${encodeURIComponent(searchQuery)}`,
+        `/api/file-organization/search?query=${encodeURIComponent(query)}`,
       );
       setFiles(response.data.data || []);
     } catch (error) {
@@ -235,6 +241,49 @@ export const FileManagementPage: React.FC = () => {
       toast.error("Error al buscar archivos");
     }
   };
+
+  // Debounce: cuando cambia searchQuery espera 300ms y dispara la búsqueda.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      searchFiles(searchQuery);
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  const handleDeleteFile = async (file: FileInfo) => {
+    if (
+      !confirm(
+        `¿Eliminar definitivamente "${file.fileName}"? Esta acción no se puede deshacer.`,
+      )
+    )
+      return;
+
+    try {
+      await api.delete(`/api/attachments/${file.id}`);
+      setFiles((prev) => prev.filter((f) => f.id !== file.id));
+      toast.success("Archivo eliminado");
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error?.message || "Error al eliminar el archivo";
+      toast.error(message);
+    }
+  };
+
+  // Filtrado client-side por categoría + ordenamiento por fecha desc.
+  const visibleFiles = useMemo(() => {
+    let list = files;
+    if (categoryFilter) {
+      list = list.filter(
+        (f) =>
+          (f.organization?.categoryId ?? "__uncategorized") === categoryFilter,
+      );
+    }
+    return [...list].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [files, categoryFilter]);
 
   // Editar categoría
   const editCategory = (category: FileCategory) => {
@@ -303,8 +352,21 @@ export const FileManagementPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Cargando...</div>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="h-8 w-64 bg-muted rounded animate-pulse" />
+        <div className="h-10 w-full bg-muted rounded animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-48 bg-muted rounded animate-pulse" />
+          <div className="h-48 bg-muted rounded animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-14 bg-muted rounded animate-pulse"
+            />
+          ))}
+        </div>
       </div>
     );
   }
@@ -325,18 +387,33 @@ export const FileManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Búsqueda */}
-      <div className="flex space-x-2">
-        <Input
-          placeholder="Buscar archivos..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1"
-        />
-        <Button onClick={searchFiles}>
-          <Search size={16} className="mr-2" />
-          Buscar
-        </Button>
+      {/* Búsqueda + filtros */}
+      <div className="flex flex-col md:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            placeholder="Buscar archivos por nombre…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 md:w-64"
+        >
+          <option value="">Todas las categorías</option>
+          <option value="__uncategorized">Sin categoría</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.icon} {c.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -457,11 +534,21 @@ export const FileManagementPage: React.FC = () => {
       {/* Archivos */}
       <Card>
         <CardHeader>
-          <CardTitle>Archivos ({files.length})</CardTitle>
+          <CardTitle>
+            Archivos ({visibleFiles.length}
+            {visibleFiles.length !== files.length ? ` de ${files.length}` : ""})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {files.map((file) => {
+            {visibleFiles.length === 0 && (
+              <div className="text-center text-muted-foreground py-6 text-sm">
+                {searchQuery || categoryFilter
+                  ? "No se encontraron archivos con esos filtros."
+                  : "Todavía no hay archivos."}
+              </div>
+            )}
+            {visibleFiles.map((file) => {
               // Resolver categoría
               const categoryId = file.organization?.categoryId;
               const category = categoryId
@@ -553,6 +640,17 @@ export const FileManagementPage: React.FC = () => {
                       </Badge>
                     ))}
 
+                    {file.ticketId && (
+                      <Link
+                        to={`/tickets/${file.ticketId}`}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        title="Ir al ticket"
+                      >
+                        <TicketIcon size={12} />
+                        <span>Ticket</span>
+                      </Link>
+                    )}
+
                     <div className="flex items-center space-x-1 ml-2 pl-2 border-l">
                       <Button
                         variant="ghost"
@@ -570,16 +668,22 @@ export const FileManagementPage: React.FC = () => {
                       >
                         <Download size={16} />
                       </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteFile(file)}
+                          title="Eliminar"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
               );
             })}
-            {files.length === 0 && (
-              <div className="text-center text-muted-foreground py-4">
-                No se encontraron archivos
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
