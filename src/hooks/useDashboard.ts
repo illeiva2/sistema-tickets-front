@@ -53,7 +53,6 @@ export const useDashboard = () => {
   }, [user?.role]);
 
   useEffect(() => {
-    console.log("useDashboard useEffect triggered, user:", user?.role);
     if (user) {
       fetchDashboardStats();
     }

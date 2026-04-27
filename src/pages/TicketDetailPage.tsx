@@ -100,9 +100,7 @@ const TicketDetailPage: React.FC = () => {
       if (!id) return;
       try {
         setIsLoading(true);
-        console.log("Loading ticket with ID:", id);
         const t = await getTicketById(id);
-        console.log("Ticket loaded:", t);
         if (!cancelled) {
           setTicket(t);
           setIsLoading(false);

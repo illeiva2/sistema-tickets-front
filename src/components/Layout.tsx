@@ -133,19 +133,6 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
-  // Solo cargar notificaciones si el usuario está autenticado
-  React.useEffect(() => {
-    if (user) {
-      // El hook se ejecutará automáticamente
-      console.log("Layout: User authenticated, notifications should load");
-    }
-  }, [user]);
-
-  // Debug: log unreadCount changes
-  React.useEffect(() => {
-    console.log("Layout: unreadCount changed to:", unreadCount);
-  }, [unreadCount]);
-
   const handleLogout = () => {
     logout();
   };

@@ -107,11 +107,6 @@ export const FileManagementPage: React.FC = () => {
 
       setCategories(categoriesRes.data.data || []);
       setTags(tagsRes.data.data || []);
-
-      console.log("🔍 API Response - Files:", filesRes.data);
-      console.log("🔍 API Response - Categories:", categoriesRes.data);
-      console.log("🔍 API Response - Tags:", tagsRes.data);
-
       setFiles(filesRes.data.data || []);
     } catch (error) {
       console.error("Error loading data:", error);

@@ -6,7 +6,6 @@ export const clearAuthData = () => {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
   localStorage.removeItem("user");
-  console.log("🧹 Datos de autenticación limpiados del localStorage");
 };
 
 /**
