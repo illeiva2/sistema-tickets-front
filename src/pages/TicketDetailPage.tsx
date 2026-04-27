@@ -514,8 +514,8 @@ const TicketDetailPage: React.FC = () => {
                     }
 
                     if (
-                      (status === "IN_PROGRESS" || status === "RESOLVED") &&
-                      (isRequester || role === "ADMIN")
+                      status !== "CLOSED" &&
+                      (isRequester || isStaff)
                     ) {
                       buttons.push(
                         <Button
