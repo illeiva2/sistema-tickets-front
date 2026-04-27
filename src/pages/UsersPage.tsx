@@ -19,6 +19,7 @@ import {
   Eye,
   RefreshCw,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "../hooks";
 import api from "../lib/api";
@@ -30,6 +31,8 @@ interface User {
   name: string;
   email: string;
   role: "USER" | "AGENT" | "ADMIN";
+  isActive: boolean;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
   _count: {
@@ -57,6 +60,7 @@ export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
@@ -80,12 +84,15 @@ export const UsersPage: React.FC = () => {
     if (isAdmin) {
       fetchUsers();
     }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, showInactive]);
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get("/api/users");
+      const response = await api.get(
+        `/api/users${showInactive ? "?includeInactive=true" : ""}`,
+      );
       if (response.data.success) {
         setUsers(response.data.data);
       }
@@ -149,17 +156,36 @@ export const UsersPage: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este usuario?")) return;
+    if (
+      !confirm(
+        "Esta acción desactiva al usuario: no podrá iniciar sesión, pero sus tickets y comentarios se conservan. ¿Confirmás?",
+      )
+    )
+      return;
 
     try {
       const response = await api.delete(`/api/users/${userId}`);
       if (response.data.success) {
-        toast.success("Usuario eliminado correctamente");
+        toast.success("Usuario desactivado correctamente");
         fetchUsers();
       }
     } catch (error: any) {
       const message =
-        error.response?.data?.error?.message || "Error al eliminar usuario";
+        error.response?.data?.error?.message || "Error al desactivar usuario";
+      toast.error(message);
+    }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+    try {
+      const response = await api.post(`/api/users/${userId}/restore`);
+      if (response.data.success) {
+        toast.success("Usuario reactivado correctamente");
+        fetchUsers();
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error?.message || "Error al reactivar usuario";
       toast.error(message);
     }
   };
@@ -316,6 +342,15 @@ export const UsersPage: React.FC = () => {
                 className="pl-10"
               />
             </div>
+            <label className="flex items-center space-x-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span>Mostrar inactivos</span>
+            </label>
             <Button
               variant="outline"
               size="sm"
@@ -331,71 +366,105 @@ export const UsersPage: React.FC = () => {
 
       {/* Lista de Usuarios */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredUsers.map((user) => (
-          <Card key={user.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{user.name}</CardTitle>
-                <div className="ml-4">{getRoleBadge(user.role)}</div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-sm text-muted-foreground">{user.email}</div>
+        {filteredUsers.map((user) => {
+          const isInactive = !user.isActive;
+          return (
+            <Card
+              key={user.id}
+              className={`hover:shadow-md transition-shadow ${
+                isInactive ? "opacity-60" : ""
+              }`}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{user.name}</CardTitle>
+                  <div className="ml-4 flex items-center gap-2">
+                    {isInactive && (
+                      <Badge
+                        variant="outline"
+                        className="bg-gray-100 text-gray-600 border-gray-300 px-2 py-0.5 text-xs"
+                      >
+                        Inactivo
+                      </Badge>
+                    )}
+                    {getRoleBadge(user.role)}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm text-muted-foreground">{user.email}</div>
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Tickets solicitados: {user._count.requestedTickets}</span>
-                <span>Asignados: {user._count.assignedTickets}</span>
-              </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Tickets solicitados: {user._count.requestedTickets}</span>
+                  <span>Asignados: {user._count.assignedTickets}</span>
+                </div>
 
-              <div className="text-xs text-muted-foreground">
-                Creado: {new Date(user.createdAt).toLocaleDateString()}
-              </div>
+                <div className="text-xs text-muted-foreground">
+                  {isInactive && user.deletedAt
+                    ? `Desactivado: ${new Date(user.deletedAt).toLocaleDateString()}`
+                    : `Creado: ${new Date(user.createdAt).toLocaleDateString()}`}
+                </div>
 
-              <div className="flex space-x-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditModal(user)}
-                  className="flex-1"
-                >
-                  <Edit size={14} className="mr-1" />
-                  Editar
-                </Button>
-                {user.id === currentUser?.id ? (
+                <div className="flex space-x-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => openPasswordModal(user)}
+                    onClick={() => openEditModal(user)}
                     className="flex-1"
+                    disabled={isInactive}
                   >
-                    <Eye size={14} className="mr-1" />
-                    Cambiar Contraseña
+                    <Edit size={14} className="mr-1" />
+                    Editar
                   </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openPasswordModal(user)}
-                    className="flex-1"
-                  >
-                    <RefreshCw size={14} className="mr-1" />
-                    Blanquear Contraseña
-                  </Button>
-                )}
-                {user.id !== currentUser?.id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  {user.id === currentUser?.id ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordModal(user)}
+                      className="flex-1"
+                    >
+                      <Eye size={14} className="mr-1" />
+                      Cambiar Contraseña
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordModal(user)}
+                      className="flex-1"
+                      disabled={isInactive}
+                    >
+                      <RefreshCw size={14} className="mr-1" />
+                      Blanquear Contraseña
+                    </Button>
+                  )}
+                  {user.id !== currentUser?.id &&
+                    (isInactive ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRestoreUser(user.id)}
+                        className="text-emerald-600 hover:text-emerald-700"
+                        title="Reactivar usuario"
+                      >
+                        <RotateCcw size={14} />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="text-red-600 hover:text-red-700"
+                        title="Desactivar usuario"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Modal Crear Usuario */}
