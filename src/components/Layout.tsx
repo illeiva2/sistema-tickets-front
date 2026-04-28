@@ -19,6 +19,8 @@ import {
   User,
   ChevronDown,
   Settings,
+  Menu,
+  X,
 } from "lucide-react";
 import { useAuth, useTickets } from "../hooks";
 import { useNotificationsContext } from "../contexts/NotificationsContext";
@@ -28,10 +30,12 @@ const NavLink = ({
   to,
   children,
   icon,
+  onNavigate,
 }: {
   to: string;
   children: React.ReactNode;
   icon: React.ReactNode;
+  onNavigate?: () => void;
 }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -39,6 +43,7 @@ const NavLink = ({
   return (
     <Link
       to={to}
+      onClick={onNavigate}
       className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${isActive
         ? "bg-primary text-primary-foreground shadow-sm"
         : "text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
@@ -131,7 +136,9 @@ const Layout: React.FC = () => {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotificationsContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
 
   const handleLogout = () => {
     logout();
@@ -141,7 +148,7 @@ const Layout: React.FC = () => {
     navigate("/change-password");
   };
 
-  // Cerrar menú cuando se hace clic fuera
+  // Cerrar menú de usuario cuando se hace clic fuera.
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -156,6 +163,11 @@ const Layout: React.FC = () => {
 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isUserMenuOpen]);
+
+  // Cerrar el drawer mobile al navegar a una ruta nueva.
+  React.useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [location.pathname]);
 
   // Dark mode toggle (simple)
   const [dark, setDark] = React.useState<boolean>(
@@ -174,12 +186,13 @@ const Layout: React.FC = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75 shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between bg-blue-200 dark:bg-gray-900 border-b dark:border-gray-800 transition-colors">
-          <div className="flex items-center space-x-6">
-            <h1 className="text-xl font-bold text-primary tracking-tight">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between bg-blue-200 dark:bg-gray-900 border-b dark:border-gray-800 transition-colors gap-2">
+          <div className="flex items-center space-x-6 min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-primary tracking-tight whitespace-nowrap">
               Empresa Tickets
             </h1>
-            <nav className="flex items-center space-x-1">
+            {/* Nav horizontal en desktop */}
+            <nav className="hidden lg:flex items-center space-x-1">
               <NavLink to="/" icon={<BarChart3 size={16} />}>
                 Dashboard
               </NavLink>
@@ -209,13 +222,13 @@ const Layout: React.FC = () => {
               )}
             </nav>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2 shrink-0">
             {/* User Dropdown Menu */}
             <div className="relative user-menu">
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center space-x-2 px-3 py-2"
+                className="flex items-center space-x-2 px-2 sm:px-3 py-2"
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               >
                 <User size={16} />
@@ -229,7 +242,6 @@ const Layout: React.FC = () => {
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                   <div className="py-2">
-                    {/* User Info */}
                     <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
                         {user?.name || "Usuario"}
@@ -242,7 +254,6 @@ const Layout: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* Menu Items */}
                     <div className="py-1">
                       <button
                         onClick={handleChangePassword}
@@ -253,7 +264,6 @@ const Layout: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Logout */}
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-1">
                       <button
                         onClick={handleLogout}
@@ -268,16 +278,94 @@ const Layout: React.FC = () => {
               )}
             </div>
 
+            {/* Toggle dark visible solo en desktop. En mobile va al drawer. */}
             <Button
               variant="outline"
               size="sm"
-              className="px-2 py-1 text-sm"
+              className="hidden lg:inline-flex px-2 py-1 text-sm"
               onClick={() => setDark(!dark)}
             >
               {dark ? "Light" : "Dark"}
             </Button>
+
+            {/* Botón hamburguesa visible solo en mobile/tablet */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="lg:hidden px-2 py-2"
+              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+              aria-label="Abrir menú"
+            >
+              {isMobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+            </Button>
           </div>
         </div>
+
+        {/* Drawer mobile */}
+        {isMobileNavOpen && (
+          <div className="lg:hidden border-t bg-card dark:bg-gray-900">
+            <div className="container mx-auto px-4 py-3 flex flex-col gap-1">
+              <NavLink
+                to="/"
+                icon={<BarChart3 size={16} />}
+                onNavigate={() => setIsMobileNavOpen(false)}
+              >
+                Dashboard
+              </NavLink>
+              <NavLink
+                to="/tickets"
+                icon={<Ticket size={16} />}
+                onNavigate={() => setIsMobileNavOpen(false)}
+              >
+                Tickets
+              </NavLink>
+              <NavLink
+                to="/tickets/new"
+                icon={<Plus size={16} />}
+                onNavigate={() => setIsMobileNavOpen(false)}
+              >
+                Nuevo Ticket
+              </NavLink>
+              {(user?.role === "ADMIN" || user?.role === "AGENT") && (
+                <NavLink
+                  to="/files"
+                  icon={<Folder size={16} />}
+                  onNavigate={() => setIsMobileNavOpen(false)}
+                >
+                  Archivos
+                </NavLink>
+              )}
+              <NavLink
+                to="/notifications"
+                icon={<Mail size={16} />}
+                onNavigate={() => setIsMobileNavOpen(false)}
+              >
+                Notificaciones
+                {unreadCount > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-red-500 rounded-full">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </NavLink>
+              {user?.role === "ADMIN" && (
+                <NavLink
+                  to="/users"
+                  icon={<Users size={16} />}
+                  onNavigate={() => setIsMobileNavOpen(false)}
+                >
+                  Usuarios
+                </NavLink>
+              )}
+              <button
+                onClick={() => setDark(!dark)}
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors"
+              >
+                <Settings size={16} />
+                <span>{dark ? "Modo claro" : "Modo oscuro"}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
