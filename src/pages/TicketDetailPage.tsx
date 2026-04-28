@@ -292,9 +292,9 @@ const TicketDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
-          className="px-2 py-1 text-sm"
+          className="px-2 py-1 text-sm shrink-0"
           variant="outline"
           size="sm"
           onClick={() => navigate("/tickets")}
@@ -302,31 +302,29 @@ const TicketDetailPage: React.FC = () => {
           <ArrowLeft size={16} className="mr-2" />
           Volver
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold px-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">
             Ticket #
             {ticket?.ticketNumber
               ? formatTicketNumber(ticket.ticketNumber)
               : "..."}
           </h1>
-          <h2 className="text-muted-foreground px-2 pt-1">
+          <h2 className="text-sm text-muted-foreground">
             Detalles del ticket
           </h2>
         </div>
         {isAdmin && (
-          <div className="ml-auto flex space-x-2">
-            <Button
-              variant="outline"
-              className="px-2 py-1 text-sm"
-              size="sm"
-              onClick={() => {
-                openEditModal();
-              }}
-            >
-              <Edit size={16} className="mr-2" />
-              Editar
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            className="px-2 py-1 text-sm shrink-0"
+            size="sm"
+            onClick={() => {
+              openEditModal();
+            }}
+          >
+            <Edit size={16} className="mr-2" />
+            Editar
+          </Button>
         )}
       </div>
 

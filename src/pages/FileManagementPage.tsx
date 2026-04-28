@@ -372,15 +372,15 @@ export const FileManagementPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Gestión de Archivos</h1>
-        <div className="flex space-x-2">
-          <Button onClick={() => setShowCategoryModal(true)}>
+    <div className="container mx-auto p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Archivos</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setShowCategoryModal(true)} className="flex-1 sm:flex-initial">
             <Plus size={16} className="mr-2" />
             Nueva Categoría
           </Button>
-          <Button onClick={() => setShowTagModal(true)} variant="outline">
+          <Button onClick={() => setShowTagModal(true)} variant="outline" className="flex-1 sm:flex-initial">
             <Plus size={16} className="mr-2" />
             Nueva Etiqueta
           </Button>
@@ -596,7 +596,7 @@ export const FileManagementPage: React.FC = () => {
               return (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
                     {getFileIcon(file.mimeType)}
@@ -604,17 +604,17 @@ export const FileManagementPage: React.FC = () => {
                       <div className="font-medium truncate" title={file.fileName}>
                         {file.fileName}
                       </div>
-                      <div className="text-sm text-muted-foreground flex items-center space-x-2">
-                        <span>{formatFileSize(file.sizeBytes)}</span>
-                        <span>•</span>
-                        <span className="truncate">{file.mimeType}</span>
-                        <span>•</span>
-                        <span>{new Date(file.createdAt).toLocaleDateString()}</span>
+                      <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                        <span className="shrink-0">{formatFileSize(file.sizeBytes)}</span>
+                        <span className="opacity-50">•</span>
+                        <span className="truncate min-w-0">{file.mimeType}</span>
+                        <span className="opacity-50">•</span>
+                        <span className="shrink-0">{new Date(file.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 ml-4">
+                  <div className="flex items-center gap-2 ml-0 sm:ml-4 flex-wrap">
                     {category && (
                       <Badge
                         variant="secondary"

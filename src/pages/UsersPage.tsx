@@ -312,14 +312,14 @@ export const UsersPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Usuarios</h1>
           <p className="text-muted-foreground">
             Administra usuarios del sistema
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="px-4 py-2">
+        <Button onClick={() => setShowCreateModal(true)} className="px-4 py-2 sm:self-start">
           <Plus size={16} className="mr-2" />
           Nuevo Usuario
         </Button>
@@ -328,7 +328,7 @@ export const UsersPage: React.FC = () => {
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1 relative">
               <Search
                 size={16}
@@ -342,24 +342,26 @@ export const UsersPage: React.FC = () => {
                 className="pl-10"
               />
             </div>
-            <label className="flex items-center space-x-2 text-sm text-muted-foreground cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span>Mostrar inactivos</span>
-            </label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchUsers}
-              className="px-3 py-2"
-            >
-              <RefreshCw size={16} className="mr-2" />
-              Actualizar
-            </Button>
+            <div className="flex items-center justify-between sm:justify-end gap-3">
+              <label className="flex items-center space-x-2 text-sm text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span>Mostrar inactivos</span>
+              </label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchUsers}
+                className="px-3 py-2 shrink-0"
+              >
+                <RefreshCw size={16} className="mr-2" />
+                Actualizar
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
