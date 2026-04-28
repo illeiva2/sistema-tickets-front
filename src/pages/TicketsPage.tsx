@@ -52,7 +52,7 @@ function TicketRow({
   const isClaiming = claimingId === ticket.id;
 
   const wrapClass = [
-    "relative flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer group",
+    "relative flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer group",
     isUrgent
       ? "border-red-300 bg-red-50/50 hover:bg-red-50 dark:border-red-800 dark:bg-red-950/20 dark:hover:bg-red-950/40"
       : isUnread
@@ -79,19 +79,19 @@ function TicketRow({
     <div className={wrapClass} onClick={() => onNavigate(ticket.id)}>
       <div className={accentClass} />
 
-      <div className="flex-1 min-w-0 pl-2">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex-1 min-w-0 pl-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-mono text-muted-foreground shrink-0">
             #{ticket.ticketNumber?.toString().padStart(5, "0")}
           </span>
           {isUrgent && (
             <AlertTriangle size={13} className="text-red-500 shrink-0" />
           )}
-          <span className="font-medium text-sm truncate max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
+          <span className="font-medium text-sm truncate min-w-0 flex-1">
             {ticket.title}
           </span>
           {isUnread && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-100 border border-blue-300 rounded-full px-1.5 py-0.5 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 shrink-0">
+            <span className="hidden sm:flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-100 border border-blue-300 rounded-full px-1.5 py-0.5 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />
               SIN LEER
             </span>
@@ -116,7 +116,13 @@ function TicketRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1.5 shrink-0 pl-2 sm:pl-0 flex-wrap" onClick={(e) => e.stopPropagation()}>
+        {isUnread && (
+          <span className="sm:hidden flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-100 border border-blue-300 rounded-full px-1.5 py-0.5 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />
+            SIN LEER
+          </span>
+        )}
         <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${PRIORITY_STYLE[ticket.priority] || ""}`}>
           {PRIORITY_LABEL[ticket.priority] || ticket.priority}
         </span>
@@ -125,7 +131,7 @@ function TicketRow({
         </span>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1 shrink-0 pl-2 sm:pl-0" onClick={(e) => e.stopPropagation()}>
         {showClaim && !ticket.assignee && (
           <Button
             variant="secondary"
@@ -328,8 +334,8 @@ const TicketsPage: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 pb-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex-1 min-w-48 relative">
+          <div className="flex flex-wrap items-stretch sm:items-center gap-2">
+            <div className="w-full sm:flex-1 sm:min-w-48 relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
@@ -342,7 +348,7 @@ const TicketsPage: React.FC = () => {
             <select
               value={filters.status || ""}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="">Todos los estados</option>
               <option value="OPEN">Abierto</option>
@@ -353,7 +359,7 @@ const TicketsPage: React.FC = () => {
             <select
               value={filters.priority || ""}
               onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-              className="px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="">Todas las prioridades</option>
               <option value="LOW">Baja</option>
@@ -364,7 +370,7 @@ const TicketsPage: React.FC = () => {
             <select
               value={(filters as any).sortDir || "desc"}
               onChange={(e) => setFilters({ ...filters, sortDir: e.target.value as any })}
-              className="px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
             >
               <option value="desc">Más recientes</option>
               <option value="asc">Más antiguos</option>
@@ -373,7 +379,7 @@ const TicketsPage: React.FC = () => {
               <select
                 value={(filters as any).assigneeId || ""}
                 onChange={(e) => setFilters({ ...filters, assigneeId: e.target.value })}
-                className="px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
               >
                 <option value="">Cualquier asignación</option>
                 <option value="null">Sin asignar</option>
@@ -383,7 +389,7 @@ const TicketsPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              className="text-xs h-8"
+              className="text-xs h-8 shrink-0"
               onClick={() => {
                 const cleared = { q: "", status: "", priority: "", sortBy: "createdAt", sortDir: "desc" } as any;
                 setFilters(cleared);
