@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { useAuth, useTickets } from "../hooks";
 import { useNotificationsContext } from "../contexts/NotificationsContext";
+import { useTheme } from "../contexts/ThemeContext";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 // Componente de navegación con estado activo
 const NavLink = ({
@@ -183,24 +185,15 @@ const Layout: React.FC = () => {
     setIsMobileNavOpen(false);
   }, [location.pathname]);
 
-  // Dark mode toggle (simple)
-  const [dark, setDark] = React.useState<boolean>(
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark"),
-  );
-  React.useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [dark]);
+  // Dark/light controlado por el ThemeContext (persistencia + theme switcher).
+  const { mode, toggleMode } = useTheme();
+  const dark = mode === "dark";
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75 shadow-sm">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between bg-blue-200 dark:bg-gray-900 border-b dark:border-gray-800 transition-colors gap-2">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between transition-colors gap-2">
           <div className="flex items-center space-x-6 min-w-0">
             <h1 className="text-base sm:text-xl font-bold text-primary tracking-tight whitespace-nowrap">
               Empresa Tickets
@@ -278,6 +271,8 @@ const Layout: React.FC = () => {
                       </button>
                     </div>
 
+                    <ThemeSwitcher />
+
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-1">
                       <button
                         onClick={handleLogout}
@@ -297,7 +292,7 @@ const Layout: React.FC = () => {
               variant="outline"
               size="sm"
               className="hidden lg:inline-flex px-2 py-1 text-sm"
-              onClick={() => setDark(!dark)}
+              onClick={toggleMode}
             >
               {dark ? "Light" : "Dark"}
             </Button>
@@ -371,7 +366,7 @@ const Layout: React.FC = () => {
                 </NavLink>
               )}
               <button
-                onClick={() => setDark(!dark)}
+                onClick={toggleMode}
                 className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors"
               >
                 <Settings size={16} />
