@@ -58,27 +58,41 @@ const NavLink = ({
 // Breadcrumbs básicos
 const Breadcrumbs = () => {
   const location = useLocation();
+  // pathnames se recalcula en cada render -- nunca lo metemos como
+  // dependencia de un useEffect porque es una referencia nueva siempre.
   const pathnames = location.pathname.split("/").filter((x) => x);
   const { id: ticketId } = useParams();
   const { getTicketById } = useTickets();
   const [ticketNumber, setTicketNumber] = React.useState<string | null>(null);
 
-  // Si estamos en la página de detalle de un ticket, obtener el número
+  // Si estamos en la página de detalle de un ticket, obtener el número.
+  // Dependemos solo de location.pathname (string estable) y ticketId.
   React.useEffect(() => {
-    if (ticketId && pathnames.length === 2 && pathnames[0] === "tickets") {
-      const fetchTicketNumber = async () => {
-        try {
-          const ticket = await getTicketById(ticketId);
-          if (ticket?.ticketNumber) {
-            setTicketNumber(ticket.ticketNumber.toString().padStart(5, "0"));
-          }
-        } catch (error) {
+    setTicketNumber(null);
+    if (!ticketId) return;
+    const onTicketDetail =
+      location.pathname.startsWith("/tickets/") &&
+      location.pathname.split("/").filter(Boolean).length === 2;
+    if (!onTicketDetail) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const ticket = await getTicketById(ticketId);
+        if (!cancelled && ticket?.ticketNumber) {
+          setTicketNumber(ticket.ticketNumber.toString().padStart(5, "0"));
+        }
+      } catch (error) {
+        if (!cancelled) {
           console.error("Error fetching ticket number:", error);
         }
-      };
-      fetchTicketNumber();
-    }
-  }, [ticketId, pathnames, getTicketById]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, ticketId]);
 
   if (pathnames.length === 0) return null;
 
