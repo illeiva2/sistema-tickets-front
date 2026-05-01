@@ -29,6 +29,7 @@ import AdvancedFilePreview from "../components/AdvancedFilePreview";
 import api from "../lib/api";
 import toast from "react-hot-toast";
 import { statusLabel, priorityLabel } from "../constants/ticketLabels";
+import TicketTimeline from "../components/TicketTimeline";
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -705,6 +706,17 @@ const TicketDetailPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {ticket?.id && (
+            <Card>
+              <CardContent className="px-4 py-4">
+                <TicketTimeline
+                  ticketId={ticket.id}
+                  refreshKey={ticket?.updatedAt}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
