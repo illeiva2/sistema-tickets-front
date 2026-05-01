@@ -1,14 +1,16 @@
 import React from "react";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   TicketsEmptyState,
   TicketCardSkeleton,
   Button,
 } from "@/components/ui";
-import { Plus, Search, Filter, AlertTriangle, Eye } from "lucide-react";
+import {
+  Plus,
+  Search,
+  AlertTriangle,
+  ChevronRight,
+  MessageSquare,
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets, useAuth } from "../hooks";
 import toast from "react-hot-toast";
@@ -16,9 +18,9 @@ import api from "../lib/api";
 import {
   TICKET_STATUS_LABEL as STATUS_LABEL,
   TICKET_PRIORITY_LABEL as PRIORITY_LABEL,
-  TICKET_STATUS_STYLE as STATUS_STYLE,
-  TICKET_PRIORITY_STYLE as PRIORITY_STYLE,
 } from "../constants/ticketLabels";
+
+type TabId = "active" | "resolved" | "closed" | "all";
 
 function timeAgo(date: string) {
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -28,9 +30,23 @@ function timeAgo(date: string) {
   return `hace ${Math.floor(diff / 86400)}d`;
 }
 
-// ─── Fila de ticket compacta ──────────────────────────────────────────────────
+const STATUS_DOT: Record<string, string> = {
+  OPEN: "bg-status-open",
+  IN_PROGRESS: "bg-status-progress",
+  RESOLVED: "bg-status-resolved",
+  CLOSED: "bg-status-closed",
+};
 
-function TicketRow({
+const PRIORITY_DOT: Record<string, string> = {
+  LOW: "bg-priority-low",
+  MEDIUM: "bg-priority-medium",
+  HIGH: "bg-priority-high",
+  URGENT: "bg-priority-urgent",
+};
+
+// ─── Fila de tabla ────────────────────────────────────────────────────────────
+
+function TicketTableRow({
   ticket,
   onNavigate,
   onClaim,
@@ -51,152 +67,144 @@ function TicketRow({
   const isUnread = !ticket.isRead;
   const isClaiming = claimingId === ticket.id;
 
-  const wrapClass = [
-    "relative flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer group",
-    isUrgent
-      ? "border-red-300 bg-red-50/50 hover:bg-red-50 dark:border-red-800 dark:bg-red-950/20 dark:hover:bg-red-950/40"
-      : isUnread
-        ? "border-blue-300 bg-blue-50/40 hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 dark:hover:bg-blue-950/40"
-        : "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800",
-  ].join(" ");
-
-  const accentClass = [
-    "absolute left-0 top-0 bottom-0 w-1 rounded-l-lg",
-    isUrgent
-      ? "bg-red-500"
-      : isUnread
-        ? "bg-blue-500"
-        : ticket.status === "IN_PROGRESS"
-          ? "bg-purple-400"
-          : ticket.status === "RESOLVED"
-            ? "bg-emerald-400"
-            : ticket.status === "CLOSED"
-              ? "bg-gray-300 dark:bg-gray-600"
-              : "bg-blue-300",
-  ].join(" ");
-
   return (
-    <div className={wrapClass} onClick={() => onNavigate(ticket.id)}>
-      <div className={accentClass} />
-
-      <div className="flex-1 min-w-0 pl-2 w-full sm:w-auto">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-mono text-muted-foreground shrink-0">
+    <tr
+      className={`group cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/40 ${
+        isUnread ? "bg-primary/[0.025]" : ""
+      }`}
+      onClick={() => onNavigate(ticket.id)}
+    >
+      {/* # ticket number */}
+      <td className="py-2.5 pl-4 pr-2 align-middle whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          {isUnread && (
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-primary inline-block shrink-0"
+              title="Sin leer"
+            />
+          )}
+          <span className="font-mono text-[11.5px] text-muted-foreground tabular-nums">
             #{ticket.ticketNumber?.toString().padStart(5, "0")}
           </span>
+        </div>
+      </td>
+
+      {/* status dot */}
+      <td className="py-2.5 px-2 align-middle whitespace-nowrap">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`w-2 h-2 rounded-full ${STATUS_DOT[ticket.status] || "bg-muted"}`}
+            title={STATUS_LABEL[ticket.status]}
+          />
+          <span className="text-[11.5px] text-muted-foreground hidden md:inline">
+            {STATUS_LABEL[ticket.status]}
+          </span>
+        </div>
+      </td>
+
+      {/* title */}
+      <td className="py-2.5 px-2 align-middle min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {isUrgent && (
-            <AlertTriangle size={13} className="text-red-500 shrink-0" />
+            <AlertTriangle
+              size={13}
+              className="text-priority-urgent shrink-0"
+            />
           )}
-          <span className="font-medium text-sm truncate min-w-0 flex-1">
+          <span
+            className={`text-sm truncate ${
+              isUnread ? "font-semibold" : "font-normal"
+            }`}
+          >
             {ticket.title}
           </span>
-          {isUnread && (
-            <span className="hidden sm:flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-100 border border-blue-300 rounded-full px-1.5 py-0.5 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />
-              SIN LEER
+          {ticket._count?.comments > 0 && (
+            <span className="hidden sm:inline-flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0">
+              <MessageSquare size={11} />
+              {ticket._count.comments}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
-          <span>{ticket.requester?.name || "—"}</span>
-          {ticket.assignee && (
-            <>
-              <span className="opacity-40">·</span>
-              <span className="flex items-center gap-1">
-                <Eye size={10} />
-                {ticket.assignee.name}
-              </span>
-            </>
-          )}
-          {!ticket.assignee && ticket.status !== "CLOSED" && (
-            <span className="text-amber-500 font-medium">sin asignar</span>
-          )}
-          <span className="opacity-40">·</span>
-          <span>{timeAgo(ticket.createdAt)}</span>
-        </div>
-      </div>
+      </td>
 
-      <div className="flex items-center gap-1.5 shrink-0 pl-2 sm:pl-0 flex-wrap" onClick={(e) => e.stopPropagation()}>
-        {isUnread && (
-          <span className="sm:hidden flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-100 border border-blue-300 rounded-full px-1.5 py-0.5 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />
-            SIN LEER
+      {/* priority chip */}
+      <td className="py-2.5 px-2 align-middle whitespace-nowrap hidden lg:table-cell">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[ticket.priority] || "bg-muted"}`}
+          />
+          <span
+            className={`text-[11.5px] ${
+              isUrgent
+                ? "text-priority-urgent font-medium"
+                : "text-muted-foreground"
+            }`}
+          >
+            {PRIORITY_LABEL[ticket.priority]}
           </span>
-        )}
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${PRIORITY_STYLE[ticket.priority] || ""}`}>
-          {PRIORITY_LABEL[ticket.priority] || ticket.priority}
-        </span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${STATUS_STYLE[ticket.status] || ""}`}>
-          {STATUS_LABEL[ticket.status] || ticket.status}
-        </span>
-      </div>
+        </div>
+      </td>
 
-      <div className="flex items-center gap-1 shrink-0 pl-2 sm:pl-0" onClick={(e) => e.stopPropagation()}>
-        {showClaim && !ticket.assignee && (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={isClaiming}
-            className="text-xs h-7 px-2 flex items-center gap-1"
-            onClick={() => onClaim?.(ticket.id)}
-          >
-            {isClaiming ? (
-              <>
-                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                <span>Reclamando...</span>
-              </>
-            ) : "Reclamar"}
-          </Button>
-        )}
-        {showReopen && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs h-7 px-2 text-blue-600 hover:text-blue-700"
-            onClick={() => onReopen?.(ticket.id)}
-          >
-            Reabrir
-          </Button>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-xs h-7 px-2"
-          onClick={() => onNavigate(ticket.id)}
-        >
-          Ver →
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Sección de tickets ───────────────────────────────────────────────────────
-
-function TicketSection({
-  title,
-  count,
-  colorClass,
-  children,
-}: {
-  title: string;
-  count: number;
-  colorClass: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={`flex items-center gap-2 mb-2 pb-1.5 border-b ${colorClass}`}>
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <span className="text-xs font-medium opacity-70 px-1.5 py-0.5 rounded-full bg-current/10">
-          {count}
+      {/* requester */}
+      <td className="py-2.5 px-2 align-middle whitespace-nowrap hidden md:table-cell">
+        <span className="text-[12px] text-muted-foreground truncate max-w-[140px] block">
+          {ticket.requester?.name || "—"}
         </span>
-      </div>
-      <div className="space-y-1.5">{children}</div>
-    </div>
+      </td>
+
+      {/* assignee */}
+      <td className="py-2.5 px-2 align-middle whitespace-nowrap hidden xl:table-cell">
+        {ticket.assignee ? (
+          <span className="text-[12px] text-foreground/80 truncate max-w-[140px] block">
+            {ticket.assignee.name}
+          </span>
+        ) : ticket.status !== "CLOSED" ? (
+          <span className="text-[11.5px] font-medium text-priority-medium">
+            sin asignar
+          </span>
+        ) : (
+          <span className="text-[11.5px] text-muted-foreground">—</span>
+        )}
+      </td>
+
+      {/* time */}
+      <td className="py-2.5 px-2 align-middle whitespace-nowrap text-[11.5px] text-muted-foreground hidden sm:table-cell">
+        {timeAgo(ticket.updatedAt || ticket.createdAt)}
+      </td>
+
+      {/* actions */}
+      <td
+        className="py-2.5 pl-2 pr-4 align-middle whitespace-nowrap text-right"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-end gap-1">
+          {showClaim && !ticket.assignee && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isClaiming}
+              className="h-7 px-2 text-[11.5px]"
+              onClick={() => onClaim?.(ticket.id)}
+            >
+              {isClaiming ? "…" : "Reclamar"}
+            </Button>
+          )}
+          {showReopen && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11.5px] text-primary hover:text-primary/80"
+              onClick={() => onReopen?.(ticket.id)}
+            >
+              Reabrir
+            </Button>
+          )}
+          <span className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+            <ChevronRight size={14} />
+          </span>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -220,6 +228,7 @@ const TicketsPage: React.FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [claimingId, setClaimingId] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<TabId>("active");
 
   const handleClaim = async (ticketId: string) => {
     if (claimingId) return;
@@ -231,31 +240,41 @@ const TicketsPage: React.FC = () => {
         fetchTickets({ filters, page, pageSize });
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.error?.message || "Error al reclamar ticket");
+      toast.error(
+        error.response?.data?.error?.message || "Error al reclamar ticket",
+      );
     } finally {
       setClaimingId(null);
     }
   };
 
   const handleReopen = async (ticketId: string) => {
-    const comment = prompt("Proporciona un comentario explicando por qué reabres este ticket:");
+    const comment = prompt(
+      "Proporciona un comentario explicando por qué reabres este ticket:",
+    );
     if (!comment?.trim()) {
       toast.error("Debes proporcionar un comentario para reabrir el ticket");
       return;
     }
     try {
-      const response = await api.post(`/api/tickets/${ticketId}/reopen`, { comment: comment.trim() });
+      const response = await api.post(`/api/tickets/${ticketId}/reopen`, {
+        comment: comment.trim(),
+      });
       if (response.data.success) {
         toast.success("Ticket reabierto correctamente");
         await fetchTickets({ filters, page, pageSize });
       }
     } catch (error: any) {
-      toast.error(error instanceof Error ? error.message : "Error al reabrir el ticket");
+      toast.error(
+        error instanceof Error ? error.message : "Error al reabrir el ticket",
+      );
     }
   };
 
   React.useEffect(() => {
-    const sp: Record<string, string> = Object.fromEntries(searchParams.entries());
+    const sp: Record<string, string> = Object.fromEntries(
+      searchParams.entries(),
+    );
     const initialFilters = {
       q: sp.q ?? filters.q,
       status: sp.status ?? filters.status,
@@ -268,7 +287,11 @@ const TicketsPage: React.FC = () => {
     if (sp.pageSize) setPageSize(initialPageSize);
     if (sp.page) setPage(initialPage);
     setFilters(initialFilters);
-    fetchTickets({ filters: initialFilters, page: initialPage, pageSize: initialPageSize });
+    fetchTickets({
+      filters: initialFilters,
+      page: initialPage,
+      pageSize: initialPageSize,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -295,103 +318,167 @@ const TicketsPage: React.FC = () => {
     setSearchParams(sp, { replace: true });
   }, [filters, page, pageSize, setSearchParams, sortBy, sortDir]);
 
-  // Escuchar cuando se abre el detalle de un ticket para marcarlo como leído en la lista
   React.useEffect(() => {
     const handler = () => {
       fetchTickets({ filters, page, pageSize });
     };
     window.addEventListener("ticket:read", handler);
     return () => window.removeEventListener("ticket:read", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, page, pageSize]);
 
-  const activeTickets = tickets?.filter((t: any) => t.status === "OPEN" || t.status === "IN_PROGRESS") ?? [];
-  const resolvedTickets = tickets?.filter((t: any) => t.status === "RESOLVED") ?? [];
-  const closedTickets = tickets?.filter((t: any) => t.status === "CLOSED") ?? [];
+  const activeTickets =
+    tickets?.filter(
+      (t: any) => t.status === "OPEN" || t.status === "IN_PROGRESS",
+    ) ?? [];
+  const resolvedTickets =
+    tickets?.filter((t: any) => t.status === "RESOLVED") ?? [];
+  const closedTickets =
+    tickets?.filter((t: any) => t.status === "CLOSED") ?? [];
 
   const isAgentOrAdmin = user?.role === "AGENT" || user?.role === "ADMIN";
   const isAgent = user?.role === "AGENT";
 
+  const counts: Record<TabId, number> = {
+    active: activeTickets.length,
+    resolved: resolvedTickets.length,
+    closed: closedTickets.length,
+    all: tickets?.length ?? 0,
+  };
+
+  const visibleTickets =
+    tab === "active"
+      ? activeTickets
+      : tab === "resolved"
+        ? resolvedTickets
+        : tab === "closed"
+          ? closedTickets
+          : (tickets ?? []);
+
+  const TABS: Array<{ id: TabId; label: string }> = [
+    { id: "active", label: "Activos" },
+    { id: "resolved", label: "Resueltos" },
+    { id: "closed", label: "Cerrados" },
+    { id: "all", label: "Todos" },
+  ];
+
+  const hasFilters =
+    !!filters.q || !!filters.status || !!filters.priority || !!(filters as any).assigneeId;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* Page header */}
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Tickets</h1>
-          <p className="text-sm text-muted-foreground">Gestión y seguimiento de tickets del sistema</p>
+          <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground mb-1">
+            <span>Workspace</span>
+            <ChevronRight size={11} className="opacity-60" />
+            <span className="text-foreground">Tickets</span>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
         </div>
-        <Button size="sm" className="px-2 py-1 text-sm" onClick={() => navigate("/tickets/new")}>
-          <Plus size={16} className="mr-2" />
-          Nuevo Ticket
+        <Button
+          size="sm"
+          className="h-8 px-3 text-sm"
+          onClick={() => navigate("/tickets/new")}
+        >
+          <Plus size={15} className="mr-1.5" />
+          Nuevo ticket
         </Button>
       </div>
 
-      <Card>
-        <CardHeader className="px-3 pt-2 pb-3">
-          <CardTitle className="flex items-center space-x-2 pl-2">
-            <Filter size={18} />
-            <span className="text-base">Filtros</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 pb-4">
-          <div className="flex flex-wrap items-stretch sm:items-center gap-2">
-            <div className="w-full sm:flex-1 sm:min-w-48 relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Buscar tickets..."
-                value={filters.q || ""}
-                onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-                className="w-full pl-9 pr-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-              />
-            </div>
+      {/* Toolbar: tabs + filtros inline */}
+      <div className="border border-border bg-card rounded-lg overflow-hidden">
+        {/* Tabs row */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {TABS.map((t) => {
+              const active = t.id === tab;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex items-center gap-1.5 text-[12.5px] px-2.5 py-1 rounded-md transition-colors whitespace-nowrap ${
+                    active
+                      ? "bg-muted text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {t.label}
+                  <span className="font-mono text-[10.5px] tabular-nums opacity-70">
+                    {counts[t.id]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-[11.5px] text-muted-foreground hidden sm:inline whitespace-nowrap">
+            {total} en total
+          </span>
+        </div>
+
+        {/* Filtros compactos */}
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-muted/20">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search
+              size={13}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              type="text"
+              placeholder="Buscar tickets…"
+              value={filters.q || ""}
+              onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+              className="w-full pl-8 pr-3 py-1 text-[12.5px] border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <select
+            value={filters.priority || ""}
+            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+            className="px-2 py-1 text-[12.5px] border border-border rounded-md bg-background"
+          >
+            <option value="">Prioridad</option>
+            <option value="URGENT">Urgente</option>
+            <option value="HIGH">Alta</option>
+            <option value="MEDIUM">Media</option>
+            <option value="LOW">Baja</option>
+          </select>
+          {isAgentOrAdmin && (
             <select
-              value={filters.status || ""}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              value={(filters as any).assigneeId || ""}
+              onChange={(e) =>
+                setFilters({ ...filters, assigneeId: e.target.value })
+              }
+              className="px-2 py-1 text-[12.5px] border border-border rounded-md bg-background"
             >
-              <option value="">Todos los estados</option>
-              <option value="OPEN">Abierto</option>
-              <option value="IN_PROGRESS">En progreso</option>
-              <option value="RESOLVED">Resuelto</option>
-              <option value="CLOSED">Cerrado</option>
+              <option value="">Asignación</option>
+              <option value="null">Sin asignar</option>
+              <option value={user!.id}>Asignados a mí</option>
             </select>
-            <select
-              value={filters.priority || ""}
-              onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-              className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-            >
-              <option value="">Todas las prioridades</option>
-              <option value="LOW">Baja</option>
-              <option value="MEDIUM">Media</option>
-              <option value="HIGH">Alta</option>
-              <option value="URGENT">Urgente</option>
-            </select>
-            <select
-              value={(filters as any).sortDir || "desc"}
-              onChange={(e) => setFilters({ ...filters, sortDir: e.target.value as any })}
-              className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-            >
-              <option value="desc">Más recientes</option>
-              <option value="asc">Más antiguos</option>
-            </select>
-            {isAgentOrAdmin && (
-              <select
-                value={(filters as any).assigneeId || ""}
-                onChange={(e) => setFilters({ ...filters, assigneeId: e.target.value })}
-                className="flex-1 sm:flex-initial min-w-0 px-2 py-1.5 text-sm border rounded-md text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-              >
-                <option value="">Cualquier asignación</option>
-                <option value="null">Sin asignar</option>
-                <option value={user!.id}>Asignados a mí</option>
-              </select>
-            )}
+          )}
+          <select
+            value={(filters as any).sortDir || "desc"}
+            onChange={(e) =>
+              setFilters({ ...filters, sortDir: e.target.value as any })
+            }
+            className="px-2 py-1 text-[12.5px] border border-border rounded-md bg-background"
+          >
+            <option value="desc">Más recientes</option>
+            <option value="asc">Más antiguos</option>
+          </select>
+          {hasFilters && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="text-xs h-8 shrink-0"
+              className="h-7 px-2 text-[11.5px] text-muted-foreground"
               onClick={() => {
-                const cleared = { q: "", status: "", priority: "", sortBy: "createdAt", sortDir: "desc" } as any;
+                const cleared = {
+                  q: "",
+                  status: "",
+                  priority: "",
+                  sortBy: "createdAt",
+                  sortDir: "desc",
+                } as any;
                 setFilters(cleared);
                 setPage(1);
                 fetchTickets({ filters: cleared, page: 1, pageSize });
@@ -399,25 +486,18 @@ const TicketsPage: React.FC = () => {
             >
               Limpiar
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
 
-      <Card>
-        <CardHeader className="px-4 pt-3 pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Lista de Tickets</CardTitle>
-            <span className="text-xs text-muted-foreground">{total} tickets encontrados</span>
+        {/* Lista */}
+        {isLoading ? (
+          <div className="p-3 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <TicketCardSkeleton key={i} />
+            ))}
           </div>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          {isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <TicketCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : !tickets || tickets.length === 0 ? (
+        ) : !tickets || tickets.length === 0 ? (
+          <div className="p-6">
             <TicketsEmptyState
               action={
                 <Button onClick={() => navigate("/tickets/new")}>
@@ -426,105 +506,112 @@ const TicketsPage: React.FC = () => {
                 </Button>
               }
             />
-          ) : (
-            <div className="space-y-5">
-              {activeTickets.length > 0 && (
-                <TicketSection
-                  title="Activos"
-                  count={activeTickets.length}
-                  colorClass="border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400"
-                >
-                  {activeTickets.map((ticket: any) => (
-                    <TicketRow
-                      key={ticket.id}
-                      ticket={ticket}
-                      onNavigate={(id) => navigate(`/tickets/${id}`)}
-                      onClaim={handleClaim}
-                      claimingId={claimingId}
-                      showClaim={isAgent}
-                      showReopen={false}
-                    />
-                  ))}
-                </TicketSection>
-              )}
+          </div>
+        ) : visibleTickets.length === 0 ? (
+          <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+            No hay tickets en{" "}
+            <span className="font-medium text-foreground">
+              {TABS.find((x) => x.id === tab)?.label.toLowerCase()}
+            </span>
+            .
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10.5px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/20">
+                  <th className="font-medium pl-4 pr-2 py-2 w-0">#</th>
+                  <th className="font-medium px-2 py-2 w-0">Estado</th>
+                  <th className="font-medium px-2 py-2">Título</th>
+                  <th className="font-medium px-2 py-2 w-0 hidden lg:table-cell">
+                    Prioridad
+                  </th>
+                  <th className="font-medium px-2 py-2 w-0 hidden md:table-cell">
+                    Solicitante
+                  </th>
+                  <th className="font-medium px-2 py-2 w-0 hidden xl:table-cell">
+                    Asignado
+                  </th>
+                  <th className="font-medium px-2 py-2 w-0 hidden sm:table-cell">
+                    Actualizado
+                  </th>
+                  <th className="font-medium pl-2 pr-4 py-2 w-0 text-right">
+                    {/* acciones */}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTickets.map((ticket: any) => (
+                  <TicketTableRow
+                    key={ticket.id}
+                    ticket={ticket}
+                    onNavigate={(id) => navigate(`/tickets/${id}`)}
+                    onClaim={handleClaim}
+                    claimingId={claimingId}
+                    onReopen={handleReopen}
+                    showClaim={isAgent && tab !== "closed" && tab !== "resolved"}
+                    showReopen={
+                      isAgentOrAdmin && (tab === "resolved" || tab === "closed")
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-              {resolvedTickets.length > 0 && (
-                <TicketSection
-                  title="Resueltos"
-                  count={resolvedTickets.length}
-                  colorClass="border-emerald-200 text-emerald-700 dark:border-emerald-800 dark:text-emerald-400"
-                >
-                  {resolvedTickets.map((ticket: any) => (
-                    <TicketRow
-                      key={ticket.id}
-                      ticket={ticket}
-                      onNavigate={(id) => navigate(`/tickets/${id}`)}
-                      claimingId={claimingId}
-                      showClaim={false}
-                      showReopen={isAgentOrAdmin}
-                      onReopen={handleReopen}
-                    />
-                  ))}
-                </TicketSection>
-              )}
-
-              {closedTickets.length > 0 && (
-                <TicketSection
-                  title="Cerrados"
-                  count={closedTickets.length}
-                  colorClass="border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400"
-                >
-                  {closedTickets.map((ticket: any) => (
-                    <TicketRow
-                      key={ticket.id}
-                      ticket={ticket}
-                      onNavigate={(id) => navigate(`/tickets/${id}`)}
-                      claimingId={claimingId}
-                      showClaim={false}
-                      showReopen={isAgentOrAdmin}
-                      onReopen={handleReopen}
-                    />
-                  ))}
-                </TicketSection>
-              )}
+        {/* Footer con paginación */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border bg-muted/20">
+          <div className="flex items-center gap-2">
+            <span className="text-[11.5px] text-muted-foreground">Por página</span>
+            <select
+              className="px-1.5 py-0.5 border border-border rounded-md text-[11.5px] bg-background"
+              value={pageSize}
+              onChange={(e) => {
+                const newSize = Number(e.target.value);
+                setPageSize(newSize);
+                setPage(1);
+                fetchTickets({ filters, page: 1, pageSize: newSize });
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+          {total > pageSize && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11.5px] text-muted-foreground hidden sm:inline">
+                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de{" "}
+                {total}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11.5px]"
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+              >
+                ←
+              </Button>
+              <span className="text-[11.5px] tabular-nums">
+                {page}/{Math.ceil(total / pageSize)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11.5px]"
+                onClick={() =>
+                  setPage(Math.min(Math.ceil(total / pageSize), page + 1))
+                }
+                disabled={page >= Math.ceil(total / pageSize)}
+              >
+                →
+              </Button>
             </div>
           )}
-
-          <div className="flex items-center justify-between mt-5 pt-3 border-t border-gray-100 dark:border-gray-800">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Por página:</span>
-              <select
-                className="px-2 py-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                value={pageSize}
-                onChange={(e) => {
-                  const newSize = Number(e.target.value);
-                  setPageSize(newSize);
-                  setPage(1);
-                  fetchTickets({ filters, page: 1, pageSize: newSize });
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-            {total > pageSize && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total}
-                </span>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-                  ← Anterior
-                </Button>
-                <span className="text-xs">Pág. {page}/{Math.ceil(total / pageSize)}</span>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPage(Math.min(Math.ceil(total / pageSize), page + 1))} disabled={page >= Math.ceil(total / pageSize)}>
-                  Siguiente →
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
