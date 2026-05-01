@@ -236,12 +236,27 @@ export const UsersPage: React.FC = () => {
 
   const getRoleBadge = (role: string) => {
     const roleConfig = {
-      USER: { color: "bg-blue-100 text-blue-800 border-blue-200", icon: User },
+      USER: {
+        label: "Usuario",
+        dot: "bg-sky-500",
+        text: "text-sky-700 dark:text-sky-300",
+        bg: "bg-sky-50 dark:bg-sky-950/30 border-sky-200/70 dark:border-sky-800/60",
+        icon: User,
+      },
       AGENT: {
-        color: "bg-green-100 text-green-800 border-green-200",
+        label: "Agente",
+        dot: "bg-emerald-500",
+        text: "text-emerald-700 dark:text-emerald-300",
+        bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/70 dark:border-emerald-800/60",
         icon: UserCheck,
       },
-      ADMIN: { color: "bg-red-100 text-red-800 border-red-200", icon: Shield },
+      ADMIN: {
+        label: "Admin",
+        dot: "bg-rose-500",
+        text: "text-rose-700 dark:text-rose-300",
+        bg: "bg-rose-50 dark:bg-rose-950/30 border-rose-200/70 dark:border-rose-800/60",
+        icon: Shield,
+      },
     };
 
     const config =
@@ -249,13 +264,12 @@ export const UsersPage: React.FC = () => {
     const Icon = config.icon;
 
     return (
-      <Badge
-        variant="outline"
-        className={`${config.color} px-3 py-1 text-xs font-medium`}
+      <span
+        className={`inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full border px-2 py-0.5 ${config.bg} ${config.text}`}
       >
-        <Icon className="h-3 w-3 mr-2" />
-        {role}
-      </Badge>
+        <Icon size={11} />
+        {config.label}
+      </span>
     );
   };
 

@@ -30,6 +30,7 @@ import api from "../lib/api";
 import toast from "react-hot-toast";
 import { statusLabel, priorityLabel } from "../constants/ticketLabels";
 import TicketTimeline from "../components/TicketTimeline";
+import Avatar from "../components/Avatar";
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -423,6 +424,11 @@ const TicketDetailPage: React.FC = () => {
                         <div key={c.id} className={wrapperClass}>
                           <div className="flex items-center justify-between mb-1.5 gap-2">
                             <div className="flex items-center gap-2 min-w-0">
+                              <Avatar
+                                name={c.author?.name}
+                                email={c.author?.email}
+                                size={22}
+                              />
                               <span className="text-sm font-medium truncate">
                                 {c.author?.name || c.author?.email || "Usuario"}
                               </span>
