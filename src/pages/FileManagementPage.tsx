@@ -690,8 +690,8 @@ export const FileManagementPage: React.FC = () => {
 
       {/* Modal de Categoría */}
       {showCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-medium mb-4">
               {editingCategory ? "Editar Categoría" : "Nueva Categoría"}
             </h3>
@@ -768,8 +768,8 @@ export const FileManagementPage: React.FC = () => {
 
       {/* Modal de Etiqueta */}
       {showTagModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-medium mb-4">
               {editingTag ? "Editar Etiqueta" : "Nueva Etiqueta"}
             </h3>

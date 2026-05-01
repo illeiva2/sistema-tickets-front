@@ -897,8 +897,8 @@ const TicketDetailPage: React.FC = () => {
 
       {/* Modal para resolver ticket */}
       {showResolveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Resolver Ticket
             </h3>
@@ -940,8 +940,8 @@ const TicketDetailPage: React.FC = () => {
 
       {/* Modal para reabrir ticket */}
       {showReopenModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Reabrir Ticket
             </h3>
@@ -983,8 +983,8 @@ const TicketDetailPage: React.FC = () => {
 
       {/* Modal para cerrar ticket */}
       {showCloseModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Cerrar Ticket
             </h3>
@@ -1023,8 +1023,8 @@ const TicketDetailPage: React.FC = () => {
 
       {/* Modal para editar ticket */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 my-auto">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-4">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 my-auto">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               Editar Ticket
             </h3>
