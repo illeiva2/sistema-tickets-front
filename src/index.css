@@ -1,53 +1,189 @@
+/* ============================================================
+   tokens.css — Sistema de Tickets · multi-theme
+   ============================================================
+   Soporta 2 themes × 2 modos:
+     [data-theme="quiet-pro"]        → light
+     [data-theme="quiet-pro"].dark   → dark
+     [data-theme="workshop"]         → light
+     [data-theme="workshop"].dark    → dark
+
+   El theme se aplica con data-theme en <html>, el dark con .dark
+   en <html>. Tailwind ya consume estas variables vía hsl(var(--xxx)).
+   ============================================================ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* body background slightly gray to reduce "all white" feeling */
-    --background: 210 17% 98%; /* ~#f8f9fa */
-    --foreground: 222.2 84% 4.9%;
+  /* ---------------------------------------------------------
+     Default (fallback) — usa Quiet Pro light si no hay
+     data-theme seteado.
+     --------------------------------------------------------- */
+  :root,
+  [data-theme="quiet-pro"] {
+    --background: 240 10% 98%;
+    --foreground: 240 10% 12%;
+
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 10% 12%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --popover-foreground: 240 10% 12%;
+
+    --primary: 252 56% 57%;            /* violeta sobrio */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 6% 95%;
+    --secondary-foreground: 240 10% 20%;
+
+    --muted: 240 6% 95%;
+    --muted-foreground: 240 5% 45%;
+
+    --accent: 240 6% 92%;
+    --accent-foreground: 240 10% 12%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 88%;
+    --input: 240 6% 88%;
+    --ring: 252 56% 57%;
+
     --radius: 0.5rem;
+
+    /* Tokens semánticos del dominio */
+    --status-open: 217 91% 60%;        /* azul */
+    --status-progress: 38 92% 50%;     /* naranja */
+    --status-resolved: 142 71% 45%;    /* verde */
+    --status-closed: 240 5% 50%;       /* gris */
+    --priority-low: 142 71% 45%;
+    --priority-medium: 38 92% 50%;
+    --priority-high: 25 95% 53%;
+    --priority-urgent: 0 72% 51%;
   }
 
-  .dark {
-    /* dark mode keeps contrast comfortable */
-    --background: 222.2 84% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+  [data-theme="quiet-pro"].dark {
+    --background: 240 10% 8%;
+    --foreground: 240 5% 92%;
+
+    --card: 240 10% 11%;
+    --card-foreground: 240 5% 92%;
+
+    --popover: 240 10% 11%;
+    --popover-foreground: 240 5% 92%;
+
+    --primary: 252 70% 70%;
+    --primary-foreground: 240 10% 8%;
+
+    --secondary: 240 8% 18%;
+    --secondary-foreground: 240 5% 92%;
+
+    --muted: 240 8% 18%;
+    --muted-foreground: 240 5% 60%;
+
+    --accent: 240 8% 22%;
+    --accent-foreground: 240 5% 92%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 8% 22%;
+    --input: 240 8% 22%;
+    --ring: 252 70% 70%;
+
+    --status-open: 217 91% 65%;
+    --status-progress: 38 92% 55%;
+    --status-resolved: 142 60% 55%;
+    --status-closed: 240 5% 55%;
+    --priority-low: 142 60% 55%;
+    --priority-medium: 38 92% 55%;
+    --priority-high: 25 95% 58%;
+    --priority-urgent: 0 72% 60%;
+  }
+
+  /* ---------------------------------------------------------
+     Workshop — cálido, accent petróleo, fondo crema, terracota
+     como acento secundario.
+     --------------------------------------------------------- */
+  [data-theme="workshop"] {
+    --background: 36 30% 96%;
+    --foreground: 24 18% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 24 18% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 18% 16%;
+
+    --primary: 188 60% 32%;            /* petróleo */
+    --primary-foreground: 36 30% 98%;
+
+    --secondary: 36 25% 92%;
+    --secondary-foreground: 24 18% 22%;
+
+    --muted: 36 20% 90%;
+    --muted-foreground: 24 10% 42%;
+
+    --accent: 22 65% 55%;               /* terracota */
+    --accent-foreground: 36 30% 98%;
+
+    --destructive: 4 70% 50%;
+    --destructive-foreground: 36 30% 98%;
+
+    --border: 30 15% 84%;
+    --input: 30 15% 84%;
+    --ring: 188 60% 32%;
+
+    --radius: 0.625rem;
+
+    --status-open: 200 75% 45%;
+    --status-progress: 32 85% 50%;
+    --status-resolved: 160 55% 38%;
+    --status-closed: 24 10% 50%;
+    --priority-low: 160 55% 38%;
+    --priority-medium: 32 85% 50%;
+    --priority-high: 18 80% 50%;
+    --priority-urgent: 4 70% 50%;
+  }
+
+  [data-theme="workshop"].dark {
+    --background: 24 15% 10%;
+    --foreground: 36 25% 90%;
+
+    --card: 24 15% 13%;
+    --card-foreground: 36 25% 90%;
+
+    --popover: 24 15% 13%;
+    --popover-foreground: 36 25% 90%;
+
+    --primary: 188 50% 55%;
+    --primary-foreground: 24 15% 10%;
+
+    --secondary: 24 12% 20%;
+    --secondary-foreground: 36 25% 90%;
+
+    --muted: 24 12% 20%;
+    --muted-foreground: 36 15% 60%;
+
+    --accent: 22 55% 60%;
+    --accent-foreground: 24 15% 10%;
+
+    --destructive: 4 65% 55%;
+    --destructive-foreground: 36 25% 95%;
+
+    --border: 24 12% 24%;
+    --input: 24 12% 24%;
+    --ring: 188 50% 55%;
+
+    --status-open: 200 70% 60%;
+    --status-progress: 32 80% 60%;
+    --status-resolved: 160 50% 50%;
+    --status-closed: 24 8% 55%;
+    --priority-low: 160 50% 50%;
+    --priority-medium: 32 80% 60%;
+    --priority-high: 18 75% 60%;
+    --priority-urgent: 4 65% 60%;
   }
 }
 
@@ -57,5 +193,21 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Tipografía por theme.
+     Quiet Pro → Inter / system sans (sobrio).
+     Workshop  → Plus Jakarta Sans / Fraunces para titulares. */
+  [data-theme="quiet-pro"] body {
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  [data-theme="workshop"] body {
+    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+  [data-theme="workshop"] h1,
+  [data-theme="workshop"] h2 {
+    font-family: "Fraunces", "Plus Jakarta Sans", ui-serif, serif;
+    letter-spacing: -0.01em;
   }
 }

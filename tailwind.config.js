@@ -40,6 +40,20 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Tokens semánticos del dominio. Cambian por theme via tokens.css.
+        // Sintaxis con <alpha-value> para que Tailwind soporte bg-status-open/10 etc.
+        status: {
+          open: "hsl(var(--status-open) / <alpha-value>)",
+          progress: "hsl(var(--status-progress) / <alpha-value>)",
+          resolved: "hsl(var(--status-resolved) / <alpha-value>)",
+          closed: "hsl(var(--status-closed) / <alpha-value>)",
+        },
+        priority: {
+          low: "hsl(var(--priority-low) / <alpha-value>)",
+          medium: "hsl(var(--priority-medium) / <alpha-value>)",
+          high: "hsl(var(--priority-high) / <alpha-value>)",
+          urgent: "hsl(var(--priority-urgent) / <alpha-value>)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
