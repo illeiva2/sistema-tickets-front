@@ -54,6 +54,9 @@ const TicketDetailPage: React.FC = () => {
   const [resolveComment, setResolveComment] = useState("");
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [reopenComment, setReopenComment] = useState("");
+  const [composerMode, setComposerMode] = useState<"public" | "internal">(
+    "public",
+  );
 
   // Estado para el modal de edición. El status ya no se edita aquí: se
   // controla con los botones de transición (Tomar / Resolver / Cerrar /
@@ -378,69 +381,171 @@ const TicketDetailPage: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-2 pt-4">
-              {ticket?.comments && ticket.comments.length > 0 ? (
-                <div className="space-y-4">
-                  {ticket.comments.map((c: any) => (
-                    <div key={c.id} className="border rounded-md p-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-sm text-muted-foreground">
-                          {c.author?.name || c.author?.email || "Usuario"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(c.createdAt).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="text-sm">{c.message}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<MessageSquare size={32} className="pr-2" />}
-                  title="Sin comentarios"
-                  description="Este ticket aún no tiene comentarios. Sé el primero en agregar información o actualizaciones."
-                  action={null}
-                />
-              )}
+              {(() => {
+                const role = user?.role;
+                const isStaff = role === "AGENT" || role === "ADMIN";
+                const visibleComments =
+                  ticket?.comments?.filter((c: any) => {
+                    const isInternal = (c.message ?? "").startsWith("[INTERNA] ");
+                    if (isInternal && !isStaff) return false;
+                    return true;
+                  }) ?? [];
 
-              {/* Formulario para nuevo comentario */}
-              <div className="mt-4 flex items-center space-x-2 px-2 pb-3">
-                <Input
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Escribe un comentario..."
-                  className="flex-1 px-3 pb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                />
-                <Button
-                  disabled={adding || !commentText.trim()}
-                  onClick={async () => {
-                    if (!id || !commentText.trim()) return;
-                    try {
-                      setAdding(true);
-                      const newC = await addComment(id, commentText.trim());
-                      setTicket((prev: any) => {
-                        if (!prev) return prev;
-                        const comments = prev.comments
-                          ? [...prev.comments, newC]
-                          : [newC];
-                        return { ...prev, comments };
-                      });
-                      setCommentText("");
-                    } finally {
-                      setAdding(false);
-                    }
-                  }}
-                >
-                  {adding ? (
-                    "Enviando..."
-                  ) : (
-                    <>
-                      <MessageSquare size={16} className="mr-2" />
-                      Comentar
-                    </>
-                  )}
-                </Button>
-              </div>
+                if (visibleComments.length === 0) {
+                  return (
+                    <EmptyState
+                      icon={<MessageSquare size={32} className="pr-2" />}
+                      title="Sin comentarios"
+                      description="Este ticket aún no tiene comentarios. Sé el primero en agregar información o actualizaciones."
+                      action={null}
+                    />
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {visibleComments.map((c: any) => {
+                      const raw = c.message ?? "";
+                      const isInternal = raw.startsWith("[INTERNA] ");
+                      const isAgentClose =
+                        raw.startsWith("[TICKET CERRADO] ") ||
+                        raw.startsWith("[TICKET RESUELTO] ") ||
+                        raw.startsWith("[TICKET REABIERTO] ");
+                      const display = isInternal ? raw.slice(10) : raw;
+
+                      const wrapperClass = isInternal
+                        ? "border border-amber-300/70 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-950/20 rounded-md p-3"
+                        : isAgentClose
+                          ? "border border-border bg-muted/30 rounded-md p-3"
+                          : "border border-border rounded-md p-3";
+
+                      return (
+                        <div key={c.id} className={wrapperClass}>
+                          <div className="flex items-center justify-between mb-1.5 gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm font-medium truncate">
+                                {c.author?.name || c.author?.email || "Usuario"}
+                              </span>
+                              {isInternal && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-100 border border-amber-300 rounded-full px-1.5 py-0.5 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-800">
+                                  Nota interna
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              {new Date(c.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="text-sm whitespace-pre-wrap">
+                            {display}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* Composer */}
+              {(() => {
+                const role = user?.role;
+                const isStaff = role === "AGENT" || role === "ADMIN";
+
+                return (
+                  <div className="mt-4 px-2 pb-3">
+                    {isStaff && (
+                      <div className="flex items-center gap-1 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setComposerMode("public")}
+                          className={`text-[12px] px-2 py-1 rounded-md transition-colors ${
+                            composerMode === "public"
+                              ? "bg-muted text-foreground font-medium"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          }`}
+                        >
+                          Pública
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setComposerMode("internal")}
+                          className={`flex items-center gap-1.5 text-[12px] px-2 py-1 rounded-md transition-colors ${
+                            composerMode === "internal"
+                              ? "bg-amber-100 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 font-medium"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              composerMode === "internal"
+                                ? "bg-amber-500"
+                                : "bg-muted-foreground/40"
+                            }`}
+                          />
+                          Nota interna
+                        </button>
+                        <span className="ml-auto text-[10.5px] text-muted-foreground">
+                          {composerMode === "internal"
+                            ? "Solo visible para agentes y admins"
+                            : "Visible para todos"}
+                        </span>
+                      </div>
+                    )}
+                    <textarea
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      placeholder={
+                        composerMode === "internal"
+                          ? "Escribe una nota interna…"
+                          : "Escribe un comentario…"
+                      }
+                      rows={3}
+                      className={`w-full px-3 py-2 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 ${
+                        composerMode === "internal"
+                          ? "border-amber-300 focus:ring-amber-400 bg-amber-50/40 dark:bg-amber-950/20"
+                          : "focus:ring-primary"
+                      }`}
+                    />
+                    <div className="flex items-center justify-end mt-2">
+                      <Button
+                        disabled={adding || !commentText.trim()}
+                        onClick={async () => {
+                          if (!id || !commentText.trim()) return;
+                          try {
+                            setAdding(true);
+                            const message =
+                              composerMode === "internal"
+                                ? `[INTERNA] ${commentText.trim()}`
+                                : commentText.trim();
+                            const newC = await addComment(id, message);
+                            setTicket((prev: any) => {
+                              if (!prev) return prev;
+                              const comments = prev.comments
+                                ? [...prev.comments, newC]
+                                : [newC];
+                              return { ...prev, comments };
+                            });
+                            setCommentText("");
+                          } finally {
+                            setAdding(false);
+                          }
+                        }}
+                      >
+                        {adding ? (
+                          "Enviando…"
+                        ) : composerMode === "internal" ? (
+                          "Guardar nota"
+                        ) : (
+                          <>
+                            <MessageSquare size={16} className="mr-2" />
+                            Comentar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
