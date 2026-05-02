@@ -18,9 +18,11 @@ export interface UserDashboardData {
   period: DashboardPeriod;
   myActiveCount: number;
   myActiveByPriority: { LOW: number; MEDIUM: number; HIGH: number; URGENT: number };
+  myStatusBreakdown: { OPEN: number; IN_PROGRESS: number; RESOLVED: number; CLOSED: number };
   myResolvedPendingClose: DashboardTicket[];
   myRecentTickets: DashboardTicket[];
   avgResolutionHours: number | null;
+  myResolutionTrend: Array<{ date: string; resolved: number }>;
 }
 
 export interface AgentDashboardData {
@@ -32,6 +34,7 @@ export interface AgentDashboardData {
   myActiveTickets: DashboardTicket[];
   unassignedTickets: DashboardTicket[];
   avgResolutionHours: number | null;
+  myResolutionTrend: Array<{ date: string; resolved: number }>;
 }
 
 export interface AgentLoadRow {
