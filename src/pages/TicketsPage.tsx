@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   ChevronRight,
   MessageSquare,
+  LayoutList,
+  LayoutGrid,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTickets, useAuth } from "../hooks";
@@ -26,8 +28,12 @@ import {
   ALL_CATEGORIES,
 } from "../constants/ticketCategories";
 import { formatSla, slaToneClasses } from "../lib/sla";
+import TicketsKanban from "../components/TicketsKanban";
 
 type TabId = "active" | "resolved" | "closed" | "all";
+type ViewMode = "table" | "kanban";
+
+const VIEW_MODE_KEY = "tickets:viewMode";
 
 function timeAgo(date: string) {
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -261,6 +267,19 @@ const TicketsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [claimingId, setClaimingId] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<TabId>("active");
+  const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "table";
+    const v = window.localStorage.getItem(VIEW_MODE_KEY);
+    return v === "kanban" ? "kanban" : "table";
+  });
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_MODE_KEY, viewMode);
+    } catch {
+      // localStorage puede no estar disponible (SSR / privacy mode).
+    }
+  }, [viewMode]);
 
   const handleClaim = async (ticketId: string) => {
     if (claimingId) return;
@@ -425,32 +444,75 @@ const TicketsPage: React.FC = () => {
 
       {/* Toolbar: tabs + filtros inline */}
       <div className="border border-border bg-card rounded-lg overflow-hidden">
-        {/* Tabs row */}
+        {/* Tabs row + view toggle */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border gap-2">
           <div className="flex items-center gap-1 overflow-x-auto">
-            {TABS.map((t) => {
-              const active = t.id === tab;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-1.5 text-[12.5px] px-2.5 py-1 rounded-md transition-colors whitespace-nowrap ${
-                    active
-                      ? "bg-muted text-foreground font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {t.label}
-                  <span className="font-mono text-[10.5px] tabular-nums opacity-70">
-                    {counts[t.id]}
-                  </span>
-                </button>
-              );
-            })}
+            {viewMode === "table" ? (
+              TABS.map((t) => {
+                const active = t.id === tab;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`flex items-center gap-1.5 text-[12.5px] px-2.5 py-1 rounded-md transition-colors whitespace-nowrap ${
+                      active
+                        ? "bg-muted text-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {t.label}
+                    <span className="font-mono text-[10.5px] tabular-nums opacity-70">
+                      {counts[t.id]}
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <span className="text-[12.5px] text-muted-foreground px-2">
+                Vista Kanban
+                <span className="ml-2 font-mono text-[10.5px] tabular-nums">
+                  {tickets?.length ?? 0}
+                </span>
+              </span>
+            )}
           </div>
-          <span className="text-[11.5px] text-muted-foreground hidden sm:inline whitespace-nowrap">
-            {total} en total
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11.5px] text-muted-foreground hidden md:inline whitespace-nowrap">
+              {total} en total
+            </span>
+            <div
+              className="flex items-center border border-border rounded-md overflow-hidden"
+              role="tablist"
+              aria-label="Modo de vista"
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                aria-pressed={viewMode === "table"}
+                title="Vista de tabla"
+                className={`p-1.5 transition-colors ${
+                  viewMode === "table"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <LayoutList size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                aria-pressed={viewMode === "kanban"}
+                title="Vista kanban"
+                className={`p-1.5 transition-colors border-l border-border ${
+                  viewMode === "kanban"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <LayoutGrid size={14} />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Filtros compactos */}
@@ -558,6 +620,16 @@ const TicketsPage: React.FC = () => {
               }
             />
           </div>
+        ) : viewMode === "kanban" ? (
+          <TicketsKanban
+            tickets={tickets}
+            onNavigate={(id) => navigate(`/tickets/${id}`)}
+            onClaim={handleClaim}
+            claimingId={claimingId}
+            onReopen={handleReopen}
+            showClaim={isAgent}
+            showReopen={isAgentOrAdmin}
+          />
         ) : visibleTickets.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-muted-foreground">
             No hay tickets en{" "}
