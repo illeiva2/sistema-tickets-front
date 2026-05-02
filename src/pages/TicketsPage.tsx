@@ -457,14 +457,10 @@ const TicketsPage: React.FC = () => {
     setSearchParams(sp, { replace: true });
   }, [filters, page, pageSize, setSearchParams, sortBy, sortDir]);
 
-  React.useEffect(() => {
-    const handler = () => {
-      fetchTickets({ filters, page, pageSize });
-    };
-    window.addEventListener("ticket:read", handler);
-    return () => window.removeEventListener("ticket:read", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, page, pageSize]);
+  // Antes había un listener de "ticket:read" para refetchar la lista cuando
+  // otra instancia de useTickets marcaba un ticket como leído. Ya no es
+  // necesario: con TicketsContext el state es único y getTicketById
+  // actualiza la lista en su lugar.
 
   const activeTickets =
     tickets?.filter(

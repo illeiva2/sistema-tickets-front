@@ -21,6 +21,7 @@ import Layout from "./components/Layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { TicketsProvider } from "./contexts/TicketsContext";
 
 function App() {
   return (
@@ -37,7 +38,9 @@ function App() {
             element={
               <ProtectedRoute>
                 <NotificationsProvider>
-                  <Layout />
+                  <TicketsProvider>
+                    <Layout />
+                  </TicketsProvider>
                 </NotificationsProvider>
               </ProtectedRoute>
             }
