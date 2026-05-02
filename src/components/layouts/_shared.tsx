@@ -33,6 +33,13 @@ interface NavLinkProps {
   icon: React.ReactNode;
   variant?: "horizontal" | "vertical";
   onNavigate?: () => void;
+  /**
+   * Lista de todas las rutas hermanas. Si alguna es mas especifica que `to`
+   * y tambien matchea el pathname actual, este NavLink no se marca como
+   * activo. Ej: estando en /tickets/new, /tickets no se marca activo
+   * porque /tickets/new es mas especifico y tambien matchea.
+   */
+  siblings?: string[];
 }
 
 export const NavLink: React.FC<NavLinkProps> = ({
@@ -41,13 +48,30 @@ export const NavLink: React.FC<NavLinkProps> = ({
   icon,
   variant = "horizontal",
   onNavigate,
+  siblings,
 }) => {
   const location = useLocation();
-  const isActive =
-    to === "/"
-      ? location.pathname === "/"
-      : location.pathname === to ||
-        (to !== "/" && location.pathname.startsWith(to + "/"));
+  const pathname = location.pathname;
+
+  const matches = (route: string): boolean => {
+    if (route === "/") return pathname === "/";
+    if (pathname === route) return true;
+    return pathname.startsWith(route + "/");
+  };
+
+  let isActive = matches(to);
+  if (isActive && siblings && to !== pathname) {
+    // Si hay un hermano mas especifico que tambien matchea, dejamos que el
+    // hermano sea el activo y este queda inactivo.
+    const moreSpecific = siblings.some(
+      (other) =>
+        other !== to &&
+        other !== "/" &&
+        other.length > to.length &&
+        matches(other),
+    );
+    if (moreSpecific) isActive = false;
+  }
 
   const base =
     variant === "vertical"

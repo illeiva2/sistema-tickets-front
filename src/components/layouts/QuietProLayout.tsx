@@ -17,6 +17,7 @@ const QuietProLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const navItems = useNavItems();
+  const navRoutes = navItems.map((i) => i.to);
   const { dark, toggleMode } = useDarkToggle();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
@@ -83,6 +84,7 @@ const QuietProLayout: React.FC = () => {
             to={item.to}
             icon={item.icon}
             variant="vertical"
+            siblings={navRoutes}
           >
             <span className="flex items-center justify-between w-full gap-2">
               <span>{item.label}</span>

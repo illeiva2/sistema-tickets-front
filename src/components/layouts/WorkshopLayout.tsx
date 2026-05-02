@@ -20,6 +20,7 @@ import {
 const WorkshopLayout: React.FC = () => {
   const location = useLocation();
   const navItems = useNavItems();
+  const navRoutes = navItems.map((i) => i.to);
   const { dark, toggleMode } = useDarkToggle();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
@@ -48,7 +49,12 @@ const WorkshopLayout: React.FC = () => {
             {/* Nav horizontal en desktop */}
             <nav className="hidden lg:flex items-center gap-1">
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} icon={item.icon}>
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  icon={item.icon}
+                  siblings={navRoutes}
+                >
                   <span className="flex items-center gap-2">
                     <span>{item.label}</span>
                     {item.showUnreadCount && <UnreadDot />}
@@ -91,6 +97,7 @@ const WorkshopLayout: React.FC = () => {
                   to={item.to}
                   icon={item.icon}
                   onNavigate={() => setDrawerOpen(false)}
+                  siblings={navRoutes}
                 >
                   <span className="flex items-center justify-between w-full gap-2">
                     <span>{item.label}</span>
