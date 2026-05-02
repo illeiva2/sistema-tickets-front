@@ -12,6 +12,7 @@ const NewTicketPage: React.FC = () => {
     title: "",
     description: "",
     priority: "MEDIUM",
+    category: "" as "" | "SOFTWARE" | "HARDWARE" | "RED" | "ERP" | "OTRO",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,7 +20,13 @@ const NewTicketPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await createTicket(formData);
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        ...(formData.category ? { category: formData.category } : {}),
+      };
+      await createTicket(payload);
       navigate("/tickets");
     } catch (error) {
       // El error ya se maneja en el hook
@@ -83,18 +90,39 @@ const NewTicketPage: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Prioridad</label>
-              <select
-                value={formData.priority}
-                onChange={(e) => handleChange("priority", e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-              >
-                <option value="LOW">Baja</option>
-                <option value="MEDIUM">Media</option>
-                <option value="HIGH">Alta</option>
-                <option value="URGENT">Urgente</option>
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Prioridad</label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => handleChange("priority", e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700"
+                >
+                  <option value="LOW">Baja</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="HIGH">Alta</option>
+                  <option value="URGENT">Urgente</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Categoría</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => handleChange("category", e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700"
+                >
+                  <option value="">Sin categoría</option>
+                  <option value="SOFTWARE">◇ Software</option>
+                  <option value="HARDWARE">▤ Hardware</option>
+                  <option value="RED">≋ Red</option>
+                  <option value="ERP">◈ ERP</option>
+                  <option value="OTRO">◯ Otro</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Ayuda a clasificar el ticket. Opcional.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2 pt-2">

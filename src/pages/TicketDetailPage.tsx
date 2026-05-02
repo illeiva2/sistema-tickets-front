@@ -29,6 +29,13 @@ import AdvancedFilePreview from "../components/AdvancedFilePreview";
 import api from "../lib/api";
 import toast from "react-hot-toast";
 import { statusLabel, priorityLabel } from "../constants/ticketLabels";
+import {
+  TICKET_CATEGORY_LABEL,
+  TICKET_CATEGORY_GLYPH,
+  TICKET_CATEGORY_STYLE,
+  ALL_CATEGORIES,
+  categoryLabel,
+} from "../constants/ticketCategories";
 import TicketTimeline from "../components/TicketTimeline";
 import Avatar from "../components/Avatar";
 
@@ -714,6 +721,62 @@ const TicketDetailPage: React.FC = () => {
                       <option value="MEDIUM">Media</option>
                       <option value="HIGH">Alta</option>
                       <option value="URGENT">Urgente</option>
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Categoría
+                </label>
+                <div className="flex items-center space-x-2">
+                  {user?.role === "USER" && ticket?.requester?.id !== user?.id ? (
+                    <span
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border ${
+                        ticket?.category
+                          ? TICKET_CATEGORY_STYLE[
+                              ticket.category as keyof typeof TICKET_CATEGORY_STYLE
+                            ]
+                          : "text-muted-foreground bg-muted border-border"
+                      }`}
+                    >
+                      {ticket?.category && (
+                        <span aria-hidden>
+                          {TICKET_CATEGORY_GLYPH[
+                            ticket.category as keyof typeof TICKET_CATEGORY_GLYPH
+                          ]}
+                        </span>
+                      )}
+                      {categoryLabel(ticket?.category)}
+                    </span>
+                  ) : (
+                    <select
+                      className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                      value={ticket?.category || ""}
+                      onChange={async (e) => {
+                        if (!ticket) return;
+                        setSaving(true);
+                        try {
+                          const resp = await api.patch(
+                            `/api/tickets/${ticket.id}`,
+                            { category: e.target.value || null },
+                          );
+                          setTicket((prev: any) => ({
+                            ...(prev || {}),
+                            ...(resp.data?.data || {}),
+                          }));
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                    >
+                      <option value="">Sin categoría</option>
+                      {ALL_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {TICKET_CATEGORY_GLYPH[c]} {TICKET_CATEGORY_LABEL[c]}
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>

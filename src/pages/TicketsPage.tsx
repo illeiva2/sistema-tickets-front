@@ -19,6 +19,12 @@ import {
   TICKET_STATUS_LABEL as STATUS_LABEL,
   TICKET_PRIORITY_LABEL as PRIORITY_LABEL,
 } from "../constants/ticketLabels";
+import {
+  TICKET_CATEGORY_LABEL,
+  TICKET_CATEGORY_GLYPH,
+  TICKET_CATEGORY_STYLE,
+  ALL_CATEGORIES,
+} from "../constants/ticketCategories";
 
 type TabId = "active" | "resolved" | "closed" | "all";
 
@@ -118,6 +124,17 @@ function TicketTableRow({
           >
             {ticket.title}
           </span>
+          {ticket.category && (
+            <span
+              className={`hidden md:inline-flex items-center gap-1 text-[10.5px] px-1.5 py-0.5 rounded-md border shrink-0 ${TICKET_CATEGORY_STYLE[ticket.category as keyof typeof TICKET_CATEGORY_STYLE] || ""}`}
+              title={TICKET_CATEGORY_LABEL[ticket.category as keyof typeof TICKET_CATEGORY_LABEL]}
+            >
+              <span aria-hidden>
+                {TICKET_CATEGORY_GLYPH[ticket.category as keyof typeof TICKET_CATEGORY_GLYPH]}
+              </span>
+              {TICKET_CATEGORY_LABEL[ticket.category as keyof typeof TICKET_CATEGORY_LABEL]}
+            </span>
+          )}
           {ticket._count?.comments > 0 && (
             <span className="hidden sm:inline-flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0">
               <MessageSquare size={11} />
@@ -363,7 +380,11 @@ const TicketsPage: React.FC = () => {
   ];
 
   const hasFilters =
-    !!filters.q || !!filters.status || !!filters.priority || !!(filters as any).assigneeId;
+    !!filters.q ||
+    !!filters.status ||
+    !!filters.priority ||
+    !!(filters as any).category ||
+    !!(filters as any).assigneeId;
 
   return (
     <div className="space-y-4">
@@ -443,6 +464,20 @@ const TicketsPage: React.FC = () => {
             <option value="MEDIUM">Media</option>
             <option value="LOW">Baja</option>
           </select>
+          <select
+            value={(filters as any).category || ""}
+            onChange={(e) =>
+              setFilters({ ...filters, category: e.target.value } as any)
+            }
+            className="px-2 py-1 text-[12.5px] border border-border rounded-md bg-background"
+          >
+            <option value="">Categoría</option>
+            {ALL_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {TICKET_CATEGORY_GLYPH[c]} {TICKET_CATEGORY_LABEL[c]}
+              </option>
+            ))}
+          </select>
           {isAgentOrAdmin && (
             <select
               value={(filters as any).assigneeId || ""}
@@ -476,6 +511,7 @@ const TicketsPage: React.FC = () => {
                   q: "",
                   status: "",
                   priority: "",
+                  category: "",
                   sortBy: "createdAt",
                   sortDir: "desc",
                 } as any;
