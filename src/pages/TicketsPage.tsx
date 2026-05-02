@@ -272,6 +272,16 @@ const TicketsPage: React.FC = () => {
     const v = window.localStorage.getItem(VIEW_MODE_KEY);
     return v === "kanban" ? "kanban" : "table";
   });
+  // Modal compartido para transiciones que requieren comentario.
+  const [transitionModal, setTransitionModal] = React.useState<
+    | {
+        ticketId: string;
+        kind: "close" | "reopen";
+        comment: string;
+      }
+    | null
+  >(null);
+  const [submittingTransition, setSubmittingTransition] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -297,6 +307,84 @@ const TicketsPage: React.FC = () => {
     } finally {
       setClaimingId(null);
     }
+  };
+
+  // Llamada genérica al endpoint indicado (para transiciones simples y para
+  // ejecutar las complejas tras pedir comentario).
+  const callTransition = async (
+    method: "patch" | "post",
+    path: string,
+    body?: any,
+  ) => {
+    try {
+      setSubmittingTransition(true);
+      const resp =
+        method === "patch"
+          ? await api.patch(path, body)
+          : await api.post(path, body);
+      if (resp.data?.success) {
+        toast.success("Ticket actualizado");
+        fetchTickets({ filters, page, pageSize });
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.error?.message ||
+          "No se pudo aplicar el cambio",
+      );
+    } finally {
+      setSubmittingTransition(false);
+    }
+  };
+
+  const handleKanbanTransition = (
+    ticketId: string,
+    from: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED",
+    to: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED",
+  ) => {
+    if (from === to) return;
+    const ticket = tickets?.find((t: any) => t.id === ticketId);
+    const hasAssignee = !!ticket?.assignee;
+
+    // Cerrar requiere comentario explicativo.
+    if (to === "CLOSED") {
+      setTransitionModal({ ticketId, kind: "close", comment: "" });
+      return;
+    }
+
+    // Reabrir desde RESOLVED o CLOSED requiere comentario.
+    if (
+      (from === "RESOLVED" || from === "CLOSED") &&
+      (to === "OPEN" || to === "IN_PROGRESS")
+    ) {
+      setTransitionModal({ ticketId, kind: "reopen", comment: "" });
+      return;
+    }
+
+    // OPEN o IN_PROGRESS → RESOLVED.
+    if (
+      to === "RESOLVED" &&
+      (from === "OPEN" || from === "IN_PROGRESS")
+    ) {
+      callTransition("post", `/api/tickets/${ticketId}/resolve`, {});
+      return;
+    }
+
+    // OPEN → IN_PROGRESS sin assignee = claim.
+    if (from === "OPEN" && to === "IN_PROGRESS" && !hasAssignee) {
+      callTransition("patch", `/api/tickets/${ticketId}/claim`);
+      return;
+    }
+
+    // OPEN ↔ IN_PROGRESS con assignee.
+    if (
+      (from === "OPEN" && to === "IN_PROGRESS") ||
+      (from === "IN_PROGRESS" && to === "OPEN")
+    ) {
+      callTransition("patch", `/api/tickets/${ticketId}`, { status: to });
+      return;
+    }
+
+    toast("Transición no soportada desde el kanban", { icon: "ℹ️" });
   };
 
   const handleReopen = async (ticketId: string) => {
@@ -627,8 +715,10 @@ const TicketsPage: React.FC = () => {
             onClaim={handleClaim}
             claimingId={claimingId}
             onReopen={handleReopen}
+            onTransition={handleKanbanTransition}
             showClaim={isAgent}
             showReopen={isAgentOrAdmin}
+            canDrag={isAgentOrAdmin}
           />
         ) : visibleTickets.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-muted-foreground">
@@ -735,6 +825,71 @@ const TicketsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de transición que requiere comentario (cerrar / reabrir) */}
+      {transitionModal && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-2">
+              {transitionModal.kind === "close"
+                ? "Cerrar ticket"
+                : "Reabrir ticket"}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              {transitionModal.kind === "close"
+                ? "Indicá por qué se cierra el ticket. El comentario queda en el historial."
+                : "Indicá el motivo de la reapertura."}
+            </p>
+            <textarea
+              value={transitionModal.comment}
+              onChange={(e) =>
+                setTransitionModal((prev) =>
+                  prev ? { ...prev, comment: e.target.value } : prev,
+                )
+              }
+              placeholder={
+                transitionModal.kind === "close"
+                  ? "Motivo del cierre…"
+                  : "Motivo de la reapertura…"
+              }
+              rows={3}
+              className="w-full px-3 py-2 border border-border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTransitionModal(null)}
+                disabled={submittingTransition}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                disabled={
+                  submittingTransition || !transitionModal.comment.trim()
+                }
+                onClick={async () => {
+                  const path =
+                    transitionModal.kind === "close"
+                      ? `/api/tickets/${transitionModal.ticketId}/close`
+                      : `/api/tickets/${transitionModal.ticketId}/reopen`;
+                  await callTransition("post", path, {
+                    comment: transitionModal.comment.trim(),
+                  });
+                  setTransitionModal(null);
+                }}
+              >
+                {submittingTransition
+                  ? "Guardando…"
+                  : transitionModal.kind === "close"
+                    ? "Cerrar"
+                    : "Reabrir"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,22 @@
-import React from "react";
-import { Hash, AlertTriangle, MessageSquare, ChevronRight } from "lucide-react";
+import React, { useState } from "react";
+import {
+  Hash,
+  AlertTriangle,
+  MessageSquare,
+  ChevronRight,
+  GripVertical,
+} from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { Button } from "@/components/ui";
 import { TICKET_STATUS_LABEL } from "../constants/ticketLabels";
 import {
@@ -10,7 +27,7 @@ import {
 import { formatSla, slaToneClasses } from "../lib/sla";
 import Avatar from "./Avatar";
 
-type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 
 const COLUMNS: Array<{ id: TicketStatus; accent: string }> = [
   { id: "OPEN", accent: "border-t-status-open" },
@@ -32,11 +49,22 @@ interface KanbanProps {
   onClaim?: (id: string) => void;
   claimingId: string | null;
   onReopen?: (id: string) => void;
+  /** Callback al soltar una card en otra columna. El receptor decide
+   *  qué endpoint llamar y cómo manejar transiciones que requieren
+   *  comentario (cerrar / reabrir). */
+  onTransition?: (
+    ticketId: string,
+    from: TicketStatus,
+    to: TicketStatus,
+  ) => void | Promise<void>;
   showClaim: boolean;
   showReopen: boolean;
+  canDrag: boolean;
 }
 
-const TicketCard: React.FC<{
+// ─── Card del ticket ──────────────────────────────────────────────────────────
+
+interface CardProps {
   ticket: any;
   onNavigate: (id: string) => void;
   onClaim?: (id: string) => void;
@@ -44,14 +72,28 @@ const TicketCard: React.FC<{
   onReopen?: (id: string) => void;
   showClaim: boolean;
   showReopen: boolean;
+  canDrag: boolean;
+  /** Cuando se renderiza dentro del DragOverlay, no usar listeners. */
+  asOverlay?: boolean;
+}
+
+const TicketCardContent: React.FC<{
+  ticket: any;
+  onNavigate?: (id: string) => void;
+  onClaim?: (id: string) => void;
+  claimingId?: string | null;
+  onReopen?: (id: string) => void;
+  showClaim?: boolean;
+  showReopen?: boolean;
+  asOverlay?: boolean;
 }> = ({
   ticket,
-  onNavigate,
   onClaim,
   claimingId,
   onReopen,
   showClaim,
   showReopen,
+  asOverlay,
 }) => {
   const isUrgent = ticket.priority === "URGENT";
   const isUnread = !ticket.isRead;
@@ -59,15 +101,8 @@ const TicketCard: React.FC<{
   const sla = formatSla(ticket.dueAt, ticket.status);
 
   return (
-    <button
-      type="button"
-      onClick={() => onNavigate(ticket.id)}
-      className={`group w-full text-left bg-card border rounded-md p-2.5 transition-all hover:shadow-sm hover:border-primary/30 ${
-        isUnread ? "border-primary/40 bg-primary/[0.02]" : "border-border"
-      }`}
-    >
-      {/* Top row: #number + priority */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1 text-[10.5px] font-mono text-muted-foreground tabular-nums">
           <Hash size={9} />
           {ticket.ticketNumber?.toString().padStart(5, "0")}
@@ -83,20 +118,18 @@ const TicketCard: React.FC<{
         </div>
       </div>
 
-      {/* Title */}
       <div
-        className={`text-[13px] leading-snug mb-2 line-clamp-2 ${
+        className={`text-[13px] leading-snug line-clamp-2 ${
           isUnread ? "font-semibold" : "font-normal"
         }`}
       >
         {ticket.title}
       </div>
 
-      {/* Tags row: SLA badge + category */}
       {(sla.tone === "danger" ||
         sla.tone === "warning" ||
         ticket.category) && (
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {(sla.tone === "danger" || sla.tone === "warning") && (
             <span
               className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md border font-medium ${slaToneClasses[sla.tone]}`}
@@ -117,7 +150,6 @@ const TicketCard: React.FC<{
         </div>
       )}
 
-      {/* Footer: requester/assignee + comments */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {ticket.assignee ? (
@@ -149,11 +181,11 @@ const TicketCard: React.FC<{
         </div>
       </div>
 
-      {/* Inline actions (solo si aplica). Stop propagation para no navegar al detalle. */}
-      {(showClaim && !ticket.assignee) || showReopen ? (
+      {((showClaim && !ticket.assignee) || showReopen) && !asOverlay ? (
         <div
-          className="flex items-center gap-1 mt-2 pt-2 border-t border-border"
+          className="flex items-center gap-1 pt-2 border-t border-border"
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {showClaim && !ticket.assignee && (
             <Button
@@ -176,14 +208,104 @@ const TicketCard: React.FC<{
               Reabrir
             </Button>
           )}
-          <span className="ml-auto text-muted-foreground/50 group-hover:text-muted-foreground">
+          <span className="ml-auto text-muted-foreground/50">
             <ChevronRight size={12} />
           </span>
         </div>
       ) : null}
-    </button>
+    </div>
   );
 };
+
+const TicketCard: React.FC<CardProps> = ({
+  ticket,
+  onNavigate,
+  onClaim,
+  claimingId,
+  onReopen,
+  showClaim,
+  showReopen,
+  canDrag,
+  asOverlay,
+}) => {
+  const isUnread = !ticket.isRead;
+  const draggable = useDraggable({
+    id: ticket.id,
+    data: { ticket },
+    disabled: !canDrag || asOverlay,
+  });
+
+  const style: React.CSSProperties = {
+    opacity: !asOverlay && draggable.isDragging ? 0.4 : 1,
+    cursor: canDrag ? "grab" : "pointer",
+  };
+
+  return (
+    <div
+      ref={canDrag && !asOverlay ? draggable.setNodeRef : undefined}
+      style={style}
+      onClick={() => !asOverlay && onNavigate(ticket.id)}
+      className={`group bg-card border rounded-md p-2.5 transition-shadow ${
+        asOverlay ? "shadow-2xl ring-2 ring-primary/40" : "hover:shadow-sm hover:border-primary/30"
+      } ${isUnread ? "border-primary/40 bg-primary/[0.02]" : "border-border"}`}
+      {...(canDrag && !asOverlay ? draggable.attributes : {})}
+      {...(canDrag && !asOverlay ? draggable.listeners : {})}
+    >
+      {canDrag && !asOverlay && (
+        <div className="absolute -top-1 -left-1 opacity-0 group-hover:opacity-60 transition-opacity pointer-events-none">
+          <GripVertical size={11} className="text-muted-foreground" />
+        </div>
+      )}
+      <TicketCardContent
+        ticket={ticket}
+        onClaim={onClaim}
+        claimingId={claimingId}
+        onReopen={onReopen}
+        showClaim={showClaim}
+        showReopen={showReopen}
+        asOverlay={asOverlay}
+      />
+    </div>
+  );
+};
+
+// ─── Columna ──────────────────────────────────────────────────────────────────
+
+const KanbanColumn: React.FC<{
+  status: TicketStatus;
+  accent: string;
+  tickets: any[];
+  isDragging: boolean;
+  children: React.ReactNode;
+}> = ({ status, accent, tickets, isDragging, children }) => {
+  const droppable = useDroppable({ id: status });
+  const isOver = droppable.isOver;
+
+  return (
+    <div
+      ref={droppable.setNodeRef}
+      className={`flex flex-col rounded-lg border-t-2 bg-muted/20 transition-colors ${accent} ${
+        isDragging
+          ? isOver
+            ? "ring-2 ring-primary ring-offset-1 bg-primary/5"
+            : "ring-1 ring-border/40"
+          : "border border-border"
+      }`}
+    >
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <h3 className="text-[12.5px] font-semibold tracking-tight">
+          {TICKET_STATUS_LABEL[status]}
+        </h3>
+        <span className="text-[10.5px] font-mono text-muted-foreground tabular-nums">
+          {tickets.length}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 p-2 min-h-[120px]">{children}</div>
+    </div>
+  );
+};
+
+// ─── Kanban ──────────────────────────────────────────────────────────────────
 
 const TicketsKanban: React.FC<KanbanProps> = ({
   tickets,
@@ -191,9 +313,19 @@ const TicketsKanban: React.FC<KanbanProps> = ({
   onClaim,
   claimingId,
   onReopen,
+  onTransition,
   showClaim,
   showReopen,
+  canDrag,
 }) => {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Sensor con activationDistance para que un click corto navegue al detalle
+  // y solo dispare drag si se mueve > 5px.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
   const grouped = COLUMNS.reduce<Record<TicketStatus, any[]>>(
     (acc, col) => {
       acc[col.id] = tickets.filter((t) => t.status === col.id);
@@ -202,49 +334,90 @@ const TicketsKanban: React.FC<KanbanProps> = ({
     { OPEN: [], IN_PROGRESS: [], RESOLVED: [], CLOSED: [] },
   );
 
-  return (
+  const activeTicket = activeId
+    ? tickets.find((t) => t.id === activeId)
+    : null;
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over) return;
+    const ticketId = String(active.id);
+    const targetStatus = String(over.id) as TicketStatus;
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
+    const fromStatus = ticket.status as TicketStatus;
+    if (fromStatus === targetStatus) return;
+    onTransition?.(ticketId, fromStatus, targetStatus);
+  };
+
+  const content = (
     <div className="overflow-x-auto p-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-[280px]">
         {COLUMNS.map((col) => {
           const items = grouped[col.id];
           return (
-            <div
+            <KanbanColumn
               key={col.id}
-              className={`flex flex-col rounded-lg border-t-2 bg-muted/20 border-border ${col.accent}`}
+              status={col.id}
+              accent={col.accent}
+              tickets={items}
+              isDragging={Boolean(activeId)}
             >
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                <h3 className="text-[12.5px] font-semibold tracking-tight">
-                  {TICKET_STATUS_LABEL[col.id]}
-                </h3>
-                <span className="text-[10.5px] font-mono text-muted-foreground tabular-nums">
-                  {items.length}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2 p-2 min-h-[120px]">
-                {items.length === 0 ? (
-                  <div className="text-[11px] text-muted-foreground text-center py-6 italic">
-                    sin tickets
-                  </div>
-                ) : (
-                  items.map((t) => (
-                    <TicketCard
-                      key={t.id}
-                      ticket={t}
-                      onNavigate={onNavigate}
-                      onClaim={onClaim}
-                      claimingId={claimingId}
-                      onReopen={onReopen}
-                      showClaim={showClaim}
-                      showReopen={showReopen}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
+              {items.length === 0 ? (
+                <div className="text-[11px] text-muted-foreground text-center py-6 italic">
+                  {canDrag && activeId ? "soltá acá" : "sin tickets"}
+                </div>
+              ) : (
+                items.map((t) => (
+                  <TicketCard
+                    key={t.id}
+                    ticket={t}
+                    onNavigate={onNavigate}
+                    onClaim={onClaim}
+                    claimingId={claimingId}
+                    onReopen={onReopen}
+                    showClaim={showClaim}
+                    showReopen={showReopen}
+                    canDrag={canDrag}
+                  />
+                ))
+              )}
+            </KanbanColumn>
           );
         })}
       </div>
     </div>
+  );
+
+  if (!canDrag) return content;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
+      {content}
+      <DragOverlay>
+        {activeTicket ? (
+          <TicketCard
+            ticket={activeTicket}
+            onNavigate={() => {}}
+            claimingId={null}
+            showClaim={false}
+            showReopen={false}
+            canDrag={false}
+            asOverlay
+          />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
 
