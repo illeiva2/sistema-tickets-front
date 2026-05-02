@@ -25,6 +25,7 @@ import {
   TICKET_CATEGORY_STYLE,
   ALL_CATEGORIES,
 } from "../constants/ticketCategories";
+import { formatSla, slaToneClasses } from "../lib/sla";
 
 type TabId = "active" | "resolved" | "closed" | "all";
 
@@ -124,6 +125,20 @@ function TicketTableRow({
           >
             {ticket.title}
           </span>
+          {(() => {
+            const sla = formatSla(ticket.dueAt, ticket.status);
+            if (sla.tone === "danger" || sla.tone === "warning") {
+              return (
+                <span
+                  className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 font-medium ${slaToneClasses[sla.tone]}`}
+                  title={sla.dueAt ? new Date(sla.dueAt).toLocaleString() : ""}
+                >
+                  {sla.text}
+                </span>
+              );
+            }
+            return null;
+          })()}
           {ticket.category && (
             <span
               className={`hidden md:inline-flex items-center gap-1 text-[10.5px] px-1.5 py-0.5 rounded-md border shrink-0 ${TICKET_CATEGORY_STYLE[ticket.category as keyof typeof TICKET_CATEGORY_STYLE] || ""}`}

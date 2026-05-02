@@ -6,7 +6,9 @@ export interface DashboardTicket {
   title: string;
   status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  category?: "SOFTWARE" | "HARDWARE" | "RED" | "ERP" | "OTRO" | null;
   isRead: boolean;
+  dueAt?: string | null;
   createdAt: string;
   updatedAt: string;
   requester: { id: string; name: string; email: string };
@@ -53,6 +55,8 @@ export interface AdminDashboardData {
   byPriority: { LOW: number; MEDIUM: number; HIGH: number; URGENT: number };
   unassignedCount: number;
   urgentActiveCount: number;
+  overdueCount: number;
+  overdueTickets: DashboardTicket[];
   unassignedTickets: DashboardTicket[];
   avgResponseHours: number | null;
   avgResolutionHours: number | null;

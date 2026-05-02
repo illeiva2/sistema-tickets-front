@@ -38,6 +38,7 @@ import {
 } from "../constants/ticketCategories";
 import TicketTimeline from "../components/TicketTimeline";
 import Avatar from "../components/Avatar";
+import { formatSla, slaToneClasses } from "../lib/sla";
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -781,6 +782,29 @@ const TicketDetailPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {(() => {
+                const sla = formatSla(ticket?.dueAt, ticket?.status ?? "OPEN");
+                if (sla.tone === "neutral" && !sla.dueAt) return null;
+                return (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      SLA
+                    </label>
+                    <div
+                      className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border ${slaToneClasses[sla.tone]}`}
+                      title={
+                        sla.dueAt
+                          ? `Vence: ${new Date(sla.dueAt).toLocaleString()}`
+                          : ""
+                      }
+                    >
+                      <Clock size={12} />
+                      {sla.text}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground">

@@ -6,6 +6,7 @@ import {
   Clock,
   Repeat,
   TrendingUp,
+  AlarmClock,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -45,8 +46,8 @@ const AdminDashboard: React.FC<{ data: AdminDashboardData }> = ({ data }) => {
 
   return (
     <div className="space-y-6">
-      {/* KPIs operativos */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {/* KPIs operativos: estados (4) + alertas (3) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
           label="Abiertos"
           value={data.totalsByStatus.OPEN}
@@ -67,6 +68,8 @@ const AdminDashboard: React.FC<{ data: AdminDashboardData }> = ({ data }) => {
           value={data.totalsByStatus.CLOSED}
           tone="slate"
         />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard
           label="Sin asignar"
           value={data.unassignedCount}
@@ -83,6 +86,18 @@ const AdminDashboard: React.FC<{ data: AdminDashboardData }> = ({ data }) => {
               className={data.urgentActiveCount > 0 ? "text-red-500" : "text-muted-foreground"}
             />
           }
+        />
+        <KpiCard
+          label="Vencidos por SLA"
+          value={data.overdueCount ?? 0}
+          tone={(data.overdueCount ?? 0) > 0 ? "red" : "default"}
+          icon={
+            <AlarmClock
+              size={16}
+              className={(data.overdueCount ?? 0) > 0 ? "text-red-500" : "text-muted-foreground"}
+            />
+          }
+          hint="Activos con dueAt vencido"
         />
       </div>
 
@@ -226,6 +241,25 @@ const AdminDashboard: React.FC<{ data: AdminDashboardData }> = ({ data }) => {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Vencidos por SLA */}
+        {(data.overdueCount ?? 0) > 0 && (
+          <Card className="border-red-200/70 dark:border-red-900/50">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2 text-red-700 dark:text-red-300">
+                <AlarmClock size={16} />
+                Vencidos por SLA (top 10)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {(data.overdueTickets ?? []).map((t) => (
+                  <TicketRow key={t.id} ticket={t} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sin asignar */}
         <Card>
           <CardHeader>

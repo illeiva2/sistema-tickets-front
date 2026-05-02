@@ -9,9 +9,11 @@ interface Ticket {
   description: string;
   status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  category?: "SOFTWARE" | "HARDWARE" | "RED" | "ERP" | "OTRO" | null;
   isRead: boolean;
   requesterId: string;
   assigneeId?: string;
+  dueAt?: string | null;
   closedAt?: string;
   createdAt: string;
   updatedAt: string;
