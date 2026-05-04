@@ -420,12 +420,16 @@ const TicketsPage: React.FC = () => {
       priority: sp.priority ?? filters.priority,
       sortBy: (sp.sortBy as any) ?? (filters as any).sortBy,
       sortDir: (sp.sortDir as any) ?? (filters as any).sortDir,
+      filter: (sp.filter as any) ?? (filters as any).filter,
     } as any;
     const initialPage = sp.page ? Number(sp.page) : page;
     const initialPageSize = sp.pageSize ? Number(sp.pageSize) : pageSize;
     if (sp.pageSize) setPageSize(initialPageSize);
     if (sp.page) setPage(initialPage);
     setFilters(initialFilters);
+    // Si venimos con triage filter desde el dashboard, default a "all" tab
+    // para no esconder los tickets bajo el sub-tab "active".
+    if (sp.filter) setTab("all");
     fetchTickets({
       filters: initialFilters,
       page: initialPage,
@@ -450,6 +454,7 @@ const TicketsPage: React.FC = () => {
     if (filters.q) sp.set("q", String(filters.q));
     if (filters.status) sp.set("status", String(filters.status));
     if (filters.priority) sp.set("priority", String(filters.priority));
+    if ((filters as any).filter) sp.set("filter", String((filters as any).filter));
     if (sortBy) sp.set("sortBy", String(sortBy));
     if (sortDir) sp.set("sortDir", String(sortDir));
     sp.set("page", String(page));
@@ -502,7 +507,21 @@ const TicketsPage: React.FC = () => {
     !!filters.status ||
     !!filters.priority ||
     !!(filters as any).category ||
-    !!(filters as any).assigneeId;
+    !!(filters as any).assigneeId ||
+    !!(filters as any).filter;
+
+  const triageFilter = (filters as any).filter as
+    | "fresh"
+    | "unassigned"
+    | "unread"
+    | "mine"
+    | undefined;
+  const TRIAGE_LABEL: Record<string, string> = {
+    fresh: "Sin leer ni asignar",
+    unassigned: "Sin asignar",
+    unread: "Sin leer",
+    mine: "Asignados a mí",
+  };
 
   return (
     <div className="space-y-4">
@@ -673,6 +692,7 @@ const TicketsPage: React.FC = () => {
                   status: "",
                   priority: "",
                   category: "",
+                  filter: "",
                   sortBy: "createdAt",
                   sortDir: "desc",
                 } as any;
@@ -685,6 +705,29 @@ const TicketsPage: React.FC = () => {
             </Button>
           )}
         </div>
+
+        {isAgentOrAdmin && triageFilter && (
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-primary/5">
+            <span className="text-[11.5px] text-muted-foreground">
+              Filtro de triage:
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium px-2 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/30">
+              {TRIAGE_LABEL[triageFilter]}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const next = { ...filters, filter: "" } as any;
+                setFilters(next);
+                setPage(1);
+                fetchTickets({ filters: next, page: 1, pageSize });
+              }}
+              className="text-[11.5px] text-muted-foreground hover:text-foreground ml-1"
+            >
+              Quitar
+            </button>
+          </div>
+        )}
 
         {/* Lista */}
         {isLoading ? (
