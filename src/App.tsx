@@ -1,6 +1,7 @@
 // React 18 with jsx:react-jsx doesn't require explicit import
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -93,6 +94,7 @@ function App() {
           </Route>
           </Routes>
           <Toaster position="top-right" />
+          <SpeedInsights />
         </div>
       </AuthProvider>
     </ErrorBoundary>
