@@ -18,6 +18,7 @@ import {
   User,
   ChevronDown,
   Settings,
+  BookOpen,
 } from "lucide-react";
 import { useAuth, useTickets } from "../../hooks";
 import { useNotificationsContext } from "../../contexts/NotificationsContext";
@@ -323,6 +324,7 @@ export const useNavItems = (): NavItem[] => {
     { to: "/", label: "Dashboard", icon: <BarChart3 size={16} /> },
     { to: "/tickets", label: "Tickets", icon: <Ticket size={16} /> },
     { to: "/tickets/new", label: "Nuevo ticket", icon: <Plus size={16} /> },
+    { to: "/resources", label: "Recursos", icon: <BookOpen size={16} /> },
     {
       to: "/files",
       label: "Archivos",
