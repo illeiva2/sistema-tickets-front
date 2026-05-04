@@ -48,6 +48,8 @@ interface TicketFilters {
   pageSize?: number;
   sortBy?: string;
   sortDir?: string;
+  // Triage filters (solo aplican para AGENT/ADMIN)
+  filter?: "fresh" | "unassigned" | "unread" | "mine" | "";
 }
 
 interface FetchOverrides {
