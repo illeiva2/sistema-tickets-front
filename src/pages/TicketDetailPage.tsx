@@ -22,6 +22,8 @@ import {
   CheckCircle,
   Lock,
   RotateCcw,
+  Share2,
+  X as XIcon,
 } from "lucide-react";
 import { useTickets, useAuth } from "../hooks";
 import FileUploadZone from "../components/FileUploadZone";
@@ -38,6 +40,7 @@ import {
 } from "../constants/ticketCategories";
 import TicketTimeline from "../components/TicketTimeline";
 import Avatar from "../components/Avatar";
+import TicketShareModal from "../components/TicketShareModal";
 import { formatSla, slaToneClasses } from "../lib/sla";
 
 // Tiempo abreviado relativo para la lista de viewers ("hace 2h", "hace 3d").
@@ -74,6 +77,7 @@ const TicketDetailPage: React.FC = () => {
   const [resolveComment, setResolveComment] = useState("");
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [reopenComment, setReopenComment] = useState("");
+  const [showShareModal, setShowShareModal] = useState(false);
   const [composerMode, setComposerMode] = useState<"public" | "internal">(
     "public",
   );
@@ -124,6 +128,40 @@ const TicketDetailPage: React.FC = () => {
   // Función para formatear el número del ticket
   const formatTicketNumber = (ticketNumber: number) => {
     return ticketNumber.toString().padStart(5, "0");
+  };
+
+  // Recarga el ticket desde el back. Lo usamos despues de compartir/quitar.
+  const reloadTicket = React.useCallback(async () => {
+    if (!id) return;
+    try {
+      const t = await getTicketById(id);
+      if (t) setTicket(t);
+    } catch (error) {
+      console.error("Error reloading ticket:", error);
+    }
+  }, [id, getTicketById]);
+
+  // Quitar un share del ticket (solo assignee, ADMIN o el propio destinatario).
+  const handleUnshare = async (sharedWithUserId: string) => {
+    if (!ticket) return;
+    if (
+      !confirm(
+        "¿Quitar el acceso compartido de este agente al ticket?",
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete(
+        `/api/tickets/${ticket.id}/share/${sharedWithUserId}`,
+      );
+      toast.success("Acceso retirado");
+      await reloadTicket();
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.error?.message || "No se pudo retirar el acceso",
+      );
+    }
   };
 
   React.useEffect(() => {
@@ -680,6 +718,28 @@ const TicketDetailPage: React.FC = () => {
                       );
                     }
 
+                    // Compartir: assignee o ADMIN, sobre tickets activos.
+                    const isAssignee = ticket.assignee?.id === user.id;
+                    if (
+                      isStaff &&
+                      (isAssignee || role === "ADMIN") &&
+                      status !== "CLOSED"
+                    ) {
+                      buttons.push(
+                        <Button
+                          key="share"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowShareModal(true)}
+                          disabled={saving}
+                          className="justify-start"
+                        >
+                          <Share2 size={14} className="mr-2" />
+                          Compartir
+                        </Button>,
+                      );
+                    }
+
                     if (buttons.length === 0) return null;
 
                     return (
@@ -913,6 +973,65 @@ const TicketDetailPage: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Compartido con: lista de shares + permite quitar acceso. */}
+              {(user?.role === "AGENT" || user?.role === "ADMIN") &&
+                Array.isArray(ticket?.shares) &&
+                ticket.shares.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-border/60">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Compartido con
+                    </label>
+                    <ul className="space-y-1.5">
+                      {ticket.shares.map((s: any) => {
+                        const isMyShare = s.sharedWith?.id === user?.id;
+                        const isAssigneeOfTicket =
+                          ticket.assignee?.id === user?.id;
+                        const canUnshare =
+                          user?.role === "ADMIN" ||
+                          isAssigneeOfTicket ||
+                          isMyShare;
+                        return (
+                          <li
+                            key={s.id}
+                            className="flex items-center gap-2 text-[12px]"
+                            title={
+                              s.message
+                                ? `"${s.message}" — ${s.sharedBy?.name}`
+                                : `Compartido por ${s.sharedBy?.name}`
+                            }
+                          >
+                            <Avatar
+                              name={s.sharedWith?.name}
+                              email={s.sharedWith?.email}
+                              size={18}
+                            />
+                            <span className="truncate flex-1 min-w-0">
+                              {s.sharedWith?.name || s.sharedWith?.email}
+                              {isMyShare && (
+                                <span className="ml-1.5 text-[10.5px] text-primary">
+                                  (vos)
+                                </span>
+                              )}
+                            </span>
+                            {canUnshare && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUnshare(s.sharedWith?.id)
+                                }
+                                className="text-muted-foreground hover:text-destructive shrink-0"
+                                title="Quitar acceso"
+                              >
+                                <XIcon size={12} />
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
 
               {/* Lista de viewers (solo para staff). Muestra quien y cuando
                   abrio este ticket. Si nadie lo abrio aun, no se muestra. */}
@@ -1239,6 +1358,26 @@ const TicketDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal compartir ticket con otro agente */}
+      {ticket && (
+        <TicketShareModal
+          open={showShareModal}
+          ticketId={ticket.id}
+          agents={agents}
+          excludeUserIds={[
+            ...(ticket.assignee?.id ? [ticket.assignee.id] : []),
+            ...(Array.isArray(ticket.shares)
+              ? ticket.shares
+                  .map((s: any) => s.sharedWith?.id)
+                  .filter(Boolean)
+              : []),
+            ...(user?.id ? [user.id] : []),
+          ]}
+          onClose={() => setShowShareModal(false)}
+          onShared={reloadTicket}
+        />
       )}
     </div>
   );
