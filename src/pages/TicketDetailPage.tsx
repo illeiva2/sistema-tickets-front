@@ -40,6 +40,17 @@ import TicketTimeline from "../components/TicketTimeline";
 import Avatar from "../components/Avatar";
 import { formatSla, slaToneClasses } from "../lib/sla";
 
+// Tiempo abreviado relativo para la lista de viewers ("hace 2h", "hace 3d").
+function viewerTimeAgo(date: string | Date): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 60) return "ahora";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  return d.toLocaleDateString();
+}
+
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -902,6 +913,52 @@ const TicketDetailPage: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Lista de viewers (solo para staff). Muestra quien y cuando
+                  abrio este ticket. Si nadie lo abrio aun, no se muestra. */}
+              {(user?.role === "AGENT" || user?.role === "ADMIN") &&
+                Array.isArray(ticket?.viewers) &&
+                ticket.viewers.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-border/60">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Visto por
+                    </label>
+                    <ul className="space-y-1.5">
+                      {ticket.viewers
+                        .slice(0, 6)
+                        .map((v: any) => (
+                          <li
+                            key={v.user?.id}
+                            className="flex items-center gap-2 text-[12px]"
+                            title={
+                              v.lastReadAt
+                                ? new Date(v.lastReadAt).toLocaleString()
+                                : ""
+                            }
+                          >
+                            <Avatar
+                              name={v.user?.name}
+                              email={v.user?.email}
+                              size={18}
+                            />
+                            <span className="truncate flex-1 min-w-0">
+                              {v.user?.name || v.user?.email}
+                            </span>
+                            <span className="text-muted-foreground text-[11px] shrink-0">
+                              {v.lastReadAt
+                                ? viewerTimeAgo(v.lastReadAt)
+                                : ""}
+                            </span>
+                          </li>
+                        ))}
+                      {ticket.viewers.length > 6 && (
+                        <li className="text-[11px] text-muted-foreground">
+                          +{ticket.viewers.length - 6} más
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
             </CardContent>
           </Card>
 
