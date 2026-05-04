@@ -41,6 +41,8 @@ import {
 import TicketTimeline from "../components/TicketTimeline";
 import Avatar from "../components/Avatar";
 import TicketShareModal from "../components/TicketShareModal";
+import CollapsibleSection from "../components/CollapsibleSection";
+import { Activity } from "lucide-react";
 import { formatSla, slaToneClasses } from "../lib/sla";
 
 // Tiempo abreviado relativo para la lista de viewers ("hace 2h", "hace 3d").
@@ -1082,85 +1084,88 @@ const TicketDetailPage: React.FC = () => {
           </Card>
 
           {ticket?.id && (
-            <Card>
-              <CardContent className="px-4 py-4">
-                <TicketTimeline
-                  ticketId={ticket.id}
-                  refreshKey={ticket?.updatedAt}
-                />
-              </CardContent>
-            </Card>
+            <CollapsibleSection
+              icon={<Activity size={16} />}
+              title="Actividad"
+              hint="Historial del ticket"
+            >
+              <TicketTimeline
+                ticketId={ticket.id}
+                refreshKey={ticket?.updatedAt}
+              />
+            </CollapsibleSection>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 px-3 pt-2">
-                <Paperclip size={20} />
-                <span>Archivos</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pt-4 pb-2">
-              {/* Zona de upload con drag & drop */}
-              <FileUploadZone
-                ticketId={id!}
-                maxFiles={20}
-                maxSize={10 * 1024 * 1024} // 10MB
-                onSuccess={(newAttachments) => {
-                  setTicket((prev: any) => {
-                    if (!prev) return prev;
-                    const attachments = prev.attachments
-                      ? [...newAttachments, ...prev.attachments]
-                      : newAttachments;
-                    return { ...prev, attachments };
-                  });
-                }}
-                onError={(error) => {
-                  console.error("Error uploading files:", error);
-                }}
-                className="mb-4"
-              />
+          <CollapsibleSection
+            icon={<Paperclip size={16} />}
+            title="Archivos"
+            count={ticket?.attachments?.length ?? 0}
+            hint={
+              ticket?.attachments?.length
+                ? undefined
+                : "Sin archivos adjuntos"
+            }
+          >
+            {/* Zona de upload con drag & drop */}
+            <FileUploadZone
+              ticketId={id!}
+              maxFiles={20}
+              maxSize={10 * 1024 * 1024} // 10MB
+              onSuccess={(newAttachments) => {
+                setTicket((prev: any) => {
+                  if (!prev) return prev;
+                  const attachments = prev.attachments
+                    ? [...newAttachments, ...prev.attachments]
+                    : newAttachments;
+                  return { ...prev, attachments };
+                });
+              }}
+              onError={(error) => {
+                console.error("Error uploading files:", error);
+              }}
+              className="mb-4"
+            />
 
-              {/* Lista de archivos existentes */}
-              {ticket?.attachments && ticket.attachments.length > 0 ? (
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-muted-foreground">
-                    Archivos adjuntos ({ticket.attachments.length})
-                  </h4>
-                  {ticket.attachments.map((attachment: any) => (
-                    <AdvancedFilePreview
-                      key={attachment.id}
-                      attachment={attachment}
-                      onDelete={async (attachmentId) => {
-                        try {
-                          await api.delete(`/api/attachments/${attachmentId}`);
-                          setTicket((prev: any) => {
-                            if (!prev) return prev;
-                            const attachments = (prev.attachments || []).filter(
-                              (a: any) => a.id !== attachmentId,
-                            );
-                            return { ...prev, attachments };
-                          });
-                          toast.success("Archivo eliminado correctamente");
-                        } catch (error: any) {
-                          const message =
-                            error.response?.data?.error?.message ||
-                            "Error al eliminar archivo";
-                          toast.error(message);
-                        }
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<Paperclip size={32} />}
-                  title="Sin archivos"
-                  description="No se han adjuntado archivos a este ticket."
-                  action={null}
-                />
-              )}
-            </CardContent>
-          </Card>
+            {/* Lista de archivos existentes */}
+            {ticket?.attachments && ticket.attachments.length > 0 ? (
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground">
+                  Archivos adjuntos ({ticket.attachments.length})
+                </h4>
+                {ticket.attachments.map((attachment: any) => (
+                  <AdvancedFilePreview
+                    key={attachment.id}
+                    attachment={attachment}
+                    onDelete={async (attachmentId) => {
+                      try {
+                        await api.delete(`/api/attachments/${attachmentId}`);
+                        setTicket((prev: any) => {
+                          if (!prev) return prev;
+                          const attachments = (prev.attachments || []).filter(
+                            (a: any) => a.id !== attachmentId,
+                          );
+                          return { ...prev, attachments };
+                        });
+                        toast.success("Archivo eliminado correctamente");
+                      } catch (error: any) {
+                        const message =
+                          error.response?.data?.error?.message ||
+                          "Error al eliminar archivo";
+                        toast.error(message);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Paperclip size={32} />}
+                title="Sin archivos"
+                description="No se han adjuntado archivos a este ticket."
+                action={null}
+              />
+            )}
+          </CollapsibleSection>
         </div>
       </div>
 
