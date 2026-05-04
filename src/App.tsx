@@ -10,6 +10,9 @@ import NewTicketPage from "./pages/NewTicketPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import FileManagementPage from "./pages/FileManagementPage";
 import UsersPage from "./pages/UsersPage";
+import ResourcesPage from "./pages/ResourcesPage";
+import ResourceDetailPage from "./pages/ResourceDetailPage";
+import ResourceEditorPage from "./pages/ResourceEditorPage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 import SetupPasswordPage from "./pages/SetupPasswordPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
@@ -67,6 +70,24 @@ function App() {
                 </RoleProtectedRoute>
               }
             />
+            <Route path="resources" element={<ResourcesPage />} />
+            <Route
+              path="resources/new"
+              element={
+                <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ResourceEditorPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="resources/:id/edit"
+              element={
+                <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                  <ResourceEditorPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route path="resources/:idOrSlug" element={<ResourceDetailPage />} />
             <Route path="setup-password" element={<SetupPasswordPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />
           </Route>

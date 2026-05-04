@@ -1,0 +1,46 @@
+export type ResourceCategory =
+  | "HOW_TO"
+  | "POLICY"
+  | "FAQ"
+  | "ANNOUNCEMENT"
+  | "GLOSSARY"
+  | "LINK"
+  | "OTHER";
+
+export interface ResourceListItem {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  category: ResourceCategory;
+  tags: string[];
+  isPublished: boolean;
+  viewCount: number;
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { id: string; name: string; email: string } | null;
+}
+
+export interface Resource extends ResourceListItem {
+  content: string;
+}
+
+export interface ResourceSuggestion {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  category: ResourceCategory;
+  tags: string[];
+}
+
+export interface ResourceListResponse {
+  data: ResourceListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
