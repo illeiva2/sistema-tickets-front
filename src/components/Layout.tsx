@@ -1,24 +1,36 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import QuietProLayout from "./layouts/QuietProLayout";
 import WorkshopLayout from "./layouts/WorkshopLayout";
 import CommandPalette from "./CommandPalette";
 import PinnedModalAnnouncements from "./PinnedModalAnnouncements";
+import OnboardingTour from "./OnboardingTour";
+import { ONBOARDING_STEPS, TOUR_STORAGE_KEY } from "../constants/tourSteps";
+import { ONBOARDING_REPLAY_EVENT } from "../lib/onboarding";
 
 // Wrapper que ramifica al layout adecuado segun el theme activo.
-// Cada layout maneja su propia version de NavLinks, drawer mobile,
-// dropdown de usuario, etc; lo comun esta extraido a layouts/_shared.tsx.
-// El CommandPalette se monta a este nivel para que el atajo Cmd/Ctrl+K
-// funcione en cualquier ruta protegida sin importar el layout activo.
-// PinnedModalAnnouncements se monta aca para que aparezca como overlay
-// la primera vez que el user entra a la app en cada sesion.
 const Layout: React.FC = () => {
   const { theme } = useTheme();
+  const [tourForce, setTourForce] = useState(0);
+
+  React.useEffect(() => {
+    const handler = () => setTourForce((n) => n + 1);
+    window.addEventListener(ONBOARDING_REPLAY_EVENT, handler);
+    return () => window.removeEventListener(ONBOARDING_REPLAY_EVENT, handler);
+  }, []);
+
   return (
     <>
       {theme === "workshop" ? <WorkshopLayout /> : <QuietProLayout />}
       <CommandPalette />
       <PinnedModalAnnouncements />
+      {/* key cambia cuando se replay para remontar y forzar visibilidad */}
+      <OnboardingTour
+        key={tourForce}
+        steps={ONBOARDING_STEPS}
+        storageKey={TOUR_STORAGE_KEY}
+        forceShow={tourForce > 0}
+      />
     </>
   );
 };

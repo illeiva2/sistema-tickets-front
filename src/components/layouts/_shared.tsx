@@ -19,7 +19,9 @@ import {
   ChevronDown,
   Settings,
   BookOpen,
+  HelpCircle,
 } from "lucide-react";
+import { replayOnboardingTour } from "../../lib/onboarding";
 import { useAuth, useTickets } from "../../hooks";
 import { useNotificationsContext } from "../../contexts/NotificationsContext";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -293,6 +295,13 @@ const UserMenuItems: React.FC<{
       >
         <Settings size={16} className="mr-3" />
         Cambiar contraseña
+      </button>
+      <button
+        onClick={() => replayOnboardingTour()}
+        className="flex items-center w-full px-4 py-2 text-sm hover:bg-muted transition-colors"
+      >
+        <HelpCircle size={16} className="mr-3" />
+        Ver tour de nuevo
       </button>
       <ThemeSwitcher />
       <div className="border-t border-border pt-1">
