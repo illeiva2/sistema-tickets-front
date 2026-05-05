@@ -24,6 +24,9 @@ const ResourceEditorPage: React.FC = () => {
   const [tagsInput, setTagsInput] = useState("");
   const [isPublished, setIsPublished] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [showAsModal, setShowAsModal] = useState(false);
+  // Datetime-local input usa formato "YYYY-MM-DDTHH:mm" sin TZ.
+  const [pinExpiresAt, setPinExpiresAt] = useState("");
   const [showPreview, setShowPreview] = useState(false);
 
   const [loading, setLoading] = useState(isEditing);
@@ -45,6 +48,18 @@ const ResourceEditorPage: React.FC = () => {
           setTagsInput(r.tags.join(", "));
           setIsPublished(r.isPublished);
           setIsPinned(r.isPinned ?? false);
+          setShowAsModal(r.showAsModal ?? false);
+          // Convertir ISO a formato datetime-local (sin segundos ni TZ)
+          if (r.pinExpiresAt) {
+            const d = new Date(r.pinExpiresAt);
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+              d.getDate(),
+            )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            setPinExpiresAt(local);
+          } else {
+            setPinExpiresAt("");
+          }
         }
       } catch (e: any) {
         toast.error(
@@ -69,6 +84,14 @@ const ResourceEditorPage: React.FC = () => {
       .slice(0, 20);
 
   const handleSave = async (publishOverride?: boolean) => {
+    // Convertir datetime-local a ISO. Si no hay fecha o no esta pinned,
+    // mandamos null para "sin vencimiento".
+    let pinExpiresAtIso: string | null = null;
+    if (isPinned && pinExpiresAt) {
+      const d = new Date(pinExpiresAt);
+      if (!isNaN(d.getTime())) pinExpiresAtIso = d.toISOString();
+    }
+
     const payload = {
       title: title.trim(),
       content,
@@ -78,6 +101,9 @@ const ResourceEditorPage: React.FC = () => {
       isPublished:
         publishOverride === undefined ? isPublished : publishOverride,
       isPinned,
+      // Solo aplican si esta pinned. Si no, los ignoramos.
+      showAsModal: isPinned && showAsModal,
+      pinExpiresAt: pinExpiresAtIso,
     };
 
     if (payload.title.length < 3) {
@@ -225,25 +251,82 @@ const ResourceEditorPage: React.FC = () => {
             />
           </div>
 
-          {/* Toggle "destacar" — pinea el recurso arriba del listado y, si es
-              ANNOUNCEMENT, lo muestra como banner en el dashboard. */}
-          <label className="flex items-start gap-2 cursor-pointer select-none p-2 rounded-md border border-border bg-card/40 hover:bg-card transition-colors">
-            <input
-              type="checkbox"
-              checked={isPinned}
-              onChange={(e) => setIsPinned(e.target.checked)}
-              className="mt-0.5 rounded border-border"
-            />
-            <span className="flex-1 min-w-0">
-              <span className="block text-[12.5px] font-medium">
-                📌 Destacar
+          {/* Bloque de "destacado": pin + opciones extras (modal y vencimiento)
+              que solo aplican cuando el recurso está pinned. */}
+          <div className="rounded-md border border-border bg-card/40 p-3 space-y-3">
+            <label className="flex items-start gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isPinned}
+                onChange={(e) => setIsPinned(e.target.checked)}
+                className="mt-0.5 rounded border-border"
+              />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[12.5px] font-medium">
+                  📌 Destacar
+                </span>
+                <span className="block text-[11.5px] text-muted-foreground">
+                  Aparece arriba del listado de Recursos. Si es un Aviso,
+                  también se muestra como banner en el Dashboard.
+                </span>
               </span>
-              <span className="block text-[11.5px] text-muted-foreground">
-                Aparece arriba del listado de Recursos. Si es un Aviso, también
-                se muestra como banner en el Dashboard.
-              </span>
-            </span>
-          </label>
+            </label>
+
+            {isPinned && (
+              <div className="space-y-3 pl-6 pt-2 border-t border-border">
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showAsModal}
+                    onChange={(e) => setShowAsModal(e.target.checked)}
+                    className="mt-0.5 rounded border-border"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[12.5px] font-medium">
+                      🔔 Mostrar como ventana al entrar
+                    </span>
+                    <span className="block text-[11.5px] text-muted-foreground">
+                      Aparece como modal flotante la primera vez que el
+                      usuario entra a la app en cada sesión. Si lo cierra, no
+                      vuelve a aparecer hasta que edites el recurso. No se
+                      muestra en el banner.
+                    </span>
+                  </span>
+                </label>
+
+                <div className="space-y-1">
+                  <label className="text-[12.5px] font-medium block">
+                    ⏰ Vencimiento del destacado{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (opcional)
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="datetime-local"
+                      value={pinExpiresAt}
+                      onChange={(e) => setPinExpiresAt(e.target.value)}
+                      className="px-2 py-1.5 text-sm border border-border rounded-md bg-background"
+                    />
+                    {pinExpiresAt && (
+                      <button
+                        type="button"
+                        onClick={() => setPinExpiresAt("")}
+                        className="text-[11.5px] text-muted-foreground hover:text-foreground"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11.5px] text-muted-foreground">
+                    A partir de esa fecha el destacado se desactiva
+                    automáticamente (deja de aparecer en banner / modal). Si
+                    no se especifica, no vence (ej: manual de uso).
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-1">
             <label className="text-[12.5px] font-medium text-muted-foreground flex items-center justify-between">

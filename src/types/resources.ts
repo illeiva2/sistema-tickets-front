@@ -16,6 +16,8 @@ export interface ResourceListItem {
   tags: string[];
   isPublished: boolean;
   isPinned: boolean;
+  showAsModal: boolean;
+  pinExpiresAt: string | null;
   viewCount: number;
   authorId: string;
   createdAt: string;
