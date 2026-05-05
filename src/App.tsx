@@ -2,6 +2,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { Analytics } from "@vercel/analytics/react";
 
 // Componentes que SI van en el bundle inicial: layout, providers,
 // proteccion de rutas, error boundary. Son indispensables y livianos.
@@ -111,6 +112,7 @@ function App() {
             </Routes>
           </Suspense>
           <Toaster position="top-right" />
+          <Analytics />
         </div>
       </AuthProvider>
     </ErrorBoundary>
