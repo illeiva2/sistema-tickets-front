@@ -7,6 +7,7 @@ import {
   Search,
   Eye,
   Tag as TagIcon,
+  Pin,
 } from "lucide-react";
 import api from "../lib/api";
 import { useAuth } from "../hooks";
@@ -158,11 +159,24 @@ const ResourcesPage: React.FC = () => {
             <li key={r.id}>
               <Link
                 to={`/resources/${r.slug}`}
-                className="group block p-4 border border-border rounded-lg bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                className={`group block p-4 border rounded-lg hover:shadow-sm transition-all ${
+                  r.isPinned
+                    ? "border-primary/40 bg-primary/[0.025] hover:border-primary/60"
+                    : "border-border bg-card hover:border-primary/40"
+                }`}
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
+                      {r.isPinned && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10.5px] px-1.5 py-0.5 rounded-md border border-primary/40 bg-primary/10 text-primary font-medium"
+                          title="Destacado"
+                        >
+                          <Pin size={10} className="rotate-45" />
+                          Destacado
+                        </span>
+                      )}
                       <span
                         className={`inline-flex items-center gap-1 text-[10.5px] px-1.5 py-0.5 rounded-md border ${RESOURCE_CATEGORY_STYLE[r.category]}`}
                       >

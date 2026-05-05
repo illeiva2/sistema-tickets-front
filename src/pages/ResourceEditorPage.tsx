@@ -23,6 +23,7 @@ const ResourceEditorPage: React.FC = () => {
   const [category, setCategory] = useState<ResourceCategory>("HOW_TO");
   const [tagsInput, setTagsInput] = useState("");
   const [isPublished, setIsPublished] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
   const [loading, setLoading] = useState(isEditing);
@@ -43,6 +44,7 @@ const ResourceEditorPage: React.FC = () => {
           setCategory(r.category);
           setTagsInput(r.tags.join(", "));
           setIsPublished(r.isPublished);
+          setIsPinned(r.isPinned ?? false);
         }
       } catch (e: any) {
         toast.error(
@@ -75,6 +77,7 @@ const ResourceEditorPage: React.FC = () => {
       tags: parseTags(tagsInput),
       isPublished:
         publishOverride === undefined ? isPublished : publishOverride,
+      isPinned,
     };
 
     if (payload.title.length < 3) {
@@ -221,6 +224,26 @@ const ResourceEditorPage: React.FC = () => {
               className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background resize-none"
             />
           </div>
+
+          {/* Toggle "destacar" — pinea el recurso arriba del listado y, si es
+              ANNOUNCEMENT, lo muestra como banner en el dashboard. */}
+          <label className="flex items-start gap-2 cursor-pointer select-none p-2 rounded-md border border-border bg-card/40 hover:bg-card transition-colors">
+            <input
+              type="checkbox"
+              checked={isPinned}
+              onChange={(e) => setIsPinned(e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <span className="flex-1 min-w-0">
+              <span className="block text-[12.5px] font-medium">
+                📌 Destacar
+              </span>
+              <span className="block text-[11.5px] text-muted-foreground">
+                Aparece arriba del listado de Recursos. Si es un Aviso, también
+                se muestra como banner en el Dashboard.
+              </span>
+            </span>
+          </label>
 
           <div className="space-y-1">
             <label className="text-[12.5px] font-medium text-muted-foreground flex items-center justify-between">

@@ -15,6 +15,7 @@ export interface ResourceListItem {
   category: ResourceCategory;
   tags: string[];
   isPublished: boolean;
+  isPinned: boolean;
   viewCount: number;
   authorId: string;
   createdAt: string;
