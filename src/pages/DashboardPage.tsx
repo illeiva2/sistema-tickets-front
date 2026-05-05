@@ -8,6 +8,7 @@ import UserDashboard from "../components/dashboards/UserDashboard";
 import AgentDashboard from "../components/dashboards/AgentDashboard";
 import AdminDashboard from "../components/dashboards/AdminDashboard";
 import TicketsTriagePanel from "../components/TicketsTriagePanel";
+import PinnedAnnouncementsBanner from "../components/PinnedAnnouncementsBanner";
 import type { DashboardPeriod } from "../types/dashboard";
 
 const PERIOD_OPTIONS: Array<{ value: DashboardPeriod; label: string }> = [
@@ -140,6 +141,9 @@ const DashboardPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Banner de avisos destacados (visible para todos los roles) */}
+      <PinnedAnnouncementsBanner />
 
       {/* Panel de triage destacado para AGENT/ADMIN */}
       {(user?.role === "AGENT" || user?.role === "ADMIN") && (
