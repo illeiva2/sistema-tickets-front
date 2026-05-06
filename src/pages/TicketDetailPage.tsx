@@ -143,6 +143,25 @@ const TicketDetailPage: React.FC = () => {
     }
   }, [id, getTicketById]);
 
+  // Aplica el resultado de una mutacion preservando los arrays que el
+  // endpoint puede no devolver (claim no incluye comments/attachments,
+  // por ejemplo). Sin esto, los comentarios desaparecen de la UI tras
+  // cualquier accion sobre el ticket.
+  const mergeTicketUpdate = React.useCallback((updated: any) => {
+    if (!updated) return;
+    setTicket((prev: any) => {
+      if (!prev) return updated;
+      return {
+        ...prev,
+        ...updated,
+        comments: updated.comments ?? prev.comments,
+        attachments: updated.attachments ?? prev.attachments,
+        viewers: updated.viewers ?? prev.viewers,
+        shares: updated.shares ?? prev.shares,
+      };
+    });
+  }, []);
+
   // Quitar un share del ticket (solo assignee, ADMIN o el propio destinatario).
   const handleUnshare = async (sharedWithUserId: string) => {
     if (!ticket) return;
@@ -220,7 +239,7 @@ const TicketDetailPage: React.FC = () => {
 
       if (response.data.success) {
         toast.success("Ticket cerrado correctamente");
-        setTicket(response.data.data);
+        mergeTicketUpdate(response.data.data);
         setShowCloseModal(false);
         setCloseComment("");
       }
@@ -239,7 +258,7 @@ const TicketDetailPage: React.FC = () => {
       const response = await api.patch(`/api/tickets/${id}/claim`);
       if (response.data.success) {
         toast.success("¡Ticket reclamado! Ahora está asignado a ti.");
-        setTicket(response.data.data);
+        mergeTicketUpdate(response.data.data);
       }
     } catch (error: any) {
       const message =
@@ -258,7 +277,7 @@ const TicketDetailPage: React.FC = () => {
       });
       if (response.data.success) {
         toast.success("Ticket resuelto");
-        setTicket(response.data.data);
+        mergeTicketUpdate(response.data.data);
         setShowResolveModal(false);
         setResolveComment("");
       }
@@ -283,7 +302,7 @@ const TicketDetailPage: React.FC = () => {
       });
       if (response.data.success) {
         toast.success("Ticket reabierto");
-        setTicket(response.data.data);
+        mergeTicketUpdate(response.data.data);
         setShowReopenModal(false);
         setReopenComment("");
       }

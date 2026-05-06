@@ -737,16 +737,72 @@ const TicketsPage: React.FC = () => {
             ))}
           </div>
         ) : !tickets || tickets.length === 0 ? (
-          <div className="p-6">
-            <TicketsEmptyState
-              action={
-                <Button onClick={() => navigate("/tickets/new")}>
-                  <Plus size={16} className="mr-2" />
-                  Crear Primer Ticket
-                </Button>
-              }
-            />
-          </div>
+          // Empty state contextual: si hay filtros aplicados (triage o
+          // normales), mostramos mensaje y boton para limpiarlos en vez del
+          // "Crear primer ticket" que confunde cuando viene de un filtro.
+          triageFilter ? (
+            <div className="px-4 py-12 text-center space-y-3">
+              <div className="text-sm font-medium">
+                No hay tickets que coincidan con{" "}
+                <span className="text-primary">
+                  «{TRIAGE_LABEL[triageFilter]}»
+                </span>
+              </div>
+              <p className="text-[12.5px] text-muted-foreground max-w-sm mx-auto">
+                Es posible que el ticket que buscás haya cambiado de estado
+                (por ejemplo, después de reclamarlo ya no es «sin asignar»).
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const next = { ...filters, filter: "" } as any;
+                  setFilters(next);
+                  setPage(1);
+                  fetchTickets({ filters: next, page: 1, pageSize });
+                }}
+              >
+                Quitar filtro y ver todos
+              </Button>
+            </div>
+          ) : hasFilters ? (
+            <div className="px-4 py-12 text-center space-y-3">
+              <div className="text-sm font-medium">
+                No hay tickets que coincidan con los filtros aplicados
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const cleared = {
+                    q: "",
+                    status: "",
+                    priority: "",
+                    category: "",
+                    filter: "",
+                    sortBy: "createdAt",
+                    sortDir: "desc",
+                  } as any;
+                  setFilters(cleared);
+                  setPage(1);
+                  fetchTickets({ filters: cleared, page: 1, pageSize });
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : (
+            <div className="p-6">
+              <TicketsEmptyState
+                action={
+                  <Button onClick={() => navigate("/tickets/new")}>
+                    <Plus size={16} className="mr-2" />
+                    Crear Primer Ticket
+                  </Button>
+                }
+              />
+            </div>
+          )
         ) : viewMode === "kanban" ? (
           <TicketsKanban
             tickets={tickets}
