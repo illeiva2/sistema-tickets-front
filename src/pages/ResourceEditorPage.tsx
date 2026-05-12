@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui";
-import { ArrowLeft, Eye, Save, Sparkles } from "lucide-react";
+import { ArrowLeft, Eye, Image as ImageIcon, Save, Sparkles } from "lucide-react";
 import api from "../lib/api";
 import toast from "react-hot-toast";
 import type { Resource, ResourceCategory } from "../types/resources";
@@ -50,6 +50,106 @@ const ResourceEditorPage: React.FC = () => {
 
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Refs para el textarea de contenido + el input file oculto que dispara
+  // el botón "Insertar imagen".
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Inserta un fragmento de markdown en la posición actual del cursor del
+  // textarea de contenido. Si no hay foco, lo apendea al final.
+  const insertAtCursor = (markdown: string) => {
+    const ta = contentRef.current;
+    if (!ta) {
+      setContent((prev) => prev + markdown);
+      return;
+    }
+    const start = ta.selectionStart ?? content.length;
+    const end = ta.selectionEnd ?? content.length;
+    const before = content.slice(0, start);
+    const after = content.slice(end);
+    const next = before + markdown + after;
+    setContent(next);
+    // Restaurar cursor justo después del fragmento insertado.
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + markdown.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  };
+
+  // Sube una imagen al back y devuelve la URL pública (Cloudinary).
+  const uploadImage = async (file: File): Promise<string | null> => {
+    // Doble check del lado del cliente (el back valida igual).
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      toast.error(
+        `Formato no soportado (${file.type || "desconocido"}). Usá JPEG, PNG, WEBP o GIF.`,
+      );
+      return null;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("La imagen supera 10 MB.");
+      return null;
+    }
+    try {
+      setUploadingImage(true);
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await api.post("/api/resources/upload-image", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const url = resp.data?.data?.url as string | undefined;
+      if (!url) {
+        toast.error("El servidor no devolvió una URL válida");
+        return null;
+      }
+      return url;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error?.message || "No se pudo subir la imagen.";
+      toast.error(message);
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSelectImage: React.ChangeEventHandler<HTMLInputElement> = async (
+    e,
+  ) => {
+    const file = e.target.files?.[0];
+    // Reset del input para poder volver a elegir el mismo archivo si quisiera.
+    e.target.value = "";
+    if (!file) return;
+    const url = await uploadImage(file);
+    if (!url) return;
+    const baseName = file.name.replace(/\.[^/.]+$/, "");
+    insertAtCursor(`![${baseName}](${url})`);
+  };
+
+  // Si el user pega una imagen del clipboard (Ctrl+V), la subimos y la
+  // insertamos. Mantenemos el comportamiento default si lo pegado es texto.
+  const handleContentPaste: React.ClipboardEventHandler<HTMLTextAreaElement> = async (
+    e,
+  ) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        const url = await uploadImage(file);
+        if (!url) return;
+        const name = file.name || "imagen-pegada";
+        const baseName = name.replace(/\.[^/.]+$/, "") || "imagen-pegada";
+        insertAtCursor(`![${baseName}](${url})`);
+        return;
+      }
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -384,9 +484,38 @@ const ResourceEditorPage: React.FC = () => {
                 ¿Cómo escribir Markdown?
               </a>
             </label>
+
+            {/* Toolbar mínima sobre el textarea */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploadingImage}
+                onClick={() => fileInputRef.current?.click()}
+                className="h-7 px-2 text-[11.5px]"
+              >
+                <ImageIcon size={13} className="mr-1.5" />
+                {uploadingImage ? "Subiendo..." : "Insertar imagen"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleSelectImage}
+                className="hidden"
+              />
+              <span className="text-[11px] text-muted-foreground">
+                Podés insertar imágenes con el botón o pegando (Ctrl+V).
+                Máx 10 MB · JPEG, PNG, WEBP, GIF.
+              </span>
+            </div>
+
             <textarea
+              ref={contentRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onPaste={handleContentPaste}
               placeholder={`# Título\n\nLa primera oración aparece en el listado si no llenás "Resumen".\n\n## Pasos\n\n1. Primer paso\n2. Segundo paso\n\n> Tip importante\n\nPodés usar **negrita**, *cursiva*, [enlaces](https://...) y código \`inline\`.`}
               rows={20}
               className="w-full px-3 py-2 text-[13px] font-mono border border-border rounded-md bg-background resize-y"

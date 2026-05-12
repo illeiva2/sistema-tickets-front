@@ -47,6 +47,14 @@ const MarkdownView: React.FC<{ source: string; className?: string }> = ({
               {children}
             </a>
           ),
+          img: ({ src, alt }) => (
+            <img
+              src={src as string | undefined}
+              alt={alt ?? ""}
+              className="my-3 max-w-full rounded-md border border-border"
+              loading="lazy"
+            />
+          ),
           code: ({ children, className }) => {
             const isBlock = className?.includes("language-");
             if (isBlock) {
