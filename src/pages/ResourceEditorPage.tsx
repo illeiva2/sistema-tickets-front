@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui";
-import { ArrowLeft, Eye, Save } from "lucide-react";
+import { ArrowLeft, Eye, Save, Sparkles } from "lucide-react";
 import api from "../lib/api";
 import toast from "react-hot-toast";
 import type { Resource, ResourceCategory } from "../types/resources";
@@ -12,16 +12,35 @@ import {
 } from "../constants/resourceCategories";
 import MarkdownView from "../components/MarkdownView";
 
+interface DraftLocationState {
+  draft?: {
+    title: string;
+    excerpt: string;
+    category: ResourceCategory;
+    content: string;
+    tags: string[];
+  };
+  fromTicketNumber?: number;
+  fromTicketId?: string;
+}
+
 const ResourceEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const draftState = (location.state as DraftLocationState | null) ?? null;
   const isEditing = Boolean(id);
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [excerpt, setExcerpt] = useState("");
-  const [category, setCategory] = useState<ResourceCategory>("HOW_TO");
-  const [tagsInput, setTagsInput] = useState("");
+  // Si vinimos con un draft generado por IA, pre-llenamos los campos.
+  const [title, setTitle] = useState(draftState?.draft?.title ?? "");
+  const [content, setContent] = useState(draftState?.draft?.content ?? "");
+  const [excerpt, setExcerpt] = useState(draftState?.draft?.excerpt ?? "");
+  const [category, setCategory] = useState<ResourceCategory>(
+    draftState?.draft?.category ?? "HOW_TO",
+  );
+  const [tagsInput, setTagsInput] = useState(
+    draftState?.draft?.tags?.join(", ") ?? "",
+  );
   const [isPublished, setIsPublished] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [showAsModal, setShowAsModal] = useState(false);
@@ -189,6 +208,31 @@ const ResourceEditorPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {draftState?.draft && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 dark:bg-primary/10 px-3 py-2.5 flex items-start gap-2">
+          <Sparkles
+            size={16}
+            className="text-primary shrink-0 mt-0.5"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium text-foreground">
+              Borrador generado con IA
+              {draftState.fromTicketNumber && (
+                <>
+                  {" "}desde el ticket #
+                  {String(draftState.fromTicketNumber).padStart(5, "0")}
+                </>
+              )}
+            </p>
+            <p className="text-[11.5px] text-muted-foreground mt-0.5">
+              Revisá título, categoría, tags y contenido antes de publicar.
+              La IA puede haberse equivocado o quedado corta — vos firmás el
+              recurso final.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Form */}
