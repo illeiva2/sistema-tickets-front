@@ -23,6 +23,7 @@ import {
   Lock,
   RotateCcw,
   Share2,
+  Sparkles,
   X as XIcon,
 } from "lucide-react";
 import { useTickets, useAuth } from "../hooks";
@@ -80,6 +81,7 @@ const TicketDetailPage: React.FC = () => {
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [reopenComment, setReopenComment] = useState("");
   const [showShareModal, setShowShareModal] = useState(false);
+  const [draftingResource, setDraftingResource] = useState(false);
   const [composerMode, setComposerMode] = useState<"public" | "internal">(
     "public",
   );
@@ -161,6 +163,52 @@ const TicketDetailPage: React.FC = () => {
       };
     });
   }, []);
+
+  // Pedir a la IA un borrador de recurso basado en este ticket. Al terminar,
+  // navega al editor de recursos con el draft pre-llenado en location.state.
+  const handleDraftResource = async () => {
+    if (!ticket || draftingResource) return;
+    if (
+      !confirm(
+        "Se va a enviar el contenido de este ticket a Anthropic (Claude) para generar un borrador de artículo. El borrador queda en pantalla — vos decidís si publicarlo. ¿Continuar?",
+      )
+    ) {
+      return;
+    }
+    try {
+      setDraftingResource(true);
+      const resp = await api.post(
+        `/api/resources/draft-from-ticket/${ticket.id}`,
+      );
+      const draft = resp.data?.data;
+      if (!draft) {
+        toast.error("La IA no devolvió un borrador válido");
+        return;
+      }
+      toast.success("Borrador generado. Revisalo antes de publicar.");
+      navigate("/resources/new", {
+        state: {
+          draft,
+          fromTicketId: ticket.id,
+          fromTicketNumber: ticket.ticketNumber,
+        },
+      });
+    } catch (error: any) {
+      const code = error?.response?.data?.error?.code;
+      const message =
+        error?.response?.data?.error?.message ||
+        "No se pudo generar el borrador. Probá de nuevo.";
+      if (code === "AI_NOT_CONFIGURED") {
+        toast.error(
+          "La generación con IA no está configurada en el servidor. Pedile al admin que active ANTHROPIC_API_KEY.",
+        );
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setDraftingResource(false);
+    }
+  };
 
   // Quitar un share del ticket (solo assignee, ADMIN o el propio destinatario).
   const handleUnshare = async (sharedWithUserId: string) => {
@@ -757,6 +805,29 @@ const TicketDetailPage: React.FC = () => {
                         >
                           <Share2 size={14} className="mr-2" />
                           Compartir
+                        </Button>,
+                      );
+                    }
+
+                    // Convertir resolucion a recurso con IA (AGENT/ADMIN, ticket RESOLVED/CLOSED)
+                    if (
+                      isStaff &&
+                      (status === "RESOLVED" || status === "CLOSED")
+                    ) {
+                      buttons.push(
+                        <Button
+                          key="draft-resource"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDraftResource}
+                          disabled={draftingResource || saving}
+                          className="justify-start"
+                          title="Generar un borrador de artículo de base de conocimiento a partir de este ticket usando IA"
+                        >
+                          <Sparkles size={14} className="mr-2" />
+                          {draftingResource
+                            ? "Generando..."
+                            : "Convertir en recurso"}
                         </Button>,
                       );
                     }
