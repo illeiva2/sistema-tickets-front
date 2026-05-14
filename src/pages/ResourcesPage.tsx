@@ -22,6 +22,7 @@ import {
 const ResourcesPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const isStaff = user?.role === "ADMIN" || user?.role === "AGENT";
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<ResourceListItem[]>([]);
@@ -190,6 +191,23 @@ const ResourcesPage: React.FC = () => {
                           Borrador
                         </span>
                       )}
+                      {/* Hint para staff cuando el recurso tiene audiencia
+                          restringida (no público). */}
+                      {isStaff &&
+                        r.audienceDepartments &&
+                        r.audienceDepartments.length > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10.5px] px-1.5 py-0.5 rounded-md border border-primary/30 bg-primary/5 text-primary"
+                            title={
+                              "Audiencia: " +
+                              r.audienceDepartments
+                                .map((d) => d.name)
+                                .join(", ")
+                            }
+                          >
+                            👥 {r.audienceDepartments.length} sector(es)
+                          </span>
+                        )}
                       {r.tags.length > 0 && (
                         <span className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
                           <TagIcon size={10} />

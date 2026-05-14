@@ -7,6 +7,13 @@ export type ResourceCategory =
   | "LINK"
   | "OTHER";
 
+export interface ResourceAudienceDepartment {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+}
+
 export interface ResourceListItem {
   id: string;
   slug: string;
@@ -23,6 +30,7 @@ export interface ResourceListItem {
   createdAt: string;
   updatedAt: string;
   author: { id: string; name: string; email: string } | null;
+  audienceDepartments?: ResourceAudienceDepartment[];
 }
 
 export interface Resource extends ResourceListItem {
