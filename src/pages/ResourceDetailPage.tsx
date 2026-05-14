@@ -19,6 +19,7 @@ const ResourceDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const isStaff = user?.role === "ADMIN" || user?.role === "AGENT";
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,6 +137,33 @@ const ResourceDetailPage: React.FC = () => {
               Borrador
             </span>
           )}
+          {/* Audiencia: chips por sector. Solo visible para staff
+              (ADMIN/AGENT) — el USER promedio no necesita ver esto. */}
+          {isStaff &&
+            resource.audienceDepartments &&
+            resource.audienceDepartments.length > 0 && (
+              <>
+                <span className="text-[11px] text-muted-foreground">
+                  Audiencia:
+                </span>
+                {resource.audienceDepartments.map((d) => (
+                  <span
+                    key={d.id}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border"
+                    style={{
+                      backgroundColor: d.color
+                        ? `${d.color}20`
+                        : undefined,
+                      borderColor: d.color ? `${d.color}60` : undefined,
+                      color: d.color ?? undefined,
+                    }}
+                  >
+                    {d.icon && <span aria-hidden>{d.icon}</span>}
+                    {d.name}
+                  </span>
+                ))}
+              </>
+            )}
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{resource.title}</h1>
         {resource.excerpt && (

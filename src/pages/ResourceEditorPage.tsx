@@ -5,6 +5,7 @@ import { ArrowLeft, Eye, Image as ImageIcon, Save, Sparkles } from "lucide-react
 import api from "../lib/api";
 import toast from "react-hot-toast";
 import type { Resource, ResourceCategory } from "../types/resources";
+import type { DepartmentMini } from "../types/departments";
 import {
   ALL_RESOURCE_CATEGORIES,
   RESOURCE_CATEGORY_GLYPH,
@@ -47,6 +48,9 @@ const ResourceEditorPage: React.FC = () => {
   // Datetime-local input usa formato "YYYY-MM-DDTHH:mm" sin TZ.
   const [pinExpiresAt, setPinExpiresAt] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  // Audiencia: sectores con acceso. Vacío = público.
+  const [audienceIds, setAudienceIds] = useState<string[]>([]);
+  const [allDepartments, setAllDepartments] = useState<DepartmentMini[]>([]);
 
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -151,6 +155,22 @@ const ResourceEditorPage: React.FC = () => {
     }
   };
 
+  // Cargar lista de sectores para el multi-select de audiencia.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await api.get("/api/departments");
+        if (!cancelled) setAllDepartments(resp.data?.data ?? []);
+      } catch {
+        // silencio: el editor sigue funcionando sin sectores
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -179,6 +199,9 @@ const ResourceEditorPage: React.FC = () => {
           } else {
             setPinExpiresAt("");
           }
+          setAudienceIds(
+            (r.audienceDepartments ?? []).map((d) => d.id),
+          );
         }
       } catch (e: any) {
         toast.error(
@@ -223,6 +246,8 @@ const ResourceEditorPage: React.FC = () => {
       // Solo aplican si esta pinned. Si no, los ignoramos.
       showAsModal: isPinned && showAsModal,
       pinExpiresAt: pinExpiresAtIso,
+      // Audiencia: lista de sectores con acceso. Vacío = público.
+      audienceDepartmentIds: audienceIds,
     };
 
     if (payload.title.length < 3) {
@@ -393,6 +418,63 @@ const ResourceEditorPage: React.FC = () => {
               rows={2}
               className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background resize-none"
             />
+          </div>
+
+          {/* Audiencia por sector. Si no se selecciona ninguno, el recurso
+              es público (visible para todos). Si hay sectores, solo los
+              usuarios de esos sectores lo ven (ADMIN/AGENT lo ven siempre). */}
+          <div className="rounded-md border border-border bg-card/40 p-3 space-y-2">
+            <div>
+              <div className="text-[12.5px] font-medium">
+                👥 Audiencia
+              </div>
+              <p className="text-[11.5px] text-muted-foreground">
+                {audienceIds.length === 0
+                  ? "Sin selección = visible para todos los colaboradores."
+                  : `Solo visible para usuarios de ${audienceIds.length} sector(es) y para staff (ADMIN / AGENT).`}
+              </p>
+            </div>
+            {allDepartments.length === 0 ? (
+              <p className="text-[11.5px] text-muted-foreground italic">
+                No hay sectores cargados. Crealos desde el menú{" "}
+                <span className="font-medium">Sectores</span>.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {allDepartments.map((d) => {
+                  const active = audienceIds.includes(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        setAudienceIds((ids) =>
+                          ids.includes(d.id)
+                            ? ids.filter((x) => x !== d.id)
+                            : [...ids, d.id],
+                        );
+                      }}
+                      className={`inline-flex items-center gap-1 text-[11.5px] px-2 py-1 rounded-md border transition-all ${
+                        active
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:bg-muted"
+                      }`}
+                      style={
+                        active && d.color
+                          ? {
+                              backgroundColor: `${d.color}20`,
+                              borderColor: `${d.color}80`,
+                            }
+                          : undefined
+                      }
+                    >
+                      {d.icon && <span aria-hidden>{d.icon}</span>}
+                      <span>{d.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Bloque de "destacado": pin + opciones extras (modal y vencimiento)
