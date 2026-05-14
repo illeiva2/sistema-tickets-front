@@ -14,6 +14,12 @@ interface User {
   email: string;
   name: string;
   role: "USER" | "AGENT" | "ADMIN";
+  department?: {
+    id: string;
+    name: string;
+    color: string | null;
+    icon: string | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
   mustChangePassword: boolean;

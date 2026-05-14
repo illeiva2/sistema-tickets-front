@@ -20,6 +20,7 @@ import {
   Settings,
   BookOpen,
   HelpCircle,
+  Building2,
 } from "lucide-react";
 import { replayOnboardingTour } from "../../lib/onboarding";
 import { useAuth, useTickets } from "../../hooks";
@@ -350,6 +351,12 @@ export const useNavItems = (): NavItem[] => {
       to: "/users",
       label: "Usuarios",
       icon: <Users size={16} />,
+      showFor: ["ADMIN"],
+    },
+    {
+      to: "/departments",
+      label: "Sectores",
+      icon: <Building2 size={16} />,
       showFor: ["ADMIN"],
     },
   ];

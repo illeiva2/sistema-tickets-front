@@ -23,6 +23,7 @@ const NewTicketPage = lazy(() => import("./pages/NewTicketPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const FileManagementPage = lazy(() => import("./pages/FileManagementPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
+const DepartmentsPage = lazy(() => import("./pages/DepartmentsPage"));
 const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
 const ResourceDetailPage = lazy(() => import("./pages/ResourceDetailPage"));
 const ResourceEditorPage = lazy(() => import("./pages/ResourceEditorPage"));
@@ -84,6 +85,14 @@ function App() {
                   element={
                     <RoleProtectedRoute allowedRoles={["ADMIN"]}>
                       <UsersPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="departments"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                      <DepartmentsPage />
                     </RoleProtectedRoute>
                   }
                 />

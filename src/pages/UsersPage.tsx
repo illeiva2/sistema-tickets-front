@@ -35,6 +35,12 @@ interface User {
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  department?: {
+    id: string;
+    name: string;
+    color: string | null;
+    icon: string | null;
+  } | null;
   _count: {
     requestedTickets: number;
     assignedTickets: number;
@@ -52,6 +58,14 @@ interface UpdateUserData {
   name?: string;
   email?: string;
   role?: "USER" | "AGENT" | "ADMIN";
+  departmentId?: string | null;
+}
+
+interface DepartmentOption {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
 }
 
 export const UsersPage: React.FC = () => {
@@ -76,6 +90,7 @@ export const UsersPage: React.FC = () => {
   });
 
   const [editForm, setEditForm] = useState<UpdateUserData>({});
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
 
   // Verificar si el usuario actual es ADMIN
   const isAdmin = currentUser?.role === "ADMIN";
@@ -83,9 +98,20 @@ export const UsersPage: React.FC = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
+      fetchDepartments();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, showInactive]);
+
+  const fetchDepartments = async () => {
+    try {
+      const resp = await api.get("/api/departments");
+      setDepartments(resp.data?.data ?? []);
+    } catch {
+      // silencioso: si falla, el selector queda vacío y el user puede
+      // editar el resto del form igual.
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -196,6 +222,7 @@ export const UsersPage: React.FC = () => {
       name: user.name,
       email: user.email,
       role: user.role,
+      departmentId: user.department?.id ?? null,
     });
     setShowEditModal(true);
   };
@@ -410,6 +437,29 @@ export const UsersPage: React.FC = () => {
               <CardContent className="space-y-3">
                 <div className="text-sm text-muted-foreground">{user.email}</div>
 
+                {user.department && (
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border"
+                      style={{
+                        backgroundColor: user.department.color
+                          ? `${user.department.color}20`
+                          : undefined,
+                        borderColor: user.department.color
+                          ? `${user.department.color}60`
+                          : undefined,
+                        color: user.department.color ?? undefined,
+                      }}
+                      title="Sector"
+                    >
+                      {user.department.icon && (
+                        <span aria-hidden>{user.department.icon}</span>
+                      )}
+                      {user.department.name}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Tickets solicitados: {user._count.requestedTickets}</span>
                   <span>Asignados: {user._count.assignedTickets}</span>
@@ -602,6 +652,36 @@ export const UsersPage: React.FC = () => {
                   <option value="AGENT">Agente</option>
                   <option value="ADMIN">Administrador</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Sector
+                </label>
+                <select
+                  value={editForm.departmentId ?? ""}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      departmentId: e.target.value || null,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">Sin sector</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.icon ? `${d.icon} ` : ""}
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                {departments.length === 0 && (
+                  <p className="text-[11.5px] text-muted-foreground mt-1">
+                    Todavía no hay sectores cargados. Andá a{" "}
+                    <span className="font-medium">Sectores</span> en el nav
+                    para crear el primero.
+                  </p>
+                )}
               </div>
               <div className="flex space-x-2 pt-4">
                 <Button
