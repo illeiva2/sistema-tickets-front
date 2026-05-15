@@ -27,6 +27,7 @@ import {
   TICKET_STATUS_LABEL,
 } from "../../constants/ticketLabels";
 import { TicketRow, KpiCard, formatHours } from "./shared";
+import NewsSection from "../NewsSection";
 
 const PRIORITY_COLOR: Record<string, string> = {
   LOW: "hsl(var(--priority-low))",
@@ -285,6 +286,8 @@ const UserDashboard: React.FC<{ data: UserDashboardData }> = ({ data }) => {
             )}
           </CardContent>
         </Card>
+
+        <NewsSection />
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ import {
 import type { AgentDashboardData } from "../../types/dashboard";
 import { TICKET_PRIORITY_LABEL } from "../../constants/ticketLabels";
 import { TicketRow, KpiCard, formatHours } from "./shared";
+import NewsSection from "../NewsSection";
 
 const PRIORITY_COLOR: Record<string, string> = {
   LOW: "hsl(var(--priority-low))",
@@ -198,6 +199,8 @@ const AgentDashboard: React.FC<{ data: AgentDashboardData }> = ({ data }) => {
             )}
           </CardContent>
         </Card>
+
+        <NewsSection />
       </div>
     </div>
   );
