@@ -9,6 +9,7 @@ import AgentDashboard from "../components/dashboards/AgentDashboard";
 import AdminDashboard from "../components/dashboards/AdminDashboard";
 import TicketsTriagePanel from "../components/TicketsTriagePanel";
 import PinnedAnnouncementsBanner from "../components/PinnedAnnouncementsBanner";
+import DepartmentResourcesPanel from "../components/DepartmentResourcesPanel";
 import type { DashboardPeriod } from "../types/dashboard";
 
 const PERIOD_OPTIONS: Array<{ value: DashboardPeriod; label: string }> = [
@@ -144,6 +145,10 @@ const DashboardPage: React.FC = () => {
 
       {/* Banner de avisos destacados (visible para todos los roles) */}
       <PinnedAnnouncementsBanner />
+
+      {/* Panel "Para tu sector": recursos dirigidos al sector del user.
+          Solo se renderiza si tiene sector asignado y hay recursos. */}
+      <DepartmentResourcesPanel />
 
       {/* Panel de triage destacado para AGENT/ADMIN */}
       {(user?.role === "AGENT" || user?.role === "ADMIN") && (
