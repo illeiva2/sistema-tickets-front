@@ -21,6 +21,7 @@ import {
   BookOpen,
   HelpCircle,
   Building2,
+  GraduationCap,
 } from "lucide-react";
 import { replayOnboardingTour } from "../../lib/onboarding";
 import { useAuth, useTickets } from "../../hooks";
@@ -357,6 +358,12 @@ export const useNavItems = (): NavItem[] => {
       to: "/departments",
       label: "Sectores",
       icon: <Building2 size={16} />,
+      showFor: ["ADMIN"],
+    },
+    {
+      to: "/admin/workshops/import",
+      label: "Workshops",
+      icon: <GraduationCap size={16} />,
       showFor: ["ADMIN"],
     },
   ];
