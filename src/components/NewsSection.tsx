@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { Megaphone, ArrowRight } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
+import { Megaphone, ArrowRight, Plus } from "lucide-react";
 import api from "../lib/api";
+import { useAuth } from "../hooks";
 import type { ResourceListItem } from "../types/resources";
 
 // Tiempo relativo abreviado: "hoy", "hace 2d", etc.
@@ -22,6 +23,8 @@ const relativeDate = (iso: string): string => {
 // audiencia automáticamente en el back). Si no hay ninguno, no se
 // renderiza (silencioso, evita ruido visual).
 const NewsSection: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const [items, setItems] = useState<ResourceListItem[] | null>(null);
 
   useEffect(() => {
@@ -69,7 +72,43 @@ const NewsSection: React.FC = () => {
     );
   }
 
-  if (items.length === 0) return null;
+  // Empty state: card visible con placeholder. Si es ADMIN ofrece CTA
+  // para crear un aviso; si no, solo el mensaje.
+  if (items.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Megaphone size={16} />
+            Novedades
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-6 space-y-3">
+            <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center mx-auto text-muted-foreground">
+              <Megaphone size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Aún no hay novedades</p>
+              <p className="text-[11.5px] text-muted-foreground mt-0.5">
+                {isAdmin
+                  ? "Publicá un aviso desde Recursos para comunicarles algo al equipo."
+                  : "Cuando el equipo publique avisos van a aparecer acá."}
+              </p>
+            </div>
+            {isAdmin && (
+              <Button asChild size="sm" variant="outline">
+                <Link to="/resources/new">
+                  <Plus size={13} className="mr-1.5" />
+                  Crear aviso
+                </Link>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
