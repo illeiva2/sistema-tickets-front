@@ -27,6 +27,8 @@ const DepartmentsPage = lazy(() => import("./pages/DepartmentsPage"));
 const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
 const ResourceDetailPage = lazy(() => import("./pages/ResourceDetailPage"));
 const ResourceEditorPage = lazy(() => import("./pages/ResourceEditorPage"));
+const AdminWorkshopsImportPage = lazy(() => import("./pages/AdminWorkshopsImportPage"));
+const AdminWorkshopsRulesPage = lazy(() => import("./pages/AdminWorkshopsRulesPage"));
 const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 const SetupPasswordPage = lazy(() => import("./pages/SetupPasswordPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
@@ -114,6 +116,22 @@ function App() {
                   }
                 />
                 <Route path="resources/:idOrSlug" element={<ResourceDetailPage />} />
+                <Route
+                  path="admin/workshops/import"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                      <AdminWorkshopsImportPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/workshops/rules"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                      <AdminWorkshopsRulesPage />
+                    </RoleProtectedRoute>
+                  }
+                />
                 <Route path="setup-password" element={<SetupPasswordPage />} />
                 <Route path="change-password" element={<ChangePasswordPage />} />
               </Route>
