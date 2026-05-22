@@ -28,6 +28,7 @@ import {
 } from "../../constants/ticketLabels";
 import { TicketRow, KpiCard, formatHours } from "./shared";
 import NewsSection from "../NewsSection";
+import ProjectsInProgressCard from "../ProjectsInProgressCard";
 
 const PRIORITY_COLOR: Record<string, string> = {
   LOW: "hsl(var(--priority-low))",
@@ -288,6 +289,7 @@ const UserDashboard: React.FC<{ data: UserDashboardData }> = ({ data }) => {
         </Card>
 
         <NewsSection />
+        <ProjectsInProgressCard />
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ import {
 import type { AdminDashboardData } from "../../types/dashboard";
 import { TicketRow, KpiCard, formatHours, formatPercent } from "./shared";
 import NewsSection from "../NewsSection";
+import ProjectsInProgressCard from "../ProjectsInProgressCard";
 import {
   TICKET_PRIORITY_LABEL,
   TICKET_STATUS_LABEL,
@@ -322,6 +323,7 @@ const AdminDashboard: React.FC<{ data: AdminDashboardData }> = ({ data }) => {
         </Card>
 
         <NewsSection />
+        <ProjectsInProgressCard />
       </div>
 
       {/* Status legend (visual hint) */}
