@@ -22,6 +22,7 @@ import {
   HelpCircle,
   Building2,
   GraduationCap,
+  Briefcase,
 } from "lucide-react";
 import { replayOnboardingTour } from "../../lib/onboarding";
 import { useAuth, useTickets } from "../../hooks";
@@ -336,6 +337,7 @@ export const useNavItems = (): NavItem[] => {
     { to: "/tickets", label: "Tickets", icon: <Ticket size={16} /> },
     { to: "/tickets/new", label: "Nuevo ticket", icon: <Plus size={16} /> },
     { to: "/resources", label: "Recursos", icon: <BookOpen size={16} /> },
+    { to: "/projects", label: "Proyectos", icon: <Briefcase size={16} /> },
     {
       to: "/files",
       label: "Archivos",
