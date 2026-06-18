@@ -125,11 +125,24 @@ export const AdvancedFilePreview: React.FC<AdvancedFilePreviewProps> = ({
   const metadata = attachment.previewInfo?.metadata;
   const thumbnail = attachment.previewInfo?.thumbnail;
 
+  // Detectamos si el archivo vive en storage remoto (Cloudinary) o local.
+  // Para Cloudinary la URL es absoluta y la usamos directo; para local
+  // pegamos al endpoint /api/files/{filename} autenticado.
+  const isRemoteStorage = attachment.storageUrl.startsWith("http");
+
   // Función para cargar el thumbnail
   const loadThumbnail = useCallback(async () => {
     if (!thumbnail) return;
 
     try {
+      // Si el thumbnail.url es absoluta (Cloudinary transform), usamos esa
+      // URL directo en el <img> — no hace falta blob ni auth header (es
+      // contenido público de Cloudinary).
+      if (thumbnail.url.startsWith("http")) {
+        setThumbnailBlob(thumbnail.url);
+        return;
+      }
+      // Caso local: bajamos como blob via API autenticada.
       const thumbnailFileName = thumbnail.url.split("/").pop() || "";
       const response = await api.get(
         `/api/thumbnails/${encodeURIComponent(thumbnailFileName)}`,
@@ -147,9 +160,15 @@ export const AdvancedFilePreview: React.FC<AdvancedFilePreviewProps> = ({
     }
   }, [thumbnail]);
 
-  // Función para cargar la imagen
+  // Función para cargar la imagen en alta calidad para el modal.
   const loadImage = useCallback(async () => {
     try {
+      // Cloudinary: usamos la URL directo (es pública, no requiere auth).
+      if (isRemoteStorage) {
+        setImageBlob(attachment.storageUrl);
+        return;
+      }
+      // Storage local: bajamos como blob via /api/files.
       const fileName =
         attachment.storageUrl.split("/").pop() || attachment.fileName;
       const response = await api.get(
@@ -166,7 +185,7 @@ export const AdvancedFilePreview: React.FC<AdvancedFilePreviewProps> = ({
       console.error("Error loading image:", error);
       toast.error("Error al cargar la imagen");
     }
-  }, [attachment.storageUrl, attachment.fileName]);
+  }, [attachment.storageUrl, attachment.fileName, isRemoteStorage]);
 
   // Cargar thumbnail cuando el componente se monte
   useEffect(() => {
