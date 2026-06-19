@@ -73,7 +73,7 @@ const LoginPage: React.FC = () => {
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" data-testid="login-form">
             <div>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -81,6 +81,7 @@ const LoginPage: React.FC = () => {
                   {...register("email")}
                   type="email"
                   placeholder="Email"
+                  data-testid="login-email"
                   className={`pl-10 ${errors.email ? "border-red-500" : ""}`}
                 />
               </div>
@@ -97,6 +98,7 @@ const LoginPage: React.FC = () => {
                   {...register("password")}
                   type="password"
                   placeholder="Contraseña"
+                  data-testid="login-password"
                   className={`pl-10 ${errors.password ? "border-red-500" : ""}`}
                 />
               </div>
@@ -149,7 +151,7 @@ const LoginPage: React.FC = () => {
               </div>
             )}
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button type="submit" disabled={isSubmitting} className="w-full" data-testid="login-submit">
               {isSubmitting ? "Iniciando..." : "Iniciar Sesión"}
             </Button>
           </form>
@@ -172,6 +174,7 @@ const LoginPage: React.FC = () => {
                 variant="outline"
                 onClick={handleGoogleLogin}
                 className="w-full"
+                data-testid="login-google"
               >
                 <Chrome className="mr-2 h-4 w-4" />
                 Continuar con Google
@@ -182,6 +185,7 @@ const LoginPage: React.FC = () => {
                 variant="outline"
                 onClick={() => setShowRegisterInfo(!showRegisterInfo)}
                 className="w-full"
+                data-testid="login-register-info"
               >
                 <UserPlus className="mr-2 h-4 w-4" />
                 ¿Nuevo usuario? Regístrate

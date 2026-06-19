@@ -230,6 +230,7 @@ const Layout: React.FC = () => {
                 size="sm"
                 className="flex items-center space-x-2 px-3 py-2"
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                data-testid="user-menu-button"
               >
                 <User size={16} />
                 <span className="hidden sm:inline">
@@ -271,6 +272,7 @@ const Layout: React.FC = () => {
                       <button
                         onClick={handleLogout}
                         className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        data-testid="logout-button"
                       >
                         <LogOut size={16} className="mr-3" />
                         Cerrar Sesión

@@ -171,7 +171,7 @@ const DashboardPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center pt-2 px-6 pb-6">
-            <div className="text-3xl font-bold tracking-tight">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-open-tickets-count">
               {stats?.openTickets || 0}
             </div>
           </CardContent>
@@ -185,7 +185,7 @@ const DashboardPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center pt-2 px-6 pb-6">
-            <div className="text-3xl font-bold tracking-tight">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-in-progress-tickets-count">
               {stats?.inProgressTickets || 0}
             </div>
           </CardContent>
@@ -199,7 +199,7 @@ const DashboardPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center pt-2 px-6 pb-6">
-            <div className="text-3xl font-bold tracking-tight">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-resolved-tickets-count">
               {stats?.resolvedTickets || 0}
             </div>
           </CardContent>
@@ -213,7 +213,7 @@ const DashboardPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center pt-2 px-6 pb-6">
-            <div className="text-3xl font-bold tracking-tight">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-closed-tickets-count">
               {stats?.closedTickets || 0}
             </div>
           </CardContent>

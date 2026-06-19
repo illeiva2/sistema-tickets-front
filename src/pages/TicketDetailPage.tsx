@@ -253,7 +253,7 @@ const TicketDetailPage: React.FC = () => {
           Volver
         </Button>
         <div>
-          <h1 className="text-3xl font-bold px-2">
+            <h1 className="text-3xl font-bold px-2" data-testid="ticket-detail-title">
             Ticket #
             {ticket?.ticketNumber
               ? formatTicketNumber(ticket.ticketNumber)
@@ -272,6 +272,7 @@ const TicketDetailPage: React.FC = () => {
               onClick={() => {
                 openEditModal();
               }}
+              data-testid="ticket-edit-button"
             >
               <Edit size={16} className="mr-2" />
               Editar
@@ -436,6 +437,7 @@ const TicketDetailPage: React.FC = () => {
                       <select
                         className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                         value={ticket?.status || "OPEN"}
+                        data-testid="ticket-status-select"
                         onChange={async (e) => {
                           if (!ticket) return;
                           setSaving(true);
@@ -487,6 +489,7 @@ const TicketDetailPage: React.FC = () => {
                     <select
                       className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.priority || "MEDIUM"}
+                    data-testid="ticket-priority-select"
                       onChange={async (e) => {
                         if (!ticket) return;
                         setSaving(true);
@@ -523,6 +526,7 @@ const TicketDetailPage: React.FC = () => {
                     <select
                       className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.assignee?.id || ""}
+                      data-testid="ticket-assignee-select"
                       onChange={async (e) => {
                         if (!ticket) return;
                         setSaving(true);
@@ -561,6 +565,7 @@ const TicketDetailPage: React.FC = () => {
                           onClick={handleClaimTicket}
                           disabled={claiming}
                           className="w-full text-xs flex items-center justify-center gap-2"
+                          data-testid="ticket-claim-button"
                         >
                           {claiming ? (
                             <>
@@ -602,7 +607,7 @@ const TicketDetailPage: React.FC = () => {
                 </label>
                 <div className="flex items-center space-x-2">
                   <Clock size={14} />
-                  <span className="text-sm">
+                  <span className="text-sm" data-testid="ticket-created-at">
                     {ticket?.createdAt
                       ? new Date(ticket.createdAt).toLocaleString()
                       : ""}
@@ -804,6 +809,7 @@ const TicketDetailPage: React.FC = () => {
                 onClick={handleUpdateTicket}
                 className="flex-1"
                 disabled={!editFormData.title.trim() || !editFormData.description.trim() || saving}
+                data-testid="ticket-save-button"
               >
                 {saving ? "Guardando..." : "Guardar Cambios"}
               </Button>
