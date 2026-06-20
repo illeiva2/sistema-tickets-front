@@ -17,38 +17,24 @@ const OAuthHandler: React.FC = () => {
         const refreshToken = searchParams.get("refreshToken");
         const userParam = searchParams.get("user");
 
-        console.log("🔐 OAuthHandler - Procesando parámetros:", {
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-          hasUser: !!userParam
-        });
-
         if (!accessToken || !userParam) {
-          console.error("❌ OAuthHandler - Parámetros faltantes");
           setError("Parámetros de autenticación incompletos");
           return;
         }
 
         try {
           const user = JSON.parse(decodeURIComponent(userParam));
-          console.log("✅ OAuthHandler - Usuario parseado:", user);
 
           if (refreshToken) {
-            // Usuario existente con refresh token
-            console.log("🔄 OAuthHandler - Usuario existente, procesando callback");
             await handleOAuthCallback(accessToken, refreshToken, user);
           } else {
-            // Usuario nuevo sin refresh token
-            console.log("🆕 OAuthHandler - Usuario nuevo, redirigiendo a registro");
             const encodedUser = encodeURIComponent(JSON.stringify(user));
             navigate(`/register?user=${encodedUser}&token=${accessToken}`, { replace: true });
           }
-        } catch (parseError) {
-          console.error("❌ OAuthHandler - Error parseando usuario:", parseError);
+        } catch {
           setError("Error procesando datos del usuario");
         }
-      } catch (error) {
-        console.error("❌ OAuthHandler - Error general:", error);
+      } catch {
         setError("Error procesando la autenticación");
       } finally {
         setIsProcessing(false);

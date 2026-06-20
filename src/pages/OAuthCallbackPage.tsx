@@ -16,12 +16,6 @@ const OAuthCallbackPage: React.FC = () => {
     const userData = searchParams.get("user");
     const isNewUser = searchParams.get("newUser") === "true";
 
-    console.log("🔍 OAuth Callback Debug:");
-    console.log("   accessToken:", accessToken ? "Presente" : "Faltante");
-    console.log("   refreshToken:", refreshToken ? "Presente" : "Faltante");
-    console.log("   userData:", userData);
-    console.log("   isNewUser:", isNewUser);
-
     if (!accessToken || !userData) {
       setError("Datos de autenticación incompletos");
       return;
@@ -29,30 +23,20 @@ const OAuthCallbackPage: React.FC = () => {
 
     try {
       const user = JSON.parse(userData);
-      console.log("👤 Usuario parseado:", user);
-      console.log("   mustChangePassword:", user.mustChangePassword);
-      console.log("   email:", user.email);
-      console.log("   role:", user.role);
 
       if (isNewUser) {
-        // Usuario nuevo, redirigir a registro
-        console.log("🆕 Usuario nuevo detectado, redirigiendo a registro");
         const encodedUser = encodeURIComponent(JSON.stringify(user));
         navigate(`/register?user=${encodedUser}&token=${accessToken}`);
         return;
       }
 
-      // Usuario existente, procesar normalmente
       if (refreshToken) {
         handleOAuthCallback(accessToken, refreshToken, user);
       } else {
-        // Si no hay refreshToken, es un usuario nuevo que necesita completar registro
-        console.log("🆕 Usuario sin refreshToken, redirigiendo a registro");
         const encodedUser = encodeURIComponent(JSON.stringify(user));
         navigate(`/register?user=${encodedUser}&token=${accessToken}`);
       }
-    } catch (error) {
-      console.error("Error parsing OAuth data:", error);
+    } catch {
       setError("Error procesando datos de autenticación");
     }
   }, [searchParams, handleOAuthCallback, navigate]);

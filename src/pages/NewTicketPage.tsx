@@ -1,8 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui";
-import { Ticket, Send, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Ticket, Send, ArrowLeft, Lightbulb, ExternalLink } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useTickets } from "../hooks";
+import api from "../lib/api";
+import type { ResourceSuggestion } from "../types/resources";
+import {
+  RESOURCE_CATEGORY_GLYPH,
+  RESOURCE_CATEGORY_LABEL,
+} from "../constants/resourceCategories";
 
 const NewTicketPage: React.FC = () => {
   const navigate = useNavigate();
@@ -12,14 +18,49 @@ const NewTicketPage: React.FC = () => {
     title: "",
     description: "",
     priority: "MEDIUM",
+    category: "" as "" | "SOFTWARE" | "HARDWARE" | "RED" | "ERP" | "OTRO",
   });
+
+  // Sugerencias contextuales no bloqueantes basadas en el título.
+  const [suggestions, setSuggestions] = useState<ResourceSuggestion[]>([]);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+
+  useEffect(() => {
+    if (suggestionsDismissed) return;
+    const q = formData.title.trim();
+    if (q.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      try {
+        const resp = await api.get(
+          `/api/resources/suggest?q=${encodeURIComponent(q)}&limit=5`,
+        );
+        if (!cancelled) setSuggestions(resp.data?.data ?? []);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [formData.title, suggestionsDismissed]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      await createTicket(formData);
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        ...(formData.category ? { category: formData.category } : {}),
+      };
+      await createTicket(payload);
       navigate("/tickets");
     } catch (error) {
       // El error ya se maneja en el hook
@@ -72,6 +113,60 @@ const NewTicketPage: React.FC = () => {
               />
             </div>
 
+            {!suggestionsDismissed && suggestions.length > 0 && (
+              <div className="rounded-md border border-primary/30 bg-primary/5 dark:bg-primary/10 px-3 py-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-foreground">
+                    <Lightbulb size={14} className="text-primary" />
+                    ¿Quizás esto te ayuda?
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSuggestionsDismissed(true)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Ocultar
+                  </button>
+                </div>
+                <ul className="space-y-1">
+                  {suggestions.map((s) => (
+                    <li key={s.id}>
+                      <Link
+                        to={`/resources/${s.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-start gap-2 text-[13px] hover:bg-primary/10 rounded px-2 py-1.5 transition-colors"
+                      >
+                        <span aria-hidden className="shrink-0 mt-0.5">
+                          {RESOURCE_CATEGORY_GLYPH[s.category]}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-medium text-foreground group-hover:text-primary truncate">
+                            {s.title}
+                          </span>
+                          {s.excerpt && (
+                            <span className="block text-[11.5px] text-muted-foreground line-clamp-1">
+                              {s.excerpt}
+                            </span>
+                          )}
+                          <span className="block text-[10.5px] text-muted-foreground mt-0.5">
+                            {RESOURCE_CATEGORY_LABEL[s.category]}
+                          </span>
+                        </span>
+                        <ExternalLink
+                          size={12}
+                          className="shrink-0 mt-1 text-muted-foreground group-hover:text-primary"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[10.5px] text-muted-foreground pt-1 border-t border-primary/10">
+                  Si igual querés crear el ticket, completá la descripción y enviá.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Descripción *</label>
               <textarea
@@ -98,6 +193,39 @@ const NewTicketPage: React.FC = () => {
                 <option value="HIGH">Alta</option>
                 <option value="URGENT">Urgente</option>
               </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Prioridad</label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => handleChange("priority", e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700"
+                >
+                  <option value="LOW">Baja</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="HIGH">Alta</option>
+                  <option value="URGENT">Urgente</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Categoría</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => handleChange("category", e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700"
+                >
+                  <option value="">Sin categoría</option>
+                  <option value="SOFTWARE">◇ Software</option>
+                  <option value="HARDWARE">▤ Hardware</option>
+                  <option value="RED">≋ Red</option>
+                  <option value="ERP">◈ ERP</option>
+                  <option value="OTRO">◯ Otro</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Ayuda a clasificar el ticket. Opcional.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2 pt-2">

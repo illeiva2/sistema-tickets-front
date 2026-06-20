@@ -1,187 +1,23 @@
-import React from "react";
-import {
-  Outlet,
-  Link,
-  useLocation,
-  useParams,
-  useNavigate,
-} from "react-router-dom";
-import { Button } from "@/components/ui";
-import {
-  LogOut,
-  Ticket,
-  BarChart3,
-  Plus,
-  Home,
-  Mail,
-  Folder,
-  Users,
-  User,
-  ChevronDown,
-  Settings,
-} from "lucide-react";
-import { useAuth, useTickets } from "../hooks";
-import { useNotificationsContext } from "../contexts/NotificationsContext";
+import React, { useState } from "react";
+import { useTheme } from "../contexts/ThemeContext";
+import QuietProLayout from "./layouts/QuietProLayout";
+import WorkshopLayout from "./layouts/WorkshopLayout";
+import CommandPalette from "./CommandPalette";
+import PinnedModalAnnouncements from "./PinnedModalAnnouncements";
+import OnboardingTour from "./OnboardingTour";
+import { ONBOARDING_STEPS, TOUR_STORAGE_KEY } from "../constants/tourSteps";
+import { ONBOARDING_REPLAY_EVENT } from "../lib/onboarding";
 
-// Componente de navegación con estado activo
-const NavLink = ({
-  to,
-  children,
-  icon,
-}: {
-  to: string;
-  children: React.ReactNode;
-  icon: React.ReactNode;
-}) => {
-  const location = useLocation();
-  const isActive = location.pathname === to;
-
-  return (
-    <Link
-      to={to}
-      className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm transition-colors ${isActive
-        ? "bg-primary text-primary-foreground shadow-sm"
-        : "text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
-        }`}
-    >
-      {icon}
-      <span>{children}</span>
-    </Link>
-  );
-};
-
-// Breadcrumbs básicos
-const Breadcrumbs = () => {
-  const location = useLocation();
-  const pathnames = location.pathname.split("/").filter((x) => x);
-  const { id: ticketId } = useParams();
-  const { getTicketById } = useTickets();
-  const [ticketNumber, setTicketNumber] = React.useState<string | null>(null);
-
-  // Si estamos en la página de detalle de un ticket, obtener el número
-  React.useEffect(() => {
-    if (ticketId && pathnames.length === 2 && pathnames[0] === "tickets") {
-      const fetchTicketNumber = async () => {
-        try {
-          const ticket = await getTicketById(ticketId);
-          if (ticket?.ticketNumber) {
-            setTicketNumber(ticket.ticketNumber.toString().padStart(5, "0"));
-          }
-        } catch (error) {
-          console.error("Error fetching ticket number:", error);
-        }
-      };
-      fetchTicketNumber();
-    }
-  }, [ticketId, pathnames, getTicketById]);
-
-  if (pathnames.length === 0) return null;
-
-  return (
-    <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
-      <Link
-        to="/"
-        className="hover:text-foreground flex items-center space-x-1"
-      >
-        <Home size={14} />
-        <span>Inicio</span>
-      </Link>
-      {pathnames.map((name, index) => {
-        const routeTo = `/${pathnames.slice(0, index + 1).join("/")}`;
-        const isLast = index === pathnames.length - 1;
-
-        // Mapear nombres más amigables
-        let displayName =
-          {
-            tickets: "Tickets",
-            new: "Nuevo",
-            login: "Iniciar Sesión",
-          }[name] || name;
-
-        // Si es el último elemento y estamos en la página de detalle de un ticket, mostrar el número
-        if (
-          isLast &&
-          ticketNumber &&
-          pathnames.length === 2 &&
-          pathnames[0] === "tickets"
-        ) {
-          displayName = `${ticketNumber}`;
-        }
-
-        return (
-          <React.Fragment key={name}>
-            <span className="text-muted-foreground">/</span>
-            {isLast ? (
-              <span className="text-foreground font-medium capitalize">
-                {displayName}
-              </span>
-            ) : (
-              <Link to={routeTo} className="hover:text-foreground capitalize">
-                {displayName}
-              </Link>
-            )}
-          </React.Fragment>
-        );
-      })}
-    </nav>
-  );
-};
-
+// Wrapper que ramifica al layout adecuado segun el theme activo.
 const Layout: React.FC = () => {
-  const { user, logout } = useAuth();
-  const { unreadCount } = useNotificationsContext();
-  const navigate = useNavigate();
-  const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+  const { theme } = useTheme();
+  const [tourForce, setTourForce] = useState(0);
 
-  // Solo cargar notificaciones si el usuario está autenticado
   React.useEffect(() => {
-    if (user) {
-      // El hook se ejecutará automáticamente
-      console.log("Layout: User authenticated, notifications should load");
-    }
-  }, [user]);
-
-  // Debug: log unreadCount changes
-  React.useEffect(() => {
-    console.log("Layout: unreadCount changed to:", unreadCount);
-  }, [unreadCount]);
-
-  const handleLogout = () => {
-    logout();
-  };
-
-  const handleChangePassword = () => {
-    navigate("/change-password");
-  };
-
-  // Cerrar menú cuando se hace clic fuera
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest(".user-menu")) {
-        setIsUserMenuOpen(false);
-      }
-    };
-
-    if (isUserMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isUserMenuOpen]);
-
-  // Dark mode toggle (simple)
-  const [dark, setDark] = React.useState<boolean>(
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark"),
-  );
-  React.useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [dark]);
+    const handler = () => setTourForce((n) => n + 1);
+    window.addEventListener(ONBOARDING_REPLAY_EVENT, handler);
+    return () => window.removeEventListener(ONBOARDING_REPLAY_EVENT, handler);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -301,6 +137,18 @@ const Layout: React.FC = () => {
         <Outlet />
       </main>
     </div>
+    <>
+      {theme === "workshop" ? <WorkshopLayout /> : <QuietProLayout />}
+      <CommandPalette />
+      <PinnedModalAnnouncements />
+      {/* key cambia cuando se replay para remontar y forzar visibilidad */}
+      <OnboardingTour
+        key={tourForce}
+        steps={ONBOARDING_STEPS}
+        storageKey={TOUR_STORAGE_KEY}
+        forceShow={tourForce > 0}
+      />
+    </>
   );
 };
 

@@ -37,23 +37,14 @@ export const useNotifications = () => {
 
   // Fetch user notifications
   const fetchNotifications = useCallback(async () => {
-    if (notificationsLoaded) {
-      console.log("Notifications already loaded, skipping...");
-      return;
-    }
+    if (notificationsLoaded) return;
 
     setIsLoading(true);
     try {
-      console.log("Fetching notifications...");
       const response = await api.get("/api/notifications/user");
       if (response.data.success) {
         setNotifications(response.data.data);
         setNotificationsLoaded(true);
-        console.log(
-          "Notifications loaded:",
-          response.data.data.length,
-          "items",
-        );
       }
     } catch (error: any) {
       console.error("Error fetching notifications:", error);
@@ -168,36 +159,27 @@ export const useNotifications = () => {
 
   // Fetch user preferences
   const fetchPreferences = useCallback(async () => {
-    if (preferencesLoaded) {
-      console.log("Preferences already loaded, skipping...");
-      return;
-    }
+    if (preferencesLoaded) return;
 
     try {
-      console.log("Fetching preferences...");
       const response = await api.get("/api/notifications/preferences");
       if (response.data.success) {
         setPreferences(response.data.data);
         setPreferencesLoaded(true);
-        console.log("Preferences loaded:", response.data.data);
       }
     } catch (error: any) {
       console.error("Error fetching preferences:", error);
     }
   }, [preferencesLoaded]);
 
-  // Load notifications and preferences on mount
   useEffect(() => {
-    console.log("useNotifications useEffect triggered");
     fetchNotifications();
     fetchPreferences();
-  }, [fetchNotifications, fetchPreferences]); // Incluir dependencias
+  }, [fetchNotifications, fetchPreferences]);
 
-  // Calculate unread count when notifications change
   useEffect(() => {
     const count = notifications.filter((n) => !n.read).length;
     setUnreadCount(count);
-    console.log("Unread count updated:", count);
   }, [notifications]);
 
   return {

@@ -5,6 +5,27 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Empresa Tickets - Sistema de Gestión</title>
+
+    <!-- Fuentes para los themes (Quiet Pro: Inter; Workshop: Plus Jakarta + Fraunces) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+
+    <!-- Anti-flash: aplica el theme y modo guardados antes de que cargue React -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("ui:theme") || "quiet-pro";
+          var m = localStorage.getItem("ui:dark");
+          document.documentElement.setAttribute("data-theme", t);
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var dark =
+            m === "1" || m === "true" || m === "dark" ||
+            ((m === null || m === undefined) && prefersDark);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

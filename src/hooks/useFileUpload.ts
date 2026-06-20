@@ -41,11 +41,22 @@ export const useFileUpload = (options: FileUploadOptions = {}) => {
       }
 
       if (allowedTypes && allowedTypes.length > 0) {
-        const isValidType = allowedTypes.some(
-          (type) =>
-            file.type.startsWith(type) ||
-            file.name.toLowerCase().endsWith(type),
-        );
+        const fileName = file.name.toLowerCase();
+        const fileMime = file.type;
+        const isValidType = allowedTypes.some((rawType) => {
+          const type = rawType.trim().toLowerCase();
+          if (!type) return false;
+          // Extension: ".csv" -> matchea por sufijo del nombre.
+          if (type.startsWith(".")) {
+            return fileName.endsWith(type);
+          }
+          // Wildcard: "image/*" -> matchea por prefijo del mime.
+          if (type.endsWith("/*")) {
+            return fileMime.startsWith(type.slice(0, -1));
+          }
+          // Mime exacto: "application/pdf".
+          return fileMime === type;
+        });
         if (!isValidType) {
           return `Tipo de archivo no permitido: ${file.name}`;
         }

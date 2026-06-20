@@ -19,6 +19,7 @@ import {
   Eye,
   RefreshCw,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "../hooks";
 import api from "../lib/api";
@@ -30,8 +31,16 @@ interface User {
   name: string;
   email: string;
   role: "USER" | "AGENT" | "ADMIN";
+  isActive: boolean;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  department?: {
+    id: string;
+    name: string;
+    color: string | null;
+    icon: string | null;
+  } | null;
   _count: {
     requestedTickets: number;
     assignedTickets: number;
@@ -49,6 +58,14 @@ interface UpdateUserData {
   name?: string;
   email?: string;
   role?: "USER" | "AGENT" | "ADMIN";
+  departmentId?: string | null;
+}
+
+interface DepartmentOption {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
 }
 
 export const UsersPage: React.FC = () => {
@@ -57,6 +74,7 @@ export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
@@ -72,6 +90,7 @@ export const UsersPage: React.FC = () => {
   });
 
   const [editForm, setEditForm] = useState<UpdateUserData>({});
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
 
   // Verificar si el usuario actual es ADMIN
   const isAdmin = currentUser?.role === "ADMIN";
@@ -79,13 +98,27 @@ export const UsersPage: React.FC = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
+      fetchDepartments();
     }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, showInactive]);
+
+  const fetchDepartments = async () => {
+    try {
+      const resp = await api.get("/api/departments");
+      setDepartments(resp.data?.data ?? []);
+    } catch {
+      // silencioso: si falla, el selector queda vacío y el user puede
+      // editar el resto del form igual.
+    }
+  };
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get("/api/users");
+      const response = await api.get(
+        `/api/users${showInactive ? "?includeInactive=true" : ""}`,
+      );
       if (response.data.success) {
         setUsers(response.data.data);
       }
@@ -149,17 +182,36 @@ export const UsersPage: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este usuario?")) return;
+    if (
+      !confirm(
+        "Esta acción desactiva al usuario: no podrá iniciar sesión, pero sus tickets y comentarios se conservan. ¿Confirmás?",
+      )
+    )
+      return;
 
     try {
       const response = await api.delete(`/api/users/${userId}`);
       if (response.data.success) {
-        toast.success("Usuario eliminado correctamente");
+        toast.success("Usuario desactivado correctamente");
         fetchUsers();
       }
     } catch (error: any) {
       const message =
-        error.response?.data?.error?.message || "Error al eliminar usuario";
+        error.response?.data?.error?.message || "Error al desactivar usuario";
+      toast.error(message);
+    }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+    try {
+      const response = await api.post(`/api/users/${userId}/restore`);
+      if (response.data.success) {
+        toast.success("Usuario reactivado correctamente");
+        fetchUsers();
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error?.message || "Error al reactivar usuario";
       toast.error(message);
     }
   };
@@ -170,6 +222,7 @@ export const UsersPage: React.FC = () => {
       name: user.name,
       email: user.email,
       role: user.role,
+      departmentId: user.department?.id ?? null,
     });
     setShowEditModal(true);
   };
@@ -210,12 +263,27 @@ export const UsersPage: React.FC = () => {
 
   const getRoleBadge = (role: string) => {
     const roleConfig = {
-      USER: { color: "bg-blue-100 text-blue-800 border-blue-200", icon: User },
+      USER: {
+        label: "Usuario",
+        dot: "bg-sky-500",
+        text: "text-sky-700 dark:text-sky-300",
+        bg: "bg-sky-50 dark:bg-sky-950/30 border-sky-200/70 dark:border-sky-800/60",
+        icon: User,
+      },
       AGENT: {
-        color: "bg-green-100 text-green-800 border-green-200",
+        label: "Agente",
+        dot: "bg-emerald-500",
+        text: "text-emerald-700 dark:text-emerald-300",
+        bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/70 dark:border-emerald-800/60",
         icon: UserCheck,
       },
-      ADMIN: { color: "bg-red-100 text-red-800 border-red-200", icon: Shield },
+      ADMIN: {
+        label: "Admin",
+        dot: "bg-rose-500",
+        text: "text-rose-700 dark:text-rose-300",
+        bg: "bg-rose-50 dark:bg-rose-950/30 border-rose-200/70 dark:border-rose-800/60",
+        icon: Shield,
+      },
     };
 
     const config =
@@ -223,13 +291,12 @@ export const UsersPage: React.FC = () => {
     const Icon = config.icon;
 
     return (
-      <Badge
-        variant="outline"
-        className={`${config.color} px-3 py-1 text-xs font-medium`}
+      <span
+        className={`inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full border px-2 py-0.5 ${config.bg} ${config.text}`}
       >
-        <Icon className="h-3 w-3 mr-2" />
-        {role}
-      </Badge>
+        <Icon size={11} />
+        {config.label}
+      </span>
     );
   };
 
@@ -286,14 +353,14 @@ export const UsersPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Usuarios</h1>
           <p className="text-muted-foreground">
             Administra usuarios del sistema
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="px-4 py-2">
+        <Button onClick={() => setShowCreateModal(true)} className="px-4 py-2 sm:self-start">
           <Plus size={16} className="mr-2" />
           Nuevo Usuario
         </Button>
@@ -302,7 +369,7 @@ export const UsersPage: React.FC = () => {
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1 relative">
               <Search
                 size={16}
@@ -316,92 +383,160 @@ export const UsersPage: React.FC = () => {
                 className="pl-10"
               />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchUsers}
-              className="px-3 py-2"
-            >
-              <RefreshCw size={16} className="mr-2" />
-              Actualizar
-            </Button>
+            <div className="flex items-center justify-between sm:justify-end gap-3">
+              <label className="flex items-center space-x-2 text-sm text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span>Mostrar inactivos</span>
+              </label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchUsers}
+                className="px-3 py-2 shrink-0"
+              >
+                <RefreshCw size={16} className="mr-2" />
+                Actualizar
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Lista de Usuarios */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredUsers.map((user) => (
-          <Card key={user.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{user.name}</CardTitle>
-                <div className="ml-4">{getRoleBadge(user.role)}</div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-sm text-muted-foreground">{user.email}</div>
+        {filteredUsers.map((user) => {
+          const isInactive = !user.isActive;
+          return (
+            <Card
+              key={user.id}
+              className={`hover:shadow-md transition-shadow ${
+                isInactive ? "opacity-60" : ""
+              }`}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{user.name}</CardTitle>
+                  <div className="ml-4 flex items-center gap-2">
+                    {isInactive && (
+                      <Badge
+                        variant="outline"
+                        className="bg-gray-100 text-gray-600 border-gray-300 px-2 py-0.5 text-xs"
+                      >
+                        Inactivo
+                      </Badge>
+                    )}
+                    {getRoleBadge(user.role)}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm text-muted-foreground">{user.email}</div>
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Tickets solicitados: {user._count.requestedTickets}</span>
-                <span>Asignados: {user._count.assignedTickets}</span>
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                Creado: {new Date(user.createdAt).toLocaleDateString()}
-              </div>
-
-              <div className="flex space-x-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditModal(user)}
-                  className="flex-1"
-                >
-                  <Edit size={14} className="mr-1" />
-                  Editar
-                </Button>
-                {user.id === currentUser?.id ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openPasswordModal(user)}
-                    className="flex-1"
-                  >
-                    <Eye size={14} className="mr-1" />
-                    Cambiar Contraseña
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openPasswordModal(user)}
-                    className="flex-1"
-                  >
-                    <RefreshCw size={14} className="mr-1" />
-                    Blanquear Contraseña
-                  </Button>
+                {user.department && (
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border"
+                      style={{
+                        backgroundColor: user.department.color
+                          ? `${user.department.color}20`
+                          : undefined,
+                        borderColor: user.department.color
+                          ? `${user.department.color}60`
+                          : undefined,
+                        color: user.department.color ?? undefined,
+                      }}
+                      title="Sector"
+                    >
+                      {user.department.icon && (
+                        <span aria-hidden>{user.department.icon}</span>
+                      )}
+                      {user.department.name}
+                    </span>
+                  </div>
                 )}
-                {user.id !== currentUser?.id && (
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Tickets solicitados: {user._count.requestedTickets}</span>
+                  <span>Asignados: {user._count.assignedTickets}</span>
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  {isInactive && user.deletedAt
+                    ? `Desactivado: ${new Date(user.deletedAt).toLocaleDateString()}`
+                    : `Creado: ${new Date(user.createdAt).toLocaleDateString()}`}
+                </div>
+
+                <div className="flex space-x-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-700"
+                    onClick={() => openEditModal(user)}
+                    className="flex-1"
+                    disabled={isInactive}
                   >
-                    <Trash2 size={14} />
+                    <Edit size={14} className="mr-1" />
+                    Editar
                   </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  {user.id === currentUser?.id ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordModal(user)}
+                      className="flex-1"
+                    >
+                      <Eye size={14} className="mr-1" />
+                      Cambiar Contraseña
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordModal(user)}
+                      className="flex-1"
+                      disabled={isInactive}
+                    >
+                      <RefreshCw size={14} className="mr-1" />
+                      Blanquear Contraseña
+                    </Button>
+                  )}
+                  {user.id !== currentUser?.id &&
+                    (isInactive ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRestoreUser(user.id)}
+                        className="text-emerald-600 hover:text-emerald-700"
+                        title="Reactivar usuario"
+                      >
+                        <RotateCcw size={14} />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="text-red-600 hover:text-red-700"
+                        title="Desactivar usuario"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Modal Crear Usuario */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Crear Nuevo Usuario</h3>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
@@ -479,8 +614,8 @@ export const UsersPage: React.FC = () => {
 
       {/* Modal Editar Usuario */}
       {showEditModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Editar Usuario</h3>
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div>
@@ -518,6 +653,36 @@ export const UsersPage: React.FC = () => {
                   <option value="ADMIN">Administrador</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Sector
+                </label>
+                <select
+                  value={editForm.departmentId ?? ""}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      departmentId: e.target.value || null,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">Sin sector</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.icon ? `${d.icon} ` : ""}
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                {departments.length === 0 && (
+                  <p className="text-[11.5px] text-muted-foreground mt-1">
+                    Todavía no hay sectores cargados. Andá a{" "}
+                    <span className="font-medium">Sectores</span> en el nav
+                    para crear el primero.
+                  </p>
+                )}
+              </div>
               <div className="flex space-x-2 pt-4">
                 <Button
                   type="submit"
@@ -542,8 +707,8 @@ export const UsersPage: React.FC = () => {
 
       {/* Modal Blanquear Contraseña */}
       {showResetPasswordModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Blanquear Contraseña</h3>
             <p className="text-sm text-muted-foreground mb-4">
               ¿Estás seguro de que quieres blanquear la contraseña de {selectedUser.name}?

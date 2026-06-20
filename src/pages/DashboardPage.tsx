@@ -1,146 +1,105 @@
-import React, { useMemo } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardDescription,
-  DashboardCardSkeleton,
-  Button,
-} from "@/components/ui";
-import {
-  Ticket,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Users,
-  AlertTriangle,
-  RefreshCcw,
-} from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Button } from "@/components/ui";
+import { RefreshCcw, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useDashboard } from "../hooks";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+import { useAuth } from "../hooks";
+import Avatar from "../components/Avatar";
+import UserDashboard from "../components/dashboards/UserDashboard";
+import AgentDashboard from "../components/dashboards/AgentDashboard";
+import AdminDashboard from "../components/dashboards/AdminDashboard";
+import TicketsTriagePanel from "../components/TicketsTriagePanel";
+import PinnedAnnouncementsBanner from "../components/PinnedAnnouncementsBanner";
+import DepartmentResourcesPanel from "../components/DepartmentResourcesPanel";
+import type { DashboardPeriod } from "../types/dashboard";
+
+const PERIOD_OPTIONS: Array<{ value: DashboardPeriod; label: string }> = [
+  { value: "7d", label: "7 días" },
+  { value: "30d", label: "30 días" },
+  { value: "90d", label: "90 días" },
+  { value: "year", label: "Este año" },
+];
+
+const SkeletonGrid: React.FC = () => (
+  <div className="space-y-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+      ))}
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="h-64 bg-muted rounded-lg animate-pulse" />
+      <div className="h-64 bg-muted rounded-lg animate-pulse" />
+    </div>
+  </div>
+);
+
+const greetingFor = (date = new Date()): string => {
+  const hour = date.getHours();
+  if (hour < 12) return "Buen día";
+  if (hour < 19) return "Buenas tardes";
+  return "Buenas noches";
+};
+
+const firstName = (full?: string | null): string => {
+  if (!full) return "";
+  return full.trim().split(/\s+/)[0] ?? "";
+};
+
+const TrendChip: React.FC<{ data: any }> = ({ data }) => {
+  // Si es Admin, calcula tendencia de la mitad reciente del periodo vs la primera mitad
+  // usando createdVsResolvedTrend. Si no, no muestra nada.
+  if (!data || data.role !== "ADMIN" || !Array.isArray(data.createdVsResolvedTrend))
+    return null;
+  const trend: Array<{ created: number; resolved: number }> = data.createdVsResolvedTrend;
+  if (trend.length < 4) return null;
+
+  const half = Math.floor(trend.length / 2);
+  const sum = (xs: typeof trend, key: "created" | "resolved") =>
+    xs.reduce((acc, t) => acc + (t[key] ?? 0), 0);
+
+  const firstResolved = sum(trend.slice(0, half), "resolved");
+  const lastResolved = sum(trend.slice(half), "resolved");
+  if (firstResolved === 0 && lastResolved === 0) return null;
+
+  const delta =
+    firstResolved === 0
+      ? 100
+      : Math.round(((lastResolved - firstResolved) / firstResolved) * 100);
+
+  const Icon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
+  const tone =
+    delta > 0
+      ? "text-emerald-700 bg-emerald-50 border-emerald-200/70 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800/60"
+      : delta < 0
+        ? "text-rose-700 bg-rose-50 border-rose-200/70 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-800/60"
+        : "text-muted-foreground bg-muted border-border";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11.5px] font-medium border rounded-full px-2 py-0.5 ${tone}`}
+      title="Resueltos en la 2da mitad del período vs la 1ra"
+    >
+      <Icon size={11} />
+      {delta > 0 ? "+" : ""}
+      {delta}% resueltos
+    </span>
+  );
+};
 
 const DashboardPage: React.FC = () => {
-  const { stats, isLoading, refreshStats } = useDashboard();
+  const { user } = useAuth();
+  const [period, setPeriod] = useState<DashboardPeriod>("30d");
+  const { data, isLoading, refresh } = useDashboard(period);
 
-  // Datos para gráficos
-  const ticketStatusData = useMemo(() => {
-    if (!stats) return [];
-    return [
-      { name: "Abiertos", value: stats.openTickets, color: "#3B82F6" },
-      { name: "En Progreso", value: stats.inProgressTickets, color: "#F59E0B" },
-      { name: "Resueltos", value: stats.resolvedTickets, color: "#22C55E" },
-      { name: "Cerrados", value: stats.closedTickets, color: "#64748B" },
-    ];
-  }, [stats]);
+  const greeting = useMemo(() => greetingFor(), []);
+  const fname = firstName(user?.name);
 
-  const priorityData = useMemo(() => {
-    // Si tuviéramos desglose por prioridad en stats, lo usaríamos aquí.
-    // Como ejemplo, simulamos distribución basada en el total o si la API lo provee en el futuro.
-    // Por ahora usamos datos mockeados o derivados si existieran.
-    // Asumiremos que 'urgentTickets' es un dato real y el resto se distribuye para el ejemplo visual
-    // Idealmente el backend debería devolver un desglose.
-    if (!stats) return [];
-
-    // Mock parcial para visualización, excepto urgentes que sí tenemos
-    const total = stats.totalTickets || 0;
-    const urgent = stats.urgentTickets || 0;
-    const others = Math.max(0, total - urgent);
-
-    // Distribuir 'others' arbitrariamente solo para demo visual si no hay data real
-    const high = Math.floor(others * 0.3);
-    const medium = Math.floor(others * 0.5);
-    const low = others - high - medium;
-
-    return [
-      { name: "Urgente", value: urgent, color: "#EF4444" },
-      { name: "Alta", value: high, color: "#F97316" },
-      { name: "Media", value: medium, color: "#EAB308" },
-      { name: "Baja", value: low, color: "#22C55E" },
-    ].filter(d => d.value > 0);
-  }, [stats]);
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded shadow-lg">
-          <p className="font-medium text-sm">{label}</p>
-          <p className="text-sm" style={{ color: payload[0].color }}>
-            {payload[0].name}: {payload[0].value}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Resumen de tickets y métricas del sistema
-          </p>
-        </div>
-
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <DashboardCardSkeleton key={i} />
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-[300px] bg-muted rounded animate-pulse"></div>
-          <div className="h-[300px] bg-muted rounded animate-pulse"></div>
-        </div>
-
-        {/* Recent Activity Skeleton */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="w-2 h-2 bg-muted rounded-full animate-pulse"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-muted rounded animate-pulse w-3/4"></div>
-                    <div className="h-3 bg-muted rounded animate-pulse w-1/2"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const formatRelative = (iso?: string) => {
-    if (!iso) return "";
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `hace ${mins} min`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `hace ${hours} horas`;
-    const days = Math.floor(hours / 24);
-    return `hace ${days} días`;
-  };
+  const headerSubtitle = (() => {
+    if (!user) return "";
+    if (user.role === "USER") return "Tu actividad y tickets";
+    if (user.role === "AGENT") return "Tu cola de trabajo y tickets disponibles";
+    return "Operación general y KPIs del sector";
+  })();
 
   return (
     <div className="space-y-6">
@@ -276,104 +235,67 @@ const DashboardPage: React.FC = () => {
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Avatar name={user?.name} email={user?.email} size={44} />
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {greeting}
+                {fname ? `, ${fname}` : ""}
+              </h1>
+              <TrendChip data={data} />
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-
-      {/* Additional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="rounded-lg shadow-sm border-l-4 border-indigo-500">
-          <CardHeader className="px-6 pt-4">
-            <CardTitle className="flex items-center space-x-2">
-              <Users size={20} className="text-indigo-500" />
-              <span>Usuarios Activos</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="text-3xl font-bold tracking-tight text-indigo-700 dark:text-indigo-300">
-              {stats?.totalUsers || 0}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {stats?.activeAgents || 0} agentes,{" "}
-              {Math.max(
-                0,
-                (stats?.totalUsers || 0) - (stats?.activeAgents || 0),
-              )}{" "}
-              administradores
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {headerSubtitle}
             </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-lg shadow-sm border-l-4 border-red-500">
-          <CardHeader className="px-6 pt-4">
-            <CardTitle className="flex items-center space-x-2">
-              <AlertTriangle size={20} className="text-red-500" />
-              <span>Tickets Urgentes</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center px-6 pb-6">
-            <div className="text-3xl font-bold text-red-600 dark:text-red-400 tracking-tight">
-              {stats?.urgentTickets || 0}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Requieren atención inmediata
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader className="px-3 pt-2 pb-5">
-          <CardTitle className="pl-2">Actividad Reciente</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3">
-          <div className="divide-y text-slate-400">
-            {stats?.recentActivity?.length ? (
-              stats.recentActivity.map((a) => {
-                const color =
-                  a.type === "ticket_created"
-                    ? "bg-blue-500"
-                    : a.type === "ticket_resolved"
-                      ? "bg-green-500"
-                      : a.type === "ticket_updated"
-                        ? "bg-yellow-500"
-                        : "bg-purple-500";
-                const title =
-                  a.type === "ticket_created"
-                    ? "Nuevo ticket creado"
-                    : a.type === "ticket_resolved"
-                      ? "Ticket resuelto"
-                      : a.type === "ticket_updated"
-                        ? "Ticket actualizado"
-                        : "Comentario agregado";
-                return (
-                  <div key={a.id} className="py-3 flex items-start space-x-3">
-                    <div className={`mt-1 w-2 h-2 ${color} rounded-full`}></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium leading-none text-foreground">
-                        {title}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {a.description || a.type}
-                      </p>
-                    </div>
-                    <div className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatRelative(a.timestamp)}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-sm text-muted-foreground pl-2">
-                Sin actividad reciente
-              </p>
-            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
+            className="px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700"
+          >
+            {PERIOD_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refresh}
+            disabled={isLoading}
+          >
+            <RefreshCcw size={14} className="mr-2" />
+            Actualizar
+          </Button>
+        </div>
+      </div>
+
+      {/* Banner de avisos destacados (visible para todos los roles) */}
+      <PinnedAnnouncementsBanner />
+
+      {/* Panel "Para tu sector": recursos dirigidos al sector del user.
+          Solo se renderiza si tiene sector asignado y hay recursos. */}
+      <DepartmentResourcesPanel />
+
+      {/* Panel de triage destacado para AGENT/ADMIN */}
+      {(user?.role === "AGENT" || user?.role === "ADMIN") && (
+        <TicketsTriagePanel />
+      )}
+
+      {isLoading || !data ? (
+        <SkeletonGrid />
+      ) : data.role === "USER" ? (
+        <UserDashboard data={data} />
+      ) : data.role === "AGENT" ? (
+        <AgentDashboard data={data} />
+      ) : (
+        <AdminDashboard data={data} />
+      )}
     </div>
   );
 };

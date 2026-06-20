@@ -38,11 +38,46 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
 
+// Tipos aceptados por defecto en el input file. La validacion real es del
+// back -- esto solo restringe el dialog del navegador para mejorar UX.
+// Cubre las categorias comunes (imagenes, docs office, texto, comprimidos,
+// audio/video corto). El back tiene la whitelist final + blacklist de
+// ejecutables.
+const DEFAULT_ACCEPT_TYPES = [
+  "image/*",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/rtf",
+  "text/*",
+  "application/json",
+  "application/xml",
+  "application/zip",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "application/gzip",
+  "application/x-tar",
+  "audio/*",
+  "video/*",
+  ".csv",
+  ".md",
+  ".rtf",
+  ".odt",
+  ".ods",
+  ".odp",
+];
+
 export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   ticketId,
   maxFiles = 20,
   maxSize = 10 * 1024 * 1024, // 10MB
-  allowedTypes = ["image/", "application/pdf", "text/", "application/zip"],
+  allowedTypes = DEFAULT_ACCEPT_TYPES,
   onSuccess,
   onError,
   className = "",

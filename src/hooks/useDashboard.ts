@@ -1,71 +1,32 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../lib/api";
 import { useAuth } from "./useAuth";
+import type { DashboardData, DashboardPeriod } from "../types/dashboard";
 
-interface DashboardStats {
-  totalTickets: number;
-  openTickets: number;
-  inProgressTickets: number;
-  resolvedTickets: number;
-  closedTickets: number;
-  urgentTickets: number;
-  totalUsers: number;
-  activeAgents: number;
-  recentActivity: Array<{
-    id: string;
-    type:
-      | "ticket_created"
-      | "ticket_updated"
-      | "ticket_resolved"
-      | "comment_added";
-    description: string;
-    timestamp: string;
-    ticketId?: string;
-    userId?: string;
-    userName?: string;
-  }>;
-}
-
-export const useDashboard = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+export const useDashboard = (period: DashboardPeriod = "30d") => {
+  const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
-  const fetchDashboardStats = useCallback(async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setIsLoading(true);
-
-      // Endpoint diferenciado según el rol
-      let endpoint = "/api/dashboard/stats";
-      if (user?.role === "AGENT") {
-        endpoint = "/api/dashboard/agent-stats";
-      } else if (user?.role === "USER") {
-        endpoint = "/api/dashboard/user-stats";
-      }
-
-      const response = await api.get(endpoint);
-      setStats(response.data.data);
+      const response = await api.get(`/api/dashboard?period=${period}`);
+      setData(response.data.data as DashboardData);
     } catch (error: any) {
-      console.error("Error fetching dashboard stats:", error);
+      console.error("Error fetching dashboard:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.role]);
+  }, [period]);
 
   useEffect(() => {
-    console.log("useDashboard useEffect triggered, user:", user?.role);
-    if (user) {
-      fetchDashboardStats();
-    }
-  }, [user, fetchDashboardStats]);
-
-  const refreshStats = () => {
-    fetchDashboardStats();
-  };
+    if (user) fetchDashboard();
+  }, [user, fetchDashboard]);
 
   return {
-    stats,
+    data,
     isLoading,
-    refreshStats,
+    refresh: fetchDashboard,
   };
 };
