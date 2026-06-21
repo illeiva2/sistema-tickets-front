@@ -433,6 +433,8 @@ const TicketDetailPage: React.FC = () => {
           <ArrowLeft size={16} className="mr-2" />
           Volver
         </Button>
+        <div>
+            <h1 className="text-3xl font-bold px-2" data-testid="ticket-detail-title">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">
             Ticket #
@@ -445,6 +447,20 @@ const TicketDetailPage: React.FC = () => {
           </h2>
         </div>
         {isAdmin && (
+          <div className="ml-auto flex space-x-2">
+            <Button
+              variant="outline"
+              className="px-2 py-1 text-sm"
+              size="sm"
+              onClick={() => {
+                openEditModal();
+              }}
+              data-testid="ticket-edit-button"
+            >
+              <Edit size={16} className="mr-2" />
+              Editar
+            </Button>
+          </div>
           <Button
             variant="outline"
             className="px-2 py-1 text-sm shrink-0"
@@ -762,6 +778,45 @@ const TicketDetailPage: React.FC = () => {
                           disabled={saving}
                           className="justify-start"
                         >
+                          Cerrar Ticket
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                        value={ticket?.status || "OPEN"}
+                        data-testid="ticket-status-select"
+                        onChange={async (e) => {
+                          if (!ticket) return;
+                          setSaving(true);
+                          try {
+                            const resp = await api.patch(
+                              `/api/tickets/${ticket.id}`,
+                              { status: e.target.value },
+                            );
+                            setTicket((prev: any) => ({
+                              ...(prev || {}),
+                              ...(resp.data?.data || {}),
+                            }));
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      >
+                        <option value="OPEN">Abierto</option>
+                        <option value="IN_PROGRESS">En progreso</option>
+                        <option value="RESOLVED">Resuelto</option>
+                        <option value="CLOSED">Cerrado</option>
+                      </select>
+                      {saving && (
+                        <span className="text-xs text-muted-foreground">
+                          Guardando...
+                        </span>
+                      )}
+                    </>
+                  )}
                           <Lock size={14} className="mr-2" />
                           Cerrar
                         </Button>,
@@ -864,6 +919,7 @@ const TicketDetailPage: React.FC = () => {
                     <select
                       className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.priority || "MEDIUM"}
+                    data-testid="ticket-priority-select"
                       onChange={async (e) => {
                         if (!ticket) return;
                         setSaving(true);
@@ -979,6 +1035,7 @@ const TicketDetailPage: React.FC = () => {
                     <select
                       className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.assignee?.id || ""}
+                      data-testid="ticket-assignee-select"
                       onChange={async (e) => {
                         if (!ticket) return;
                         setSaving(true);
@@ -1017,6 +1074,7 @@ const TicketDetailPage: React.FC = () => {
                           onClick={handleClaimTicket}
                           disabled={claiming}
                           className="w-full text-xs flex items-center justify-center gap-2"
+                          data-testid="ticket-claim-button"
                         >
                           {claiming ? (
                             <>
@@ -1058,7 +1116,7 @@ const TicketDetailPage: React.FC = () => {
                 </label>
                 <div className="flex items-center space-x-2">
                   <Clock size={14} />
-                  <span className="text-sm">
+                  <span className="text-sm" data-testid="ticket-created-at">
                     {ticket?.createdAt
                       ? new Date(ticket.createdAt).toLocaleString()
                       : ""}
@@ -1447,6 +1505,7 @@ const TicketDetailPage: React.FC = () => {
                 onClick={handleUpdateTicket}
                 className="flex-1"
                 disabled={!editFormData.title.trim() || !editFormData.description.trim() || saving}
+                data-testid="ticket-save-button"
               >
                 {saving ? "Guardando..." : "Guardar Cambios"}
               </Button>

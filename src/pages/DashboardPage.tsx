@@ -103,6 +103,138 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Resumen de tickets y métricas del sistema
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="px-3 py-2 text-base"
+          onClick={refreshStats}
+        >
+          <RefreshCcw size={14} className="mr-2" /> Actualizar
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="rounded-lg shadow-sm border-t-4 bg-white dark:bg-slate-950 border-blue-500">
+          <CardHeader className="items-center space-y-1 pb-0 px-3 pt-2">
+            <Ticket className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-center pl-2">
+              Tickets Abiertos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center pt-2 px-6 pb-6">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-open-tickets-count">
+              {stats?.openTickets || 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg shadow-sm border-t-4 bg-white dark:bg-slate-950 border-amber-500">
+          <CardHeader className="items-center space-y-1 pb-0 px-3 pt-2">
+            <Clock className="h-4 w-4 text-amber-500" />
+            <CardTitle className="text-sm font-medium text-center pl-2">
+              En Progreso
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center pt-2 px-6 pb-6">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-in-progress-tickets-count">
+              {stats?.inProgressTickets || 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg shadow-sm border-t-4 bg-white dark:bg-slate-950 border-green-500">
+          <CardHeader className="items-center space-y-1 pb-0 px-3 pt-2">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium text-center pl-2">
+              Resueltos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center pt-2 px-6 pb-6">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-resolved-tickets-count">
+              {stats?.resolvedTickets || 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg shadow-sm border-t-4 bg-white dark:bg-slate-950 border-slate-500">
+          <CardHeader className="items-center space-y-1 pb-0 px-3 pt-2">
+            <XCircle className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-sm font-medium text-center pl-2">
+              Cerrados
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center pt-2 px-6 pb-6">
+            <div className="text-3xl font-bold tracking-tight" data-testid="dashboard-closed-tickets-count">
+              {stats?.closedTickets || 0}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico de Estado de Tickets */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Estado de Tickets</CardTitle>
+            <CardDescription>Distribución actual de tickets por estado</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={ticketStatusData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {ticketStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Prioridad (Estimación/Demo) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribución de Prioridad</CardTitle>
+            <CardDescription>Tickets clasificados por nivel de urgencia</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={priorityData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {priorityData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Avatar name={user?.name} email={user?.email} size={44} />

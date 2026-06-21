@@ -108,6 +108,7 @@ const NewTicketPage: React.FC = () => {
                 onChange={(e) => handleChange("title", e.target.value)}
                 placeholder="Resumen del problema o solicitud"
                 required
+                data-testid="new-ticket-title"
                 className="w-full dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
             </div>
@@ -174,10 +175,24 @@ const NewTicketPage: React.FC = () => {
                 placeholder="Describe detalladamente el problema o solicitud..."
                 required
                 rows={4}
+                data-testid="new-ticket-description"
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Prioridad</label>
+              <select
+                value={formData.priority}
+                onChange={(e) => handleChange("priority", e.target.value)}
+                data-testid="new-ticket-priority"
+                className="w-full px-3 py-2 border rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              >
+                <option value="LOW">Baja</option>
+                <option value="MEDIUM">Media</option>
+                <option value="HIGH">Alta</option>
+                <option value="URGENT">Urgente</option>
+              </select>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Prioridad</label>
@@ -228,6 +243,7 @@ const NewTicketPage: React.FC = () => {
                 disabled={
                   isSubmitting || !formData.title || !formData.description
                 }
+                data-testid="new-ticket-submit"
               >
                 {isSubmitting ? (
                   <>
