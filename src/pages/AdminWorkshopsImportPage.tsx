@@ -22,7 +22,9 @@ const DEFAULT_SHEET_URL =
 
 const AdminWorkshopsImportPage: React.FC = () => {
   const [sheetUrl, setSheetUrl] = useState(DEFAULT_SHEET_URL);
-  const [mode, setMode] = useState<"weekly" | "monthly">("monthly");
+  const [mode, setMode] = useState<"weekly" | "monthly" | "upcoming">(
+    "upcoming",
+  );
   const [dryRun, setDryRun] = useState(false);
   const [importing, setImporting] = useState(false);
   const [lastSummary, setLastSummary] = useState<ImportSummary | null>(null);
@@ -124,25 +126,35 @@ const AdminWorkshopsImportPage: React.FC = () => {
             <label className="text-[12.5px] font-medium text-muted-foreground">
               Modo
             </label>
-            <div className="flex gap-2">
-              {(["monthly", "weekly"] as const).map((m) => {
+            <div className="flex flex-col gap-2">
+              {(["upcoming", "monthly", "weekly"] as const).map((m) => {
                 const active = mode === m;
+                const label =
+                  m === "upcoming"
+                    ? "🗓️ Todos los próximos (recomendado)"
+                    : m === "monthly"
+                      ? "📅 Mensual (resto del mes actual)"
+                      : "📆 Semanal (próximos 7 días)";
                 return (
                   <button
                     key={m}
                     type="button"
                     onClick={() => setMode(m)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                    className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${
                       active
                         ? "border-primary bg-primary/10"
                         : "border-border bg-background hover:bg-muted/40"
                     }`}
                   >
-                    {m === "monthly" ? "📅 Mensual (resto del mes)" : "📆 Semanal (próximos 7 días)"}
+                    {label}
                   </button>
                 );
               })}
             </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              &quot;Todos los próximos&quot; toma todos los workshops con
+              fecha de hoy en adelante (ideal para publicar el mes que viene).
+            </p>
           </div>
 
           <div className="space-y-1">
@@ -214,7 +226,12 @@ const AdminWorkshopsImportPage: React.FC = () => {
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">
-                    {h.period} — {h.mode === "weekly" ? "Semanal" : "Mensual"}
+                    {h.period} —{" "}
+                    {h.mode === "weekly"
+                      ? "Semanal"
+                      : h.mode === "monthly"
+                        ? "Mensual"
+                        : "Todos los próximos"}
                   </div>
                   <div className="text-[11.5px] text-muted-foreground truncate">
                     {h.totalRows} filas · {h.importedRows} importadas ·{" "}

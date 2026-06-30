@@ -15,7 +15,7 @@ export interface WorkshopRule {
 
 export interface ImportSummary {
   period: string;
-  mode: "weekly" | "monthly";
+  mode: "weekly" | "monthly" | "upcoming";
   totalRows: number;
   importedRows: number;
   discardedClosed: number;
@@ -36,7 +36,7 @@ export interface ImportSummary {
 export interface WorkshopImportLog {
   id: string;
   period: string;
-  mode: "weekly" | "monthly";
+  mode: "weekly" | "monthly" | "upcoming";
   sheetUrl: string;
   totalRows: number;
   importedRows: number;
