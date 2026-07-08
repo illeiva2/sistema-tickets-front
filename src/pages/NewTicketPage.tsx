@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useTickets } from "../hooks";
 import api from "../lib/api";
 import type { ResourceSuggestion } from "../types/resources";
+import type { KbSugerencia } from "../types/kb";
 import {
   RESOURCE_CATEGORY_GLYPH,
   RESOURCE_CATEGORY_LABEL,
@@ -22,7 +23,11 @@ const NewTicketPage: React.FC = () => {
   });
 
   // Sugerencias contextuales no bloqueantes basadas en el título.
+  // Dos fuentes en paralelo: la KB interna (resources) y la documentación
+  // oficial de Finnegans (bc.finneg.com). Si una falla, la otra se muestra
+  // igual.
   const [suggestions, setSuggestions] = useState<ResourceSuggestion[]>([]);
+  const [kbSuggestions, setKbSuggestions] = useState<KbSugerencia[]>([]);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
 
   useEffect(() => {
@@ -30,18 +35,26 @@ const NewTicketPage: React.FC = () => {
     const q = formData.title.trim();
     if (q.length < 3) {
       setSuggestions([]);
+      setKbSuggestions([]);
       return;
     }
     let cancelled = false;
     const handle = setTimeout(async () => {
-      try {
-        const resp = await api.get(
-          `/api/resources/suggest?q=${encodeURIComponent(q)}&limit=5`,
-        );
-        if (!cancelled) setSuggestions(resp.data?.data ?? []);
-      } catch {
-        if (!cancelled) setSuggestions([]);
-      }
+      const [internas, oficiales] = await Promise.allSettled([
+        api.get(`/api/resources/suggest?q=${encodeURIComponent(q)}&limit=5`),
+        api.get(`/api/kb/buscar?q=${encodeURIComponent(q)}&limit=3`),
+      ]);
+      if (cancelled) return;
+      setSuggestions(
+        internas.status === "fulfilled"
+          ? (internas.value.data?.data ?? [])
+          : [],
+      );
+      setKbSuggestions(
+        oficiales.status === "fulfilled"
+          ? (oficiales.value.data?.data?.sugerencias ?? [])
+          : [],
+      );
     }, 350);
     return () => {
       cancelled = true;
@@ -112,7 +125,8 @@ const NewTicketPage: React.FC = () => {
               />
             </div>
 
-            {!suggestionsDismissed && suggestions.length > 0 && (
+            {!suggestionsDismissed &&
+              (suggestions.length > 0 || kbSuggestions.length > 0) && (
               <div className="rounded-md border border-primary/30 bg-primary/5 dark:bg-primary/10 px-3 py-2.5 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-foreground">
@@ -127,39 +141,89 @@ const NewTicketPage: React.FC = () => {
                     Ocultar
                   </button>
                 </div>
-                <ul className="space-y-1">
-                  {suggestions.map((s) => (
-                    <li key={s.id}>
-                      <Link
-                        to={`/resources/${s.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-start gap-2 text-[13px] hover:bg-primary/10 rounded px-2 py-1.5 transition-colors"
-                      >
-                        <span aria-hidden className="shrink-0 mt-0.5">
-                          {RESOURCE_CATEGORY_GLYPH[s.category]}
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className="block font-medium text-foreground group-hover:text-primary truncate">
-                            {s.title}
+                {suggestions.length > 0 && (
+                  <ul className="space-y-1">
+                    {suggestions.map((s) => (
+                      <li key={s.id}>
+                        <Link
+                          to={`/resources/${s.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group flex items-start gap-2 text-[13px] hover:bg-primary/10 rounded px-2 py-1.5 transition-colors"
+                        >
+                          <span aria-hidden className="shrink-0 mt-0.5">
+                            {RESOURCE_CATEGORY_GLYPH[s.category]}
                           </span>
-                          {s.excerpt && (
-                            <span className="block text-[11.5px] text-muted-foreground line-clamp-1">
-                              {s.excerpt}
+                          <span className="flex-1 min-w-0">
+                            <span className="block font-medium text-foreground group-hover:text-primary truncate">
+                              {s.title}
                             </span>
-                          )}
-                          <span className="block text-[10.5px] text-muted-foreground mt-0.5">
-                            {RESOURCE_CATEGORY_LABEL[s.category]}
+                            {s.excerpt && (
+                              <span className="block text-[11.5px] text-muted-foreground line-clamp-1">
+                                {s.excerpt}
+                              </span>
+                            )}
+                            <span className="block text-[10.5px] text-muted-foreground mt-0.5">
+                              {RESOURCE_CATEGORY_LABEL[s.category]}
+                            </span>
                           </span>
-                        </span>
-                        <ExternalLink
-                          size={12}
-                          className="shrink-0 mt-1 text-muted-foreground group-hover:text-primary"
-                        />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                          <ExternalLink
+                            size={12}
+                            className="shrink-0 mt-1 text-muted-foreground group-hover:text-primary"
+                          />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {kbSuggestions.length > 0 && (
+                  <div
+                    className={
+                      suggestions.length > 0
+                        ? "pt-1.5 border-t border-primary/10"
+                        : ""
+                    }
+                  >
+                    <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground px-2 mb-0.5">
+                      De la ayuda oficial de Finnegans
+                    </div>
+                    <ul className="space-y-1">
+                      {kbSuggestions.map((s) => (
+                        <li key={s.topicId}>
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex items-start gap-2 text-[13px] hover:bg-primary/10 rounded px-2 py-1.5 transition-colors"
+                          >
+                            <span aria-hidden className="shrink-0 mt-0.5">
+                              📖
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-medium text-foreground group-hover:text-primary truncate">
+                                {s.titulo}
+                              </span>
+                              {s.extracto && (
+                                <span className="block text-[11.5px] text-muted-foreground line-clamp-1">
+                                  {s.extracto}
+                                </span>
+                              )}
+                              {s.categoria && (
+                                <span className="block text-[10.5px] text-muted-foreground mt-0.5">
+                                  {s.categoria} · bc.finneg.com
+                                </span>
+                              )}
+                            </span>
+                            <ExternalLink
+                              size={12}
+                              className="shrink-0 mt-1 text-muted-foreground group-hover:text-primary"
+                            />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <p className="text-[10.5px] text-muted-foreground pt-1 border-t border-primary/10">
                   Si igual querés crear el ticket, completá la descripción y enviá.
                 </p>
