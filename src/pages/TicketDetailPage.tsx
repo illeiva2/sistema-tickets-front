@@ -43,7 +43,8 @@ import TicketTimeline from "../components/TicketTimeline";
 import Avatar from "../components/Avatar";
 import TicketShareModal from "../components/TicketShareModal";
 import CollapsibleSection from "../components/CollapsibleSection";
-import { Activity } from "lucide-react";
+import { Activity, BookOpen } from "lucide-react";
+import FinnegansKbPanel from "../components/FinnegansKbPanel";
 import { formatSla, slaToneClasses } from "../lib/sla";
 
 // Tiempo abreviado relativo para la lista de viewers ("hace 2h", "hace 3d").
@@ -1185,6 +1186,19 @@ const TicketDetailPage: React.FC = () => {
               />
             </CollapsibleSection>
           )}
+
+          {/* Sugerencias de la documentación oficial de Finnegans, solo
+              para staff. Lazy: el fetch ocurre al expandir la sección. */}
+          {ticket?.id &&
+            (user?.role === "AGENT" || user?.role === "ADMIN") && (
+              <CollapsibleSection
+                icon={<BookOpen size={16} />}
+                title="Ayuda oficial Finnegans"
+                hint="bc.finneg.com"
+              >
+                <FinnegansKbPanel ticketId={ticket.id} />
+              </CollapsibleSection>
+            )}
 
           <CollapsibleSection
             icon={<Paperclip size={16} />}
