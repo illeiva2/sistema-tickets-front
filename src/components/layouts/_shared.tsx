@@ -23,6 +23,13 @@ import {
   Building2,
   GraduationCap,
   Briefcase,
+  Activity,
+  HardDrive,
+  Wrench,
+  ShoppingCart,
+  Smartphone,
+  Network,
+  Radar,
 } from "lucide-react";
 import { replayOnboardingTour } from "../../lib/onboarding";
 import { useAuth, useTickets } from "../../hooks";
@@ -152,6 +159,13 @@ export const Breadcrumbs: React.FC = () => {
             tickets: "Tickets",
             new: "Nuevo",
             login: "Iniciar Sesión",
+            it: "Gestión IT",
+            inventory: "Inventario",
+            maintenance: "Mantenimientos",
+            purchases: "Compras y proveedores",
+            staff: "Personal y líneas",
+            network: "Red y topología",
+            live: "Equipos en vivo",
           }[name] || name;
 
         if (
@@ -328,7 +342,12 @@ export interface NavItem {
   icon: React.ReactNode;
   showFor?: ("USER" | "AGENT" | "ADMIN")[];
   showUnreadCount?: boolean;
+  /** Grupo de navegación. "it" se renderiza bajo el separador "Gestión IT". */
+  section?: "general" | "it";
 }
+
+/** Etiqueta del grupo de navegación IT (la usan ambos layouts). */
+export const IT_NAV_GROUP_LABEL = "Gestión IT";
 
 export const useNavItems = (): NavItem[] => {
   const { user } = useAuth();
@@ -367,6 +386,56 @@ export const useNavItems = (): NavItem[] => {
       label: "Workshops",
       icon: <GraduationCap size={16} />,
       showFor: ["ADMIN"],
+    },
+    // ── Gestión IT (solo AGENT/ADMIN) ────────────────────────────────────
+    {
+      to: "/it",
+      label: "Panel IT",
+      icon: <Activity size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/inventory",
+      label: "Inventario",
+      icon: <HardDrive size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/maintenance",
+      label: "Mantenimientos",
+      icon: <Wrench size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/purchases",
+      label: "Compras y proveedores",
+      icon: <ShoppingCart size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/staff",
+      label: "Personal y líneas",
+      icon: <Smartphone size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/network",
+      label: "Red y topología",
+      icon: <Network size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/live",
+      label: "Equipos en vivo",
+      icon: <Radar size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
     },
   ];
   return items.filter(

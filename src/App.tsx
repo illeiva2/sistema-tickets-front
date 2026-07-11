@@ -1,6 +1,6 @@
 // React 18 with jsx:react-jsx doesn't require explicit import
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Outlet } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 // Componentes que SI van en el bundle inicial: layout, providers,
@@ -37,6 +37,15 @@ const SetupPasswordPage = lazy(() => import("./pages/SetupPasswordPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
 const OAuthHandler = lazy(() => import("./components/OAuthHandler"));
 const OAuthWrapper = lazy(() => import("./components/OAuthWrapper"));
+
+// Gestión IT (solo AGENT/ADMIN): todas lazy, viven bajo /it/*.
+const ItDashboardPage = lazy(() => import("./pages/it/ItDashboardPage"));
+const ItInventoryPage = lazy(() => import("./pages/it/ItInventoryPage"));
+const ItMaintenancePage = lazy(() => import("./pages/it/ItMaintenancePage"));
+const ItPurchasesPage = lazy(() => import("./pages/it/ItPurchasesPage"));
+const ItStaffPage = lazy(() => import("./pages/it/ItStaffPage"));
+const ItNetworkPage = lazy(() => import("./pages/it/ItNetworkPage"));
+const ItLiveDevicesPage = lazy(() => import("./pages/it/ItLiveDevicesPage"));
 
 // Fallback mientras carga el chunk de la pagina. Mantiene el layout estable
 // (sin flash blanco) usando un mini skeleton.
@@ -77,6 +86,24 @@ function App() {
                 <Route path="tickets/new" element={<NewTicketPage />} />
                 <Route path="tickets/:id" element={<TicketDetailPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
+                {/* Gestión IT: protección única en el route padre (el
+                    backend igual valida rol en cada endpoint). */}
+                <Route
+                  path="it"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["ADMIN", "AGENT"]}>
+                      <Outlet />
+                    </RoleProtectedRoute>
+                  }
+                >
+                  <Route index element={<ItDashboardPage />} />
+                  <Route path="inventory" element={<ItInventoryPage />} />
+                  <Route path="maintenance" element={<ItMaintenancePage />} />
+                  <Route path="purchases" element={<ItPurchasesPage />} />
+                  <Route path="staff" element={<ItStaffPage />} />
+                  <Route path="network" element={<ItNetworkPage />} />
+                  <Route path="live" element={<ItLiveDevicesPage />} />
+                </Route>
                 <Route
                   path="files"
                   element={

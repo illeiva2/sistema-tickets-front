@@ -9,6 +9,7 @@ import {
   useNavItems,
   UnreadDot,
   useDarkToggle,
+  IT_NAV_GROUP_LABEL,
 } from "./_shared";
 
 // Sidebar layout, estilo Quiet Pro: nav vertical fijo a la izquierda en
@@ -18,6 +19,8 @@ const QuietProLayout: React.FC = () => {
   const navigate = useNavigate();
   const navItems = useNavItems();
   const navRoutes = navItems.map((i) => i.to);
+  // Índice del primer ítem IT: antes de él va el separador "Gestión IT".
+  const firstItIndex = navItems.findIndex((i) => i.section === "it");
   const { dark, toggleMode } = useDarkToggle();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
@@ -78,19 +81,25 @@ const QuietProLayout: React.FC = () => {
         <div className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground px-2.5 py-1.5">
           Workspace
         </div>
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            icon={item.icon}
-            variant="vertical"
-            siblings={navRoutes}
-          >
-            <span className="flex items-center justify-between w-full gap-2">
-              <span>{item.label}</span>
-              {item.showUnreadCount && <UnreadDot />}
-            </span>
-          </NavLink>
+        {navItems.map((item, index) => (
+          <React.Fragment key={item.to}>
+            {index === firstItIndex && (
+              <div className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground px-2.5 pt-3 pb-1.5">
+                {IT_NAV_GROUP_LABEL}
+              </div>
+            )}
+            <NavLink
+              to={item.to}
+              icon={item.icon}
+              variant="vertical"
+              siblings={navRoutes}
+            >
+              <span className="flex items-center justify-between w-full gap-2">
+                <span>{item.label}</span>
+                {item.showUnreadCount && <UnreadDot />}
+              </span>
+            </NavLink>
+          </React.Fragment>
         ))}
       </nav>
 
