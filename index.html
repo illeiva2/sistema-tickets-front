@@ -6,16 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Empresa Tickets - Sistema de Gestión</title>
 
-    <!-- Fuentes para los themes (Quiet Pro: Inter; Workshop: Plus Jakarta + Fraunces) -->
+    <!-- Fuentes para los themes (Quiet Pro: Inter; Workshop: Plus Jakarta + Fraunces; Dystopia: IBM Plex Mono) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Anti-flash: aplica el theme y modo guardados antes de que cargue React -->
     <script>
       (function () {
         try {
-          var t = localStorage.getItem("ui:theme") || "quiet-pro";
+          var themes = ["quiet-pro", "workshop", "dystopia"];
+          var t = localStorage.getItem("ui:theme");
+          if (themes.indexOf(t) === -1) t = "quiet-pro";
           var m = localStorage.getItem("ui:dark");
           document.documentElement.setAttribute("data-theme", t);
           var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;

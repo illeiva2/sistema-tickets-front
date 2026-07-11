@@ -1,14 +1,19 @@
 /* ============================================================
    tokens.css — Sistema de Tickets · multi-theme
    ============================================================
-   Soporta 2 themes × 2 modos:
+   Soporta 3 themes × 2 modos:
      [data-theme="quiet-pro"]        → light
      [data-theme="quiet-pro"].dark   → dark
      [data-theme="workshop"]         → light
      [data-theme="workshop"].dark    → dark
+     [data-theme="dystopia"]         → light (papel de terminal)
+     [data-theme="dystopia"].dark    → dark (CRT fósforo)
 
    El theme se aplica con data-theme en <html>, el dark con .dark
    en <html>. Tailwind ya consume estas variables vía hsl(var(--xxx)).
+
+   Nota: "dystopia" es exclusivo de roles AGENT/ADMIN (el gating
+   vive en ThemeSwitcher + Layout; acá solo se definen los tokens).
    ============================================================ */
 
 @tailwind base;
@@ -185,6 +190,96 @@
     --priority-high: 18 75% 60%;
     --priority-urgent: 4 65% 60%;
   }
+
+  /* ---------------------------------------------------------
+     Dystopia — terminal CRT. Fósforo verde + ámbar de alerta.
+     Claro = papel de terminal (greenbar). Oscuro = CRT clásico.
+     --------------------------------------------------------- */
+  [data-theme="dystopia"] {
+    --background: 100 12% 93%;
+    --foreground: 140 45% 13%;
+
+    --card: 100 15% 97%;
+    --card-foreground: 140 45% 13%;
+
+    --popover: 100 15% 97%;
+    --popover-foreground: 140 45% 13%;
+
+    --primary: 150 85% 22%;            /* verde consola oscuro */
+    --primary-foreground: 100 15% 97%;
+
+    --secondary: 110 10% 88%;
+    --secondary-foreground: 140 40% 16%;
+
+    --muted: 110 10% 88%;
+    --muted-foreground: 140 14% 34%;
+
+    --accent: 45 90% 88%;              /* ámbar pálido */
+    --accent-foreground: 40 90% 22%;
+
+    --destructive: 0 75% 42%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 120 10% 76%;
+    --input: 120 10% 76%;
+    --ring: 150 85% 26%;
+
+    --radius: 0.125rem;                /* esquinas casi rectas */
+
+    --glow: 150 85% 26%;
+    --glow-alpha: 0;                   /* sin glow en claro */
+
+    --status-open: 190 90% 27%;
+    --status-progress: 40 95% 32%;
+    --status-resolved: 150 85% 24%;
+    --status-closed: 140 8% 40%;
+    --priority-low: 150 85% 24%;
+    --priority-medium: 40 95% 32%;
+    --priority-high: 28 90% 34%;
+    --priority-urgent: 0 75% 42%;
+  }
+
+  [data-theme="dystopia"].dark {
+    --background: 120 10% 4%;          /* negro CRT */
+    --foreground: 135 65% 72%;         /* fósforo verde legible (~8.5:1) */
+
+    --card: 120 10% 7%;
+    --card-foreground: 135 65% 72%;
+
+    --popover: 120 12% 6%;
+    --popover-foreground: 135 65% 72%;
+
+    --primary: 135 95% 55%;            /* fósforo puro para CTAs */
+    --primary-foreground: 120 10% 4%;
+
+    --secondary: 120 10% 12%;
+    --secondary-foreground: 135 50% 75%;
+
+    --muted: 120 10% 11%;
+    --muted-foreground: 135 20% 58%;   /* ~5.3:1 sobre fondo */
+
+    --accent: 135 40% 15%;             /* hover verde profundo */
+    --accent-foreground: 135 80% 78%;
+
+    --destructive: 0 90% 60%;
+    --destructive-foreground: 120 10% 4%;
+
+    --border: 135 30% 20%;
+    --input: 135 30% 20%;
+    --ring: 135 95% 55%;
+
+    --glow: 135 95% 55%;
+    --glow-alpha: 0.35;
+
+    --status-open: 180 85% 55%;        /* cian terminal */
+    --status-progress: 45 95% 58%;     /* ámbar */
+    --status-resolved: 135 85% 60%;
+    --status-closed: 135 8% 55%;
+    --priority-low: 135 85% 60%;
+    --priority-medium: 45 95% 58%;
+    --priority-high: 28 95% 60%;
+    --priority-urgent: 0 95% 64%;
+  }
 }
 
 @layer base {
@@ -198,7 +293,8 @@
 
   /* Tipografía por theme.
      Quiet Pro → Inter / system sans (sobrio).
-     Workshop  → Plus Jakarta Sans / Fraunces para titulares. */
+     Workshop  → Plus Jakarta Sans / Fraunces para titulares.
+     Dystopia  → IBM Plex Mono (terminal). */
   [data-theme="quiet-pro"] body {
     font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   }
@@ -209,5 +305,38 @@
   [data-theme="workshop"] h2 {
     font-family: "Fraunces", "Plus Jakarta Sans", ui-serif, serif;
     letter-spacing: -0.01em;
+  }
+  [data-theme="dystopia"] body {
+    font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace,
+      SFMono-Regular, Consolas, monospace;
+    letter-spacing: 0.01em;
+  }
+  [data-theme="dystopia"] h1,
+  [data-theme="dystopia"] h2 {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  /* Glow SOLO en titulares (no en texto de lectura, por legibilidad). */
+  [data-theme="dystopia"].dark :is(h1, h2) {
+    text-shadow: 0 0 8px hsl(var(--glow) / var(--glow-alpha));
+  }
+  /* Selección invertida estilo terminal. */
+  [data-theme="dystopia"].dark ::selection {
+    background: hsl(135 95% 55% / 0.9);
+    color: hsl(120 10% 4%);
+  }
+  /* Scanlines: overlay estático fijo, alpha bajísima, no bloquea clicks.
+     Se apaga agregando la clase no-crt-fx en <html>. */
+  html[data-theme="dystopia"].dark:not(.no-crt-fx) body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      hsl(0 0% 0% / 0.14) 0 1px,
+      transparent 1px 3px
+    );
   }
 }

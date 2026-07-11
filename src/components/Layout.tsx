@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useTheme } from "../contexts/ThemeContext";
+import { useTheme, DEFAULT_THEME } from "../contexts/ThemeContext";
+import { useAuth } from "../hooks";
 import QuietProLayout from "./layouts/QuietProLayout";
 import WorkshopLayout from "./layouts/WorkshopLayout";
 import CommandPalette from "./CommandPalette";
@@ -10,8 +11,19 @@ import { ONBOARDING_REPLAY_EVENT } from "../lib/onboarding";
 
 // Wrapper que ramifica al layout adecuado segun el theme activo.
 const Layout: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [tourForce, setTourForce] = useState(0);
+
+  // "dystopia" es exclusivo de AGENT/ADMIN. Si un USER lo tiene persistido
+  // en localStorage (ej: cuenta degradada o storage compartido), lo
+  // devolvemos al default. setTheme tambien reescribe localStorage, asi
+  // que el anti-flash de index.html deja de aplicarlo en proximas cargas.
+  React.useEffect(() => {
+    if (user?.role === "USER" && theme === "dystopia") {
+      setTheme(DEFAULT_THEME);
+    }
+  }, [user?.role, theme, setTheme]);
 
   React.useEffect(() => {
     const handler = () => setTourForce((n) => n + 1);
