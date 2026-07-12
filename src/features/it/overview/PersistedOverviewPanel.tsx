@@ -167,7 +167,7 @@ export function PersistedOverviewPanel() {
             ))}
           </dl>
           <div className="ops-live-panel__source">
-            <span>Fuente: Neon · {data.schemaVersion}</span>
+            <span>Fuente: API GRF · {data.schemaVersion}</span>
             <span>
               Generado:{" "}
               <time dateTime={data.generatedAt}>
