@@ -67,6 +67,18 @@ export async function updateAsset(
   return unwrapAsset(response.data.data);
 }
 
+export function getInventoryErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("response" in error)) {
+    return undefined;
+  }
+
+  return (
+    error as {
+      response?: { data?: { error?: { code?: string } } };
+    }
+  ).response?.data?.error?.code;
+}
+
 export function getInventoryErrorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "response" in error) {
     const response = (

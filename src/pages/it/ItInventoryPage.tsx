@@ -14,7 +14,10 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks";
-import { getInventoryErrorMessage } from "@/features/it/inventory/api";
+import {
+  getInventoryErrorCode,
+  getInventoryErrorMessage,
+} from "@/features/it/inventory/api";
 import { AssetEditorPanel } from "@/features/it/inventory/components/AssetEditorPanel";
 import { AssetMetrics } from "@/features/it/inventory/components/AssetMetrics";
 import { AssetTable } from "@/features/it/inventory/components/AssetTable";
@@ -105,11 +108,24 @@ function ItInventoryPage() {
   };
 
   const handleSave = async (command: AssetSaveCommand) => {
-    await saveAsset.mutateAsync(command);
-    toast.success(
-      command.mode === "edit" ? "Activo actualizado" : "Activo registrado",
-    );
-    closeEditor();
+    try {
+      await saveAsset.mutateAsync(command);
+      toast.success(
+        command.mode === "edit" ? "Activo actualizado" : "Activo registrado",
+      );
+      closeEditor();
+    } catch (error) {
+      if (
+        command.mode === "edit" &&
+        getInventoryErrorCode(error) === "ASSET_VERSION_CONFLICT"
+      ) {
+        await assetDetail.refetch();
+        toast.error(
+          "La ficha cambió y fue recargada. Revisá la versión nueva antes de guardar.",
+        );
+      }
+      throw error;
+    }
   };
 
   const hasActiveFilters = Boolean(filters.q || filters.type || filters.status);
@@ -375,7 +391,9 @@ function ItInventoryPage() {
           key={
             editor.mode === "create"
               ? "create"
-              : (assetDetail.data?.id ?? `loading-${editor.assetId}`)
+              : assetDetail.data
+                ? `${assetDetail.data.id}-${assetDetail.data.updatedAt}`
+                : `loading-${editor.assetId}`
           }
           mode={editor.mode}
           asset={editor.mode === "edit" ? (assetDetail.data ?? null) : null}

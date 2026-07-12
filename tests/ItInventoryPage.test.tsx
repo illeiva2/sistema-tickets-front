@@ -14,12 +14,13 @@ vi.mock("../src/lib/api", () => ({
 }));
 
 vi.mock("react-hot-toast", () => ({
-  default: { success: vi.fn() },
+  default: { success: vi.fn(), error: vi.fn() },
 }));
 
 import api from "../src/lib/api";
 import ItInventoryPage from "../src/pages/it/ItInventoryPage";
 import type { ItAsset } from "../src/features/it/inventory/types";
+import toast from "react-hot-toast";
 
 const apiMock = api as unknown as {
   get: ReturnType<typeof vi.fn>;
@@ -215,6 +216,77 @@ describe("ItInventoryPage", () => {
       model: "Latitude 5450",
       expectedUpdatedAt: "2026-07-12T12:00:00.000Z",
       specs: { importedBy: "legacy-cmdb" },
+    });
+  });
+
+  it("recarga la ficha y usa la versión nueva después de un conflicto", async () => {
+    const refreshedAsset: ItAsset = {
+      ...baseAsset,
+      model: "Latitude 5450",
+      updatedAt: "2026-07-12T13:00:00.000Z",
+    };
+    let detailRequests = 0;
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([baseAsset]));
+      }
+      if (url === `/api/it/assets/${baseAsset.id}`) {
+        detailRequests += 1;
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: { asset: detailRequests === 1 ? baseAsset : refreshedAsset },
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMock.patch.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: {
+            code: "ASSET_VERSION_CONFLICT",
+            message: "El activo fue modificado por otro usuario",
+          },
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getAllByRole("button", { name: "Editar NB-0001" })[0],
+    );
+
+    let dialog = await screen.findByRole("dialog", { name: "Editar activo" });
+    let modelInput = within(dialog).getByLabelText("Modelo");
+    await user.clear(modelInput);
+    await user.type(modelInput, "Mi cambio obsoleto");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    await waitFor(() => expect(detailRequests).toBe(2));
+    expect(toast.error).toHaveBeenCalledWith(
+      "La ficha cambió y fue recargada. Revisá la versión nueva antes de guardar.",
+    );
+
+    dialog = await screen.findByRole("dialog", { name: "Editar activo" });
+    modelInput = within(dialog).getByLabelText("Modelo");
+    expect(modelInput).toHaveValue("Latitude 5450");
+
+    await user.clear(modelInput);
+    await user.type(modelInput, "Latitude 5460");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+    expect(apiMock.patch.mock.calls[1][1]).toMatchObject({
+      model: "Latitude 5460",
+      expectedUpdatedAt: "2026-07-12T13:00:00.000Z",
     });
   });
 
