@@ -39,7 +39,11 @@ const OAuthHandler = lazy(() => import("./components/OAuthHandler"));
 const OAuthWrapper = lazy(() => import("./components/OAuthWrapper"));
 
 // Gestión IT (solo AGENT/ADMIN): todas lazy, viven bajo /it/*.
-const ItDashboardPage = lazy(() => import("./pages/it/ItDashboardPage"));
+const ItDashboardPage = lazy(() =>
+  import("./features/it/ItOpsDashboardPage").then(({ ItOpsDashboardPage }) => ({
+    default: ItOpsDashboardPage,
+  })),
+);
 const ItInventoryPage = lazy(() => import("./pages/it/ItInventoryPage"));
 const ItMaintenancePage = lazy(() => import("./pages/it/ItMaintenancePage"));
 const ItPurchasesPage = lazy(() => import("./pages/it/ItPurchasesPage"));
