@@ -1,4 +1,5 @@
 import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -33,6 +34,7 @@ import {
   type ItAsset,
 } from "@/features/it/inventory/types";
 import {
+  assetKeys,
   useAssetDetail,
   useAssets,
   useSaveAsset,
@@ -54,6 +56,7 @@ const INITIAL_FILTERS: AssetListQuery = {
 
 function ItInventoryPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AssetListQuery>(INITIAL_FILTERS);
   const [searchDraft, setSearchDraft] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
@@ -119,10 +122,21 @@ function ItInventoryPage() {
         command.mode === "edit" &&
         getInventoryErrorCode(error) === "ASSET_VERSION_CONFLICT"
       ) {
-        await assetDetail.refetch();
-        toast.error(
-          "La ficha cambió y fue recargada. Revisá la versión nueva antes de guardar.",
-        );
+        const refreshed = await assetDetail.refetch();
+        if (refreshed.isSuccess && refreshed.data) {
+          toast.error(
+            "La ficha cambió y fue recargada. Revisá la versión nueva antes de guardar.",
+          );
+        } else {
+          queryClient.removeQueries({
+            queryKey: assetKeys.detail(command.id),
+            exact: true,
+          });
+          closeEditor();
+          toast.error(
+            "La ficha cambió, pero no pudo recargarse. Abrila nuevamente antes de editar.",
+          );
+        }
       }
       throw error;
     }

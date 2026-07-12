@@ -290,6 +290,60 @@ describe("ItInventoryPage", () => {
     });
   });
 
+  it("cierra y descarta la copia obsoleta si falla la recarga", async () => {
+    let detailRequests = 0;
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([baseAsset]));
+      }
+      if (url === `/api/it/assets/${baseAsset.id}`) {
+        detailRequests += 1;
+        if (detailRequests === 1) {
+          return Promise.resolve({
+            data: { success: true, data: { asset: baseAsset } },
+          });
+        }
+        return Promise.reject(new Error("network unavailable"));
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMock.patch.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: {
+            code: "ASSET_VERSION_CONFLICT",
+            message: "El activo fue modificado por otro usuario",
+          },
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getAllByRole("button", { name: "Editar NB-0001" })[0],
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "Editar activo" });
+    const modelInput = within(dialog).getByLabelText("Modelo");
+    await user.clear(modelInput);
+    await user.type(modelInput, "Mi cambio obsoleto");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Editar activo" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(toast.error).toHaveBeenCalledWith(
+      "La ficha cambió, pero no pudo recargarse. Abrila nuevamente antes de editar.",
+    );
+  });
+
   it("muestra el estado vacío sin inventar datos", async () => {
     apiMock.get.mockResolvedValue(listResponse([]));
     renderInventory();

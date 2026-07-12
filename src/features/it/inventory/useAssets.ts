@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAsset, fetchAsset, fetchAssets, updateAsset } from "./api";
 import type { AssetListQuery, AssetSaveCommand } from "./types";
 
-const assetKeys = {
+export const assetKeys = {
   all: ["it", "assets"] as const,
   list: (query: AssetListQuery) => [...assetKeys.all, "list", query] as const,
   detail: (id: string) => [...assetKeys.all, "detail", id] as const,
