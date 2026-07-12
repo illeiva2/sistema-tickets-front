@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { BaselineMetricCard } from "./components/BaselineMetricCard";
 import { ModulePreviewCard } from "./components/ModulePreviewCard";
+import { PersistedOverviewPanel } from "./overview/PersistedOverviewPanel";
 import "./it-ops.css";
 
 const BASELINE_METRICS = [
@@ -71,6 +72,7 @@ const UPCOMING_MODULES = [
       "Asignación, custodia, ciclo de vida y trazabilidad del inventario.",
     icon: HardDrive,
     href: "/it/inventory",
+    status: "available",
   },
   {
     code: "MOD-02",
@@ -120,10 +122,10 @@ const UPCOMING_MODULES = [
 ] as const;
 
 const INTEGRATION_STATUS = [
-  { label: "Inventario", value: "Baseline declarado", tone: "amber" },
-  { label: "Telemetría", value: "No conectada", tone: "muted" },
-  { label: "Agente GRF", value: "Sin despliegue", tone: "muted" },
-  { label: "Salud operativa", value: "No calculada", tone: "muted" },
+  { label: "Baseline", value: "Referencia fija", tone: "amber" },
+  { label: "Persistencia", value: "Overview conectado", tone: "cyan" },
+  { label: "Telemetría", value: "Último estado guardado", tone: "muted" },
+  { label: "Control remoto", value: "En preparación", tone: "muted" },
 ] as const;
 
 export function ItOpsDashboardPage() {
@@ -137,7 +139,7 @@ export function ItOpsDashboardPage() {
           </span>
           <span className="ops-source-badge">
             <Database size={13} aria-hidden="true" />
-            Baseline manual
+            Baseline + persistencia
           </span>
         </div>
 
@@ -148,12 +150,12 @@ export function ItOpsDashboardPage() {
             <p className="ops-hero__lede">
               Primer corte visual para ordenar activos, personas y operación IT
               en una sola consola. Los valores actuales son una línea base
-              cargada manualmente: todavía no representan telemetría ni salud en
-              tiempo real.
+              cargada manualmente. La lectura persistida aparece por separado y
+              no debe confundirse con telemetría en tiempo real.
             </p>
             <ul className="ops-hero__tags" aria-label="Alcance de este corte">
               <li>Inventario declarado</li>
-              <li>Sin agentes conectados</li>
+              <li>Datos persistidos conectados</li>
               <li>Sin sesiones remotas</li>
             </ul>
           </div>
@@ -201,9 +203,11 @@ export function ItOpsDashboardPage() {
         </div>
       </section>
 
+      <PersistedOverviewPanel />
+
       <section className="ops-status-panel" aria-labelledby="ops-status-title">
         <div className="ops-status-panel__copy">
-          <span className="ops-section__index">02 / INTEGRACIÓN</span>
+          <span className="ops-section__index">03 / INTEGRACIÓN</span>
           <h2 id="ops-status-title">Estado del sistema</h2>
           <p>
             Esta vista separa datos conocidos de señales todavía inexistentes
@@ -223,8 +227,8 @@ export function ItOpsDashboardPage() {
       <section className="ops-section" aria-labelledby="ops-modules-title">
         <div className="ops-section__heading">
           <div>
-            <span className="ops-section__index">03 / EXPANSIÓN</span>
-            <h2 id="ops-modules-title">Próximos módulos</h2>
+            <span className="ops-section__index">04 / MÓDULOS</span>
+            <h2 id="ops-modules-title">Superficie de módulos</h2>
           </div>
           <p>
             Accesos a la estructura inicial. Cada módulo indica con claridad qué
