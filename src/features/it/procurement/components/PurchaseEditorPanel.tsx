@@ -147,10 +147,15 @@ export function PurchaseEditorPanel({
     }
   }, [basePurchase, mode, purchase]);
 
-  const editable =
+  const coreEditable =
     mode === "create" ||
     (basePurchase?.status === "REQUESTED" &&
       basePurchase.requestedById === currentUserId);
+  const documentsEditable =
+    mode === "create" ||
+    (basePurchase?.status === "REQUESTED"
+      ? basePurchase.requestedById === currentUserId
+      : Boolean(basePurchase));
   const total = form.items.reduce((sum, item) => {
     const quantity = Number(item.quantity);
     const price = Number(item.unitPrice);
@@ -172,12 +177,12 @@ export function PurchaseEditorPanel({
 
   const payload = (): PurchasePayload | null => {
     const justification = form.justification.trim();
-    if (!justification) {
-      setSubmitError("La justificación de la compra es obligatoria.");
+    if (justification.length < 3) {
+      setSubmitError("La justificación debe tener al menos 3 caracteres.");
       return null;
     }
-    if (!form.items.length) {
-      setSubmitError("Agregá al menos un renglón a la compra.");
+    if (!form.items.length || form.items.length > 100) {
+      setSubmitError("La compra debe tener entre 1 y 100 renglones.");
       return null;
     }
     const items = form.items.map((item) => ({
@@ -185,25 +190,27 @@ export function PurchaseEditorPanel({
       quantity: Number(item.quantity),
       unitPrice: item.unitPrice.trim(),
     }));
-    const decimalPattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+    const moneyPattern = /^\d{1,12}(?:\.\d{1,2})?$/;
     if (
       items.some(
         (item) =>
-          !item.description ||
+          item.description.length < 2 ||
           !Number.isInteger(item.quantity) ||
           item.quantity < 1 ||
-          !decimalPattern.test(item.unitPrice),
+          item.quantity > 10000 ||
+          !moneyPattern.test(item.unitPrice),
       )
     ) {
       setSubmitError(
-        "Revisá descripción, cantidad y precio de todos los renglones.",
+        "Revisá los renglones: descripción mínima de 2 caracteres, cantidad de 1 a 10000 y precio con hasta 12 enteros y 2 decimales.",
       );
       return null;
     }
     const exchangeRate = form.exchangeRate.trim();
+    const exchangePattern = /^\d{1,8}(?:\.\d{1,4})?$/;
     if (
       exchangeRate &&
-      (!decimalPattern.test(exchangeRate) || Number(exchangeRate) <= 0)
+      (!exchangePattern.test(exchangeRate) || Number(exchangeRate) <= 0)
     ) {
       setSubmitError(
         "La cotización de referencia debe ser un decimal positivo.",
@@ -224,18 +231,33 @@ export function PurchaseEditorPanel({
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitError(null);
-    const value = payload();
-    if (!value) return;
     try {
-      await onSave(
-        mode === "edit" && basePurchase
-          ? {
-              mode: "edit",
-              id: basePurchase.id,
-              payload: { ...value, expectedUpdatedAt: basePurchase.updatedAt },
-            }
-          : { mode: "create", payload: value },
-      );
+      if (mode === "edit" && basePurchase && !coreEditable) {
+        await onSave({
+          mode: "edit",
+          id: basePurchase.id,
+          payload: {
+            expectedUpdatedAt: basePurchase.updatedAt,
+            invoiceNumber: optional(form.invoiceNumber),
+            notes: optional(form.notes),
+          },
+        });
+      } else {
+        const value = payload();
+        if (!value) return;
+        await onSave(
+          mode === "edit" && basePurchase
+            ? {
+                mode: "edit",
+                id: basePurchase.id,
+                payload: {
+                  ...value,
+                  expectedUpdatedAt: basePurchase.updatedAt,
+                },
+              }
+            : { mode: "create", payload: value },
+        );
+      }
     } catch (error) {
       const info = getProcurementErrorInfo(error);
       if (info.isPurchaseConflict) setConflictMessage(info.message);
@@ -258,9 +280,12 @@ export function PurchaseEditorPanel({
   const runTransition = async (transition: PurchaseTransition) => {
     if (!basePurchase) return;
     setSubmitError(null);
-    if (transition === "cancel" && cancelReason.trim().length < 3) {
+    if (
+      transition === "cancel" &&
+      (cancelReason.trim().length < 3 || cancelReason.trim().length > 1000)
+    ) {
       setSubmitError(
-        "Indicá un motivo de cancelación de al menos 3 caracteres.",
+        "El motivo de cancelación debe tener entre 3 y 1000 caracteres.",
       );
       return;
     }
@@ -379,7 +404,7 @@ export function PurchaseEditorPanel({
               </div>
             ) : null}
 
-            <fieldset disabled={!editable || busy}>
+            <fieldset disabled={!coreEditable || busy}>
               <legend>Decisión y proveedor</legend>
               {lookupError ? (
                 <div className="procurement-reference-error" role="alert">
@@ -440,7 +465,7 @@ export function PurchaseEditorPanel({
                     <input
                       type="text"
                       inputMode="decimal"
-                      pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+                      pattern="[0-9]{1,8}(?:\.[0-9]{1,4})?"
                       value={form.exchangeRate}
                       onChange={(event) =>
                         setForm((current) => ({
@@ -451,24 +476,13 @@ export function PurchaseEditorPanel({
                     />
                   </label>
                 ) : null}
-                <label>
-                  Número de factura <span>Opcional</span>
-                  <input
-                    value={form.invoiceNumber}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        invoiceNumber: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
               </div>
               <label className="procurement-form__wide">
                 Justificación
                 <textarea
                   rows={4}
                   required
+                  minLength={3}
                   maxLength={10_000}
                   value={form.justification}
                   placeholder="Necesidad, criterio de selección y decisión de compra"
@@ -480,27 +494,9 @@ export function PurchaseEditorPanel({
                   }
                 />
               </label>
-              <label className="procurement-form__wide">
-                Notas internas{" "}
-                <span>
-                  No registrar contraseñas, datos bancarios ni información
-                  personal.
-                </span>
-                <textarea
-                  rows={3}
-                  maxLength={10_000}
-                  value={form.notes}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
-                />
-              </label>
             </fieldset>
 
-            <fieldset disabled={!editable || busy}>
+            <fieldset disabled={!coreEditable || busy}>
               <legend>Renglones de compra</legend>
               <div className="procurement-items__header">
                 <div>
@@ -509,10 +505,11 @@ export function PurchaseEditorPanel({
                     El total se calcula en el servidor y se previsualiza aquí.
                   </small>
                 </div>
-                {editable ? (
+                {coreEditable ? (
                   <button
                     type="button"
                     className="procurement-button procurement-button--ghost"
+                    disabled={form.items.length >= 100}
                     onClick={() =>
                       setForm((current) => ({
                         ...current,
@@ -532,6 +529,8 @@ export function PurchaseEditorPanel({
                       <input
                         aria-label={`Descripción del item ${index + 1}`}
                         required
+                        minLength={2}
+                        maxLength={500}
                         value={item.description}
                         onChange={(event) =>
                           updateItem(
@@ -548,6 +547,7 @@ export function PurchaseEditorPanel({
                         aria-label={`Cantidad del item ${index + 1}`}
                         type="number"
                         min="1"
+                        max="10000"
                         step="1"
                         required
                         value={item.quantity}
@@ -562,7 +562,7 @@ export function PurchaseEditorPanel({
                         aria-label={`Precio unitario del item ${index + 1}`}
                         type="text"
                         inputMode="decimal"
-                        pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+                        pattern="[0-9]{1,12}(?:\.[0-9]{1,2})?"
                         required
                         value={item.unitPrice}
                         onChange={(event) =>
@@ -570,7 +570,7 @@ export function PurchaseEditorPanel({
                         }
                       />
                     </label>
-                    {editable ? (
+                    {coreEditable ? (
                       <button
                         type="button"
                         className="procurement-icon-button"
@@ -596,6 +596,55 @@ export function PurchaseEditorPanel({
                 <strong>{formatMoney(total, form.currency)}</strong>
               </div>
             </fieldset>
+
+            {documentsEditable ? (
+              <fieldset disabled={busy}>
+                <legend>
+                  {coreEditable
+                    ? "Documentación y observaciones"
+                    : "Correcciones documentales"}
+                </legend>
+                {!coreEditable ? (
+                  <p className="procurement-help">
+                    El proveedor, la moneda, la justificación y los renglones ya
+                    están bloqueados. Sólo se pueden corregir factura y notas.
+                  </p>
+                ) : null}
+                <div className="procurement-form__grid">
+                  <label>
+                    Número de factura <span>Opcional</span>
+                    <input
+                      maxLength={200}
+                      value={form.invoiceNumber}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          invoiceNumber: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="procurement-form__wide">
+                  Notas internas{" "}
+                  <span>
+                    No registrar contraseñas, datos bancarios ni información
+                    personal.
+                  </span>
+                  <textarea
+                    rows={3}
+                    maxLength={10_000}
+                    value={form.notes}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        notes: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </fieldset>
+            ) : null}
 
             {basePurchase?.status === "RECEIVED" ? (
               <fieldset>
@@ -718,6 +767,7 @@ export function PurchaseEditorPanel({
                         autoFocus
                         rows={2}
                         minLength={3}
+                        maxLength={1000}
                         required
                         value={cancelReason}
                         onChange={(event) =>
@@ -728,7 +778,11 @@ export function PurchaseEditorPanel({
                     <button
                       type="button"
                       className="procurement-button procurement-button--danger"
-                      disabled={busy || cancelReason.trim().length < 3}
+                      disabled={
+                        busy ||
+                        cancelReason.trim().length < 3 ||
+                        cancelReason.trim().length > 1000
+                      }
                       onClick={() => void runTransition("cancel")}
                     >
                       <ArrowRight size={15} aria-hidden="true" /> Confirmar
@@ -771,7 +825,7 @@ export function PurchaseEditorPanel({
               >
                 Cerrar
               </button>
-              {editable ? (
+              {documentsEditable ? (
                 <button
                   type="submit"
                   className="procurement-button procurement-button--primary"
@@ -784,7 +838,11 @@ export function PurchaseEditorPanel({
                       aria-hidden="true"
                     />
                   ) : null}
-                  {mode === "create" ? "Crear solicitud" : "Guardar cambios"}
+                  {mode === "create"
+                    ? "Crear solicitud"
+                    : coreEditable
+                      ? "Guardar cambios"
+                      : "Guardar correcciones"}
                 </button>
               ) : null}
             </footer>

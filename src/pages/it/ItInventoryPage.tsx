@@ -97,7 +97,9 @@ function ItInventoryPage() {
   const assetsQuery = useAssets(filters);
   const editingAssetId = editor?.mode === "edit" ? editor.assetId : null;
   const assetDetail = useAssetDetail(editingAssetId);
-  const originPurchase = usePurchaseDetail(originPurchaseId);
+  const originPurchase = usePurchaseDetail(
+    originPurchaseId && originPurchaseItemId ? originPurchaseId : null,
+  );
   const custodyDetail = useAssetDetail(custodyAssetId);
   const custodyLookups = useCustodyLookups(
     Boolean(custodyAssetId && custodyDetail.data?.status === "IN_STOCK"),

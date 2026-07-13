@@ -286,6 +286,20 @@ describe("ItInventoryPage", () => {
     );
   });
 
+  it("no consulta compras cuando falta un parámetro de origen", async () => {
+    renderInventory("/it/inventory?purchaseId=purchase-1");
+    await screen.findAllByText("NB-0001");
+
+    expect(
+      apiMock.get.mock.calls.some(
+        ([url]: [string]) => url === "/api/it/purchases/purchase-1",
+      ),
+    ).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining("origen de compra está incompleto"),
+    );
+  });
+
   it("preserva ASSIGNED y no reenvía assetTag cuando edita un AGENT", async () => {
     authMock.role = "AGENT";
     const assignedAsset: ItAsset = { ...baseAsset, status: "ASSIGNED" };

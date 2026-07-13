@@ -147,8 +147,15 @@ export interface PurchasePayload {
   items: PurchaseItemPayload[];
 }
 
-export interface PurchaseUpdatePayload extends PurchasePayload {
+export interface PurchaseUpdatePayload {
   expectedUpdatedAt: string;
+  supplierId?: string | null;
+  currency?: PurchaseCurrency;
+  exchangeRate?: string | null;
+  justification?: string;
+  invoiceNumber?: string | null;
+  notes?: string | null;
+  items?: PurchaseItemPayload[];
 }
 
 export type PurchaseSaveCommand =

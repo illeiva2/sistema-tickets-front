@@ -300,6 +300,77 @@ describe("ItPurchasesPage", () => {
     ).toBeNull();
   });
 
+  it("corrige sólo factura y notas después de autorizar", async () => {
+    const approved: Purchase = {
+      ...basePurchase,
+      status: "APPROVED",
+      invoiceNumber: "FAC-100",
+      notes: "Pendiente de remito",
+      authorizedById: "admin-1",
+      authorizedBy: { id: "admin-1", name: "Admin IT" },
+    };
+    vi.clearAllMocks();
+    installMocks(approved);
+    const user = userEvent.setup();
+    renderPage();
+    const dialog = await openPurchase();
+
+    expect(within(dialog).getByLabelText(/Proveedor/)).toBeDisabled();
+    expect(within(dialog).getByLabelText("Justificación")).toBeDisabled();
+    const invoice = within(dialog).getByLabelText(/Número de factura/);
+    const notes = within(dialog).getByLabelText(/Notas internas/);
+    expect(invoice).toBeEnabled();
+    expect(notes).toBeEnabled();
+    await user.clear(invoice);
+    await user.type(invoice, "FAC-101");
+    await user.clear(notes);
+    await user.type(notes, "Remito recibido");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar correcciones" }),
+    );
+
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+    expect(apiMock.patch).toHaveBeenCalledWith(
+      `/api/it/purchases/${approved.id}`,
+      {
+        expectedUpdatedAt: approved.updatedAt,
+        invoiceNumber: "FAC-101",
+        notes: "Remito recibido",
+      },
+    );
+    const sent = apiMock.patch.mock.calls[0][1];
+    expect(sent).not.toHaveProperty("items");
+    expect(sent).not.toHaveProperty("supplierId");
+    expect(sent).not.toHaveProperty("currency");
+    expect(sent).not.toHaveProperty("justification");
+  });
+
+  it("expone los mismos límites decimales y textuales que la API", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findAllByText("OC-0042");
+    await user.click(screen.getByRole("button", { name: "Nueva orden" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "Nueva orden de compra",
+    });
+    await user.selectOptions(within(dialog).getByLabelText("Moneda"), "USD");
+
+    expect(within(dialog).getByLabelText(/Cotización/)).toHaveAttribute(
+      "pattern",
+      "[0-9]{1,8}(?:\\.[0-9]{1,4})?",
+    );
+    expect(
+      within(dialog).getByLabelText("Precio unitario del item 1"),
+    ).toHaveAttribute("pattern", "[0-9]{1,12}(?:\\.[0-9]{1,2})?");
+    expect(
+      within(dialog).getByLabelText("Descripción del item 1"),
+    ).toHaveAttribute("minlength", "2");
+    expect(within(dialog).getByLabelText("Justificación")).toHaveAttribute(
+      "minlength",
+      "3",
+    );
+  });
+
   it("envía motivo al cancelar y la versión del snapshot", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -307,6 +378,9 @@ describe("ItPurchasesPage", () => {
     await user.click(
       within(dialog).getByRole("button", { name: "Cancelar orden" }),
     );
+    expect(
+      within(dialog).getByLabelText("Motivo de cancelación"),
+    ).toHaveAttribute("maxlength", "1000");
     await user.type(
       within(dialog).getByLabelText("Motivo de cancelación"),
       "Presupuesto rechazado",
