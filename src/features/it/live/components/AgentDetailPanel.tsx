@@ -13,6 +13,7 @@ import {
   Loader2,
   MonitorUp,
   Network,
+  PackagePlus,
   Power,
   RefreshCw,
   ShieldOff,
@@ -41,6 +42,7 @@ import {
 } from "../types";
 import { useLiveDialogFocus } from "../useDialogFocus";
 import { MetricSeries } from "./MetricSeries";
+import { InventorySnapshotView } from "./InventorySnapshotView";
 
 interface AgentDetailPanelProps {
   device: AgentDevice | null;
@@ -65,6 +67,7 @@ interface AgentDetailPanelProps {
     expectedUpdatedAt: string,
     assetId: string | null,
   ) => Promise<AgentDevice>;
+  onRegisterAsset: () => void;
   onTransition: (
     action: "activate" | "revoke",
     expectedUpdatedAt: string,
@@ -81,38 +84,6 @@ const healthLabels = {
   OFFLINE: "Offline",
   REVOKED: "Revocado",
 } as const;
-
-const SENSITIVE_INVENTORY_KEY =
-  /(password|secret|token|credential|private.?key)/i;
-
-function sanitizeInventoryValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeInventoryValue);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value).map(([key, nested]) => [
-        key,
-        SENSITIVE_INVENTORY_KEY.test(key)
-          ? "[dato oculto]"
-          : sanitizeInventoryValue(nested),
-      ]),
-    );
-  return value;
-}
-
-function inventoryRows(payload: Record<string, unknown>) {
-  return Object.entries(payload)
-    .filter(([key]) => !SENSITIVE_INVENTORY_KEY.test(key))
-    .slice(0, 30)
-    .map(([key, value]) => ({
-      key,
-      value:
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean"
-          ? String(value)
-          : JSON.stringify(sanitizeInventoryValue(value)),
-    }));
-}
 
 function connectionCommand(result: RemoteSessionStartResult) {
   const { port, protocol, target } = result.connection;
@@ -151,6 +122,7 @@ export function AgentDetailPanel({
   onRetryLookups,
   onReload,
   onLinkAsset,
+  onRegisterAsset,
   onTransition,
   onStartSession,
   onCloseSession,
@@ -555,14 +527,7 @@ export function AgentDetailPanel({
                 {snapshotsError}
               </div>
             ) : latestInventory ? (
-              <dl className="live-inventory-grid">
-                {inventoryRows(latestInventory.payload).map((row) => (
-                  <div key={row.key}>
-                    <dt>{row.key}</dt>
-                    <dd title={row.value}>{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
+              <InventorySnapshotView payload={latestInventory.payload} />
             ) : (
               <div className="live-inline-empty">
                 <Box size={22} />
@@ -649,6 +614,17 @@ export function AgentDetailPanel({
                 >
                   <Link2 size={14} />
                   Confirmar vínculo
+                </button>
+              ) : null}
+              {canManage && !snapshot.assetId && !assetId ? (
+                <button
+                  type="button"
+                  className="live-button live-button--primary"
+                  disabled={busy || conflict}
+                  onClick={onRegisterAsset}
+                >
+                  <PackagePlus size={14} />
+                  Crear activo con estos datos
                 </button>
               ) : null}
             </div>

@@ -9,10 +9,13 @@ import {
   fetchAgentSnapshots,
   fetchEnrollmentTokens,
   revokeEnrollmentToken,
+  registerAgentAsset,
   startRemoteSession,
   transitionAgentDevice,
   updateAgentAsset,
 } from "./api";
+import type { RegisterAgentAssetPayload } from "./api";
+import { assetKeys } from "../inventory/useAssets";
 import type {
   AgentDeviceListQuery,
   EnrollmentTokenPayload,
@@ -149,6 +152,26 @@ export function useUpdateAgentAsset() {
       queryClient.setQueryData(liveDeviceKeys.detail(device.id), device);
       invalidateFleet(queryClient);
       void queryClient.invalidateQueries({ queryKey: liveDeviceKeys.lookups });
+    },
+  });
+}
+
+export function useRegisterAgentAsset() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      deviceId,
+      payload,
+    }: {
+      deviceId: string;
+      payload: RegisterAgentAssetPayload;
+    }) => registerAgentAsset(deviceId, payload),
+    onSuccess: ({ device, asset }) => {
+      queryClient.setQueryData(liveDeviceKeys.detail(device.id), device);
+      queryClient.setQueryData(assetKeys.detail(asset.id), asset);
+      invalidateFleet(queryClient);
+      void queryClient.invalidateQueries({ queryKey: liveDeviceKeys.lookups });
+      void queryClient.invalidateQueries({ queryKey: assetKeys.all });
     },
   });
 }

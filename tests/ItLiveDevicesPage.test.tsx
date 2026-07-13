@@ -166,13 +166,27 @@ function installMocks() {
                 deviceId: device.id,
                 createdAt: "2026-07-13T11:50:00.000Z",
                 payload: {
-                  cpu: "Intel Core i5",
-                  ramSlots: 2,
-                  disks: [{ model: "NVMe", sizeGb: 512 }],
-                  network: {
-                    adapter: "Intel I219",
-                    password: "never-render-this-secret",
+                  collectedAt: "2026-07-13T11:49:00.000Z",
+                  hardware: {
+                    manufacturer: "Dell",
+                    model: "Latitude 5440",
+                    serialNumber: "DL-5440-001",
+                    biosVersion: "1.9.0",
                   },
+                  cpu: { model: "Intel Core i5", logicalProcessors: 12 },
+                  memoryModules: [
+                    { capacityBytes: 8 * 1024 ** 3, manufacturer: "Micron" },
+                    { capacityBytes: 8 * 1024 ** 3, manufacturer: "Micron" },
+                  ],
+                  disks: [{ name: "C:", model: "NVMe", sizeGb: 512 }],
+                  networkAdapters: [
+                    {
+                      name: "Intel I219",
+                      macAddress: "AA:BB:CC:DD:EE:01",
+                      ipAddresses: ["10.20.30.41"],
+                      password: "never-render-this-secret",
+                    },
+                  ],
                 },
               },
             ],
@@ -183,6 +197,29 @@ function installMocks() {
     if (url === "/api/it/agents/enrollment-tokens")
       return Promise.resolve({
         data: { success: true, data: { items: [token] } },
+      });
+    if (url === "/api/it/people")
+      return Promise.resolve({
+        data: {
+          success: true,
+          data: {
+            items: [
+              {
+                id: "person-1",
+                firstName: "María",
+                lastName: "López",
+                status: "ACTIVE",
+              },
+            ],
+          },
+        },
+      });
+    if (url === "/api/departments")
+      return Promise.resolve({
+        data: {
+          success: true,
+          data: [{ id: "department-1", name: "Administración" }],
+        },
       });
     return Promise.reject(new Error(`Unexpected GET ${url}`));
   });
@@ -221,6 +258,37 @@ function installMocks() {
               ...session,
               status: "CLOSED",
               endedAt: "2026-07-13T12:10:00.000Z",
+            },
+          },
+        },
+      });
+    if (url === `/api/it/agents/devices/${device.id}/register-asset`)
+      return Promise.resolve({
+        data: {
+          success: true,
+          data: {
+            device: {
+              ...device,
+              assetId: "asset-new",
+              asset: {
+                id: "asset-new",
+                assetTag: "NB-0001",
+                type: "NOTEBOOK",
+                brand: "Dell",
+                model: "Latitude 5440",
+                serialNumber: "DL-5440-001",
+              },
+              updatedAt: "2026-07-13T12:10:00.000Z",
+            },
+            asset: {
+              id: "asset-new",
+              assetTag: "NB-0001",
+              type: "NOTEBOOK",
+              status: "ASSIGNED",
+              brand: "Dell",
+              model: "Latitude 5440",
+              serialNumber: "DL-5440-001",
+              updatedAt: "2026-07-13T12:10:00.000Z",
             },
           },
         },
@@ -460,7 +528,67 @@ describe("ItLiveDevicesPage", () => {
     renderPage();
     const dialog = await openDevice(user);
     expect(dialog.textContent).not.toContain("never-render-this-secret");
-    expect(dialog.textContent).toContain("[dato oculto]");
+    expect(dialog.textContent).not.toMatch(/password/i);
+    expect(dialog).toHaveTextContent("Hardware");
+    expect(dialog).toHaveTextContent("Número de serie");
+    expect(dialog).toHaveTextContent("Adaptadores de red");
+    expect(dialog).toHaveTextContent("Dell");
+    expect(within(dialog).getAllByText("8 GB").length).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it("crea, vincula y asigna un activo usando la telemetría precargada", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const detail = await openDevice(user);
+    await user.click(
+      within(detail).getByRole("button", {
+        name: "Crear activo con estos datos",
+      }),
+    );
+
+    const onboarding = await screen.findByRole("dialog", {
+      name: `Crear activo desde ${device.hostname}`,
+    });
+    expect(within(onboarding).getByLabelText("Marca")).toHaveValue("Dell");
+    expect(within(onboarding).getByLabelText("Modelo")).toHaveValue(
+      "Latitude 5440",
+    );
+    expect(within(onboarding).getByLabelText(/^Número de serie/)).toHaveValue(
+      "DL-5440-001",
+    );
+    await user.selectOptions(
+      within(onboarding).getByLabelText("Persona de custodia"),
+      "person-1",
+    );
+    await user.click(
+      within(onboarding).getByRole("button", {
+        name: "Crear, vincular y asignar",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/api/it/agents/devices/${device.id}/register-asset`,
+        expect.objectContaining({
+          expectedUpdatedAt: device.updatedAt,
+          asset: expect.objectContaining({
+            type: "NOTEBOOK",
+            status: "IN_STOCK",
+            brand: "Dell",
+            model: "Latitude 5440",
+            serialNumber: "DL-5440-001",
+            specs: expect.objectContaining({
+              cpu: "Intel Core i5",
+              ramGb: 16,
+              mac: device.primaryMac,
+            }),
+          }),
+          custody: expect.objectContaining({ personId: "person-1" }),
+        }),
+      ),
+    );
   });
 
   it("oculta controles de gestión a perfiles fuera de IT", async () => {

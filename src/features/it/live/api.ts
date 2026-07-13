@@ -1,5 +1,10 @@
 import api from "@/lib/api";
 import type {
+  AssetCreatePayload,
+  ItAsset,
+} from "@/features/it/inventory/types";
+import type { AssignAssetPayload } from "@/features/it/inventory/custody/types";
+import type {
   AgentDevice,
   AgentDeviceListQuery,
   AgentDeviceListResult,
@@ -92,6 +97,28 @@ export async function updateAgentAsset(
     { expectedUpdatedAt, assetId },
   );
   return unwrapDevice(response.data.data);
+}
+
+export interface RegisterAgentAssetPayload {
+  expectedUpdatedAt: string;
+  asset: AssetCreatePayload;
+  custody?: AssignAssetPayload;
+}
+
+export interface RegisterAgentAssetResult {
+  device: AgentDevice;
+  asset: ItAsset;
+}
+
+export async function registerAgentAsset(
+  id: string,
+  payload: RegisterAgentAssetPayload,
+): Promise<RegisterAgentAssetResult> {
+  const response = await api.post<ApiEnvelope<RegisterAgentAssetResult>>(
+    `/api/it/agents/devices/${id}/register-asset`,
+    payload,
+  );
+  return response.data.data;
 }
 
 export async function transitionAgentDevice(

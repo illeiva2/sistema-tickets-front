@@ -18,6 +18,8 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAgentErrorInfo } from "@/features/it/live/api";
 import { AgentDetailPanel } from "@/features/it/live/components/AgentDetailPanel";
+import { AgentAssetOnboardingPanel } from "@/features/it/live/components/AgentAssetOnboardingPanel";
+import type { AgentAssetOnboardingSubmission } from "@/features/it/live/agentAssetOnboarding";
 import { EnrollmentPanel } from "@/features/it/live/components/EnrollmentPanel";
 import { FleetMetrics } from "@/features/it/live/components/FleetMetrics";
 import { LiveDeviceTable } from "@/features/it/live/components/LiveDeviceTable";
@@ -39,10 +41,12 @@ import {
   useCreateEnrollmentToken,
   useEnrollmentTokens,
   useRevokeEnrollmentToken,
+  useRegisterAgentAsset,
   useStartRemoteSession,
   useTransitionAgentDevice,
   useUpdateAgentAsset,
 } from "@/features/it/live/useLiveDevices";
+import { useCustodyLookups } from "@/features/it/inventory/custody/useCustody";
 import "@/features/it/live/live.css";
 
 const INITIAL_FILTERS: AgentDeviceListQuery = {
@@ -61,6 +65,7 @@ function ItLiveDevicesPage() {
   const [paused, setPaused] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tokensOpen, setTokensOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   const devicesQuery = useAgentDevices(filters, paused);
   const fleetQuery = useAgentFleet(paused);
@@ -69,14 +74,19 @@ function ItLiveDevicesPage() {
   const snapshotsQuery = useAgentSnapshots(selectedId);
   const lookupsQuery = useAgentLookups();
   const tokensQuery = useEnrollmentTokens(tokensOpen && canManage);
+  const custodyLookups = useCustodyLookups(onboardingOpen && canManage);
   const updateAsset = useUpdateAgentAsset();
+  const registerAsset = useRegisterAgentAsset();
   const transitionDevice = useTransitionAgentDevice();
   const createToken = useCreateEnrollmentToken();
   const revokeToken = useRevokeEnrollmentToken();
   const startSession = useStartRemoteSession();
   const closeSession = useCloseRemoteSession();
 
-  const closeDetail = useCallback(() => setSelectedId(null), []);
+  const closeDetail = useCallback(() => {
+    setOnboardingOpen(false);
+    setSelectedId(null);
+  }, []);
   const closeTokens = useCallback(() => setTokensOpen(false), []);
 
   const submitSearch = (event: FormEvent) => {
@@ -120,6 +130,33 @@ function ItLiveDevicesPage() {
     });
     toast.success(assetId ? "Activo vinculado" : "Activo desvinculado");
     return device;
+  };
+
+  const registerAssetFromAgent = async (
+    submission: AgentAssetOnboardingSubmission,
+  ) => {
+    if (!selectedId || !detailQuery.data) {
+      throw new Error("No hay un equipo listo para registrar.");
+    }
+    const refreshed = await detailQuery.refetch();
+    if (refreshed.isError || !refreshed.data) {
+      throw new Error(
+        "No se pudo confirmar la versión actual del equipo. Reintentá el alta.",
+      );
+    }
+    await registerAsset.mutateAsync({
+      deviceId: selectedId,
+      payload: {
+        expectedUpdatedAt: refreshed.data.updatedAt,
+        ...submission,
+      },
+    });
+    toast.success(
+      submission.custody
+        ? "Activo creado, vinculado y asignado"
+        : "Activo creado y vinculado",
+    );
+    setOnboardingOpen(false);
   };
 
   const transition = async (
@@ -459,7 +496,7 @@ function ItLiveDevicesPage() {
         ) : null}
       </div>
 
-      {selectedId ? (
+      {selectedId && !onboardingOpen ? (
         <AgentDetailPanel
           key={selectedId}
           device={detailQuery.data ?? null}
@@ -501,9 +538,49 @@ function ItLiveDevicesPage() {
           onRetryLookups={() => void lookupsQuery.refetch()}
           onReload={reloadDetail}
           onLinkAsset={linkAsset}
+          onRegisterAsset={() => {
+            registerAsset.reset();
+            setOnboardingOpen(true);
+          }}
           onTransition={transition}
           onStartSession={beginSession}
           onCloseSession={finishSession}
+        />
+      ) : null}
+      {selectedId && onboardingOpen && detailQuery.data ? (
+        <AgentAssetOnboardingPanel
+          key={`${selectedId}-${snapshotsQuery.data?.items[0]?.id ?? "no-snapshot"}`}
+          device={detailQuery.data}
+          latestSnapshotPayload={snapshotsQuery.data?.items[0]?.payload ?? null}
+          people={custodyLookups.people.data?.items ?? []}
+          departments={custodyLookups.departments.data ?? []}
+          canSetAssetTag={user?.role === "ADMIN"}
+          isLoading={
+            snapshotsQuery.isLoading ||
+            custodyLookups.people.isLoading ||
+            custodyLookups.departments.isLoading
+          }
+          isSaving={registerAsset.isPending}
+          loadError={
+            snapshotsQuery.isError
+              ? getAgentErrorInfo(snapshotsQuery.error).message
+              : undefined
+          }
+          lookupsError={
+            custodyLookups.people.isError || custodyLookups.departments.isError
+              ? getAgentErrorInfo(
+                  custodyLookups.people.error ??
+                    custodyLookups.departments.error,
+                ).message
+              : undefined
+          }
+          saveError={
+            registerAsset.isError
+              ? getAgentErrorInfo(registerAsset.error).message
+              : undefined
+          }
+          onSubmit={registerAssetFromAgent}
+          onClose={() => setOnboardingOpen(false)}
         />
       ) : null}
       {tokensOpen && canManage ? (
