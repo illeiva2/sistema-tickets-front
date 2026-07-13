@@ -22,10 +22,13 @@ interface PersonEditorPanelProps {
   mode: "create" | "edit";
   person: StaffPerson | null;
   departments: StaffDepartment[];
+  isDepartmentsLoading: boolean;
+  departmentsError?: string;
   isLoading: boolean;
   isSaving: boolean;
   loadError?: string;
   onClose: () => void;
+  onRetryDepartments: () => void;
   onRetry: () => void;
   onReload: () => Promise<boolean>;
   onSave: (command: StaffSaveCommand) => Promise<void>;
@@ -77,10 +80,13 @@ export function PersonEditorPanel({
   mode,
   person,
   departments,
+  isDepartmentsLoading,
+  departmentsError,
   isLoading,
   isSaving,
   loadError,
   onClose,
+  onRetryDepartments,
   onRetry,
   onReload,
   onSave,
@@ -101,6 +107,11 @@ export function PersonEditorPanel({
   );
   const titleId =
     mode === "edit" ? "staff-editor-title-edit" : "staff-editor-title-new";
+  const departmentOptions =
+    person?.department &&
+    !departments.some((department) => department.id === person.department?.id)
+      ? [person.department, ...departments]
+      : departments;
 
   useEffect(() => {
     isSavingRef.current = isSaving;
@@ -376,20 +387,55 @@ export function PersonEditorPanel({
                   Sector <span>Opcional</span>
                   <select
                     value={form.departmentId}
+                    disabled={isDepartmentsLoading || Boolean(departmentsError)}
+                    aria-describedby={
+                      departmentsError ? "staff-department-help" : undefined
+                    }
                     onChange={(event) =>
                       updateField("departmentId", event.target.value)
                     }
                   >
-                    <option value="">Sin sector</option>
-                    {departments.map((department) => (
+                    <option value="">
+                      {isDepartmentsLoading
+                        ? "Cargando sectores"
+                        : departmentsError
+                          ? "Sectores no disponibles"
+                          : "Sin sector"}
+                    </option>
+                    {departmentOptions.map((department) => (
                       <option key={department.id} value={department.id}>
                         {department.name}
                       </option>
                     ))}
                   </select>
+                  {departmentsError && (
+                    <small id="staff-department-help">
+                      {person?.department
+                        ? `Se conserva el sector actual: ${person.department.name}.`
+                        : "Reintentá la carga antes de elegir un sector."}
+                    </small>
+                  )}
                 </label>
               </div>
             </fieldset>
+
+            {departmentsError && (
+              <div className="staff-form__reference-error" role="alert">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <div>
+                  <strong>No se pudieron cargar los sectores</strong>
+                  <p>{departmentsError}</p>
+                  <button
+                    type="button"
+                    className="staff-button staff-button--ghost"
+                    onClick={onRetryDepartments}
+                  >
+                    <RotateCcw size={15} aria-hidden="true" />
+                    Reintentar sectores
+                  </button>
+                </div>
+              </div>
+            )}
 
             <fieldset>
               <legend>Contacto y vigencia laboral</legend>

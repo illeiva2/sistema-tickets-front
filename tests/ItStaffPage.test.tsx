@@ -86,6 +86,7 @@ function renderStaff() {
 
 describe("ItStaffPage", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     apiMock.get.mockImplementation((url: string) => {
       if (url === "/api/departments") {
@@ -134,6 +135,16 @@ describe("ItStaffPage", () => {
     );
   });
 
+  it("muestra las fechas laborales como fechas civiles en Buenos Aires", async () => {
+    vi.stubEnv("TZ", "America/Argentina/Buenos_Aires");
+    renderStaff();
+
+    expect(
+      (await screen.findAllByText("01 de mar de 2024")).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("29 de feb de 2024")).toBeNull();
+  });
+
   it("registra una persona usando exclusivamente datos laborales", async () => {
     const user = userEvent.setup();
     renderStaff();
@@ -168,6 +179,41 @@ describe("ItStaffPage", () => {
     expect(JSON.stringify(payload)).not.toMatch(
       /dni|document|address|domicilio|health|personalPhone/i,
     );
+  });
+
+  it("cierra el alta aunque la revalidación posterior quede pendiente", async () => {
+    let peopleCalls = 0;
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/departments") {
+        return Promise.resolve({ data: { success: true, data: [department] } });
+      }
+      if (url === "/api/it/people") {
+        peopleCalls += 1;
+        if (peopleCalls === 1)
+          return Promise.resolve(listResponse([basePerson]));
+        return new Promise(() => undefined);
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+    await user.click(screen.getByRole("button", { name: "Nueva persona" }));
+    const dialog = screen.getByRole("dialog", { name: "Registrar persona" });
+    await user.type(within(dialog).getByLabelText("Nombre"), "Mario");
+    await user.type(within(dialog).getByLabelText("Apellido"), "Gómez");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar persona" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Registrar persona" }),
+      ).toBeNull(),
+    );
+    expect(toastMock.success).toHaveBeenCalledWith("Persona registrada");
+    expect(peopleCalls).toBe(2);
   });
 
   it("edita con expectedUpdatedAt y limpia egreso al mantener ACTIVE", async () => {
@@ -372,6 +418,79 @@ describe("ItStaffPage", () => {
     expect(
       screen.getByText(/todavía no muestra ni solicita números/i),
     ).toBeInTheDocument();
+  });
+
+  it("navega las pestañas con flechas, Inicio y Fin", async () => {
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+
+    const peopleTab = screen.getByRole("tab", { name: /Personal/i });
+    const linesTab = screen.getByRole("tab", { name: /Líneas/i });
+    expect(peopleTab).toHaveAttribute("tabindex", "0");
+    expect(linesTab).toHaveAttribute("tabindex", "-1");
+
+    peopleTab.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(linesTab).toHaveFocus();
+    expect(linesTab).toHaveAttribute("aria-selected", "true");
+    expect(linesTab).toHaveAttribute("tabindex", "0");
+
+    await user.keyboard("{Home}");
+    expect(peopleTab).toHaveFocus();
+    await user.keyboard("{End}");
+    expect(linesTab).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(peopleTab).toHaveFocus();
+  });
+
+  it("informa el fallo de sectores y conserva el sector al editar", async () => {
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/departments") {
+        return Promise.reject(new Error("departments unavailable"));
+      }
+      if (url === "/api/it/people") {
+        return Promise.resolve(listResponse([basePerson]));
+      }
+      if (url === `/api/it/people/${basePerson.id}`) {
+        return Promise.resolve({
+          data: { success: true, data: { person: basePerson } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+    expect(screen.getByLabelText("Sector")).toBeDisabled();
+    expect(
+      screen.getByText("No se pudieron cargar los sectores"),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Editar Ana Pérez" })[0],
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Editar persona",
+    });
+    const departmentSelect = await within(dialog).findByLabelText(/Sector/);
+    expect(departmentSelect).toBeDisabled();
+    expect(departmentSelect).toHaveValue(department.id);
+    expect(
+      within(departmentSelect).getByRole("option", { name: department.name }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Reintentar sectores" }),
+    );
+    await waitFor(() =>
+      expect(
+        apiMock.get.mock.calls.filter(
+          ([url]: [string]) => url === "/api/departments",
+        ),
+      ).toHaveLength(2),
+    );
   });
 
   it("muestra estados vacío y error sin datos ficticios", async () => {

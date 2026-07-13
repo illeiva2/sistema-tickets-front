@@ -50,9 +50,9 @@ export function useSavePerson() {
       command.mode === "edit"
         ? updatePerson(command.id, command.payload)
         : createPerson(command.payload),
-    onSuccess: async (person) => {
+    onSuccess: (person) => {
       queryClient.setQueryData(staffKeys.detail(person.id), person);
-      await queryClient.invalidateQueries({ queryKey: staffKeys.all });
+      void queryClient.invalidateQueries({ queryKey: staffKeys.all });
     },
   });
 }

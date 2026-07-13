@@ -1,4 +1,11 @@
-import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -56,6 +63,8 @@ function ItStaffPage() {
   const [filters, setFilters] = useState<StaffListQuery>(INITIAL_FILTERS);
   const [searchDraft, setSearchDraft] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
+  const peopleTabRef = useRef<HTMLButtonElement>(null);
+  const linesTabRef = useRef<HTMLButtonElement>(null);
 
   const peopleQuery = usePeople(filters);
   const departmentsQuery = useStaffDepartments();
@@ -99,6 +108,25 @@ function ItStaffPage() {
     setFilters(INITIAL_FILTERS);
   };
 
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentTab: StaffTab,
+  ) => {
+    let nextTab: StaffTab | null = null;
+    if (event.key === "Home") nextTab = "people";
+    else if (event.key === "End") nextTab = "lines";
+    else if (event.key === "ArrowRight") {
+      nextTab = currentTab === "people" ? "lines" : "people";
+    } else if (event.key === "ArrowLeft") {
+      nextTab = currentTab === "people" ? "lines" : "people";
+    }
+
+    if (!nextTab) return;
+    event.preventDefault();
+    setActiveTab(nextTab);
+    (nextTab === "people" ? peopleTabRef : linesTabRef).current?.focus();
+  };
+
   const handleSave = async (command: StaffSaveCommand) => {
     await savePerson.mutateAsync(command);
     toast.success(
@@ -131,6 +159,9 @@ function ItStaffPage() {
   const pagination = peopleQuery.data?.pagination;
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
   const departments = departmentsQuery.data ?? [];
+  const departmentsError = departmentsQuery.isError
+    ? getStaffErrorInfo(departmentsQuery.error).message
+    : undefined;
 
   return (
     <section className="it-staff" aria-labelledby="staff-title">
@@ -185,11 +216,14 @@ function ItStaffPage() {
 
       <div className="staff-tabs" role="tablist" aria-label="Personal y líneas">
         <button
+          ref={peopleTabRef}
           id="staff-tab-people"
           type="button"
           role="tab"
           aria-selected={activeTab === "people"}
           aria-controls="staff-panel-people"
+          tabIndex={activeTab === "people" ? 0 : -1}
+          onKeyDown={(event) => handleTabKeyDown(event, "people")}
           onClick={() => setActiveTab("people")}
         >
           <Users size={16} aria-hidden="true" />
@@ -197,11 +231,14 @@ function ItStaffPage() {
           <span>Operativo</span>
         </button>
         <button
+          ref={linesTabRef}
           id="staff-tab-lines"
           type="button"
           role="tab"
           aria-selected={activeTab === "lines"}
           aria-controls="staff-panel-lines"
+          tabIndex={activeTab === "lines" ? 0 : -1}
+          onKeyDown={(event) => handleTabKeyDown(event, "lines")}
           onClick={() => setActiveTab("lines")}
         >
           <Smartphone size={16} aria-hidden="true" />
@@ -297,7 +334,9 @@ function ItStaffPage() {
               <select
                 id="staff-department"
                 value={filters.departmentId}
-                disabled={departmentsQuery.isLoading}
+                disabled={
+                  departmentsQuery.isLoading || departmentsQuery.isError
+                }
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
@@ -309,7 +348,9 @@ function ItStaffPage() {
                 <option value="">
                   {departmentsQuery.isLoading
                     ? "Cargando sectores"
-                    : "Todos los sectores"}
+                    : departmentsQuery.isError
+                      ? "Sectores no disponibles"
+                      : "Todos los sectores"}
                 </option>
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
@@ -349,6 +390,31 @@ function ItStaffPage() {
               </button>
             )}
           </form>
+
+          {departmentsError && (
+            <div className="staff-reference-error" role="alert">
+              <AlertTriangle size={17} aria-hidden="true" />
+              <div>
+                <strong>No se pudieron cargar los sectores</strong>
+                <p>{departmentsError}</p>
+              </div>
+              <button
+                type="button"
+                className="staff-button staff-button--ghost"
+                disabled={departmentsQuery.isFetching}
+                onClick={() => void departmentsQuery.refetch()}
+              >
+                <RefreshCw
+                  size={15}
+                  className={
+                    departmentsQuery.isFetching ? "staff-spin" : undefined
+                  }
+                  aria-hidden="true"
+                />
+                Reintentar sectores
+              </button>
+            </div>
+          )}
 
           <div className="staff-results-bar" aria-live="polite">
             {pagination
@@ -464,6 +530,8 @@ function ItStaffPage() {
           mode={editor.mode}
           person={editor.mode === "edit" ? (personDetail.data ?? null) : null}
           departments={departments}
+          isDepartmentsLoading={departmentsQuery.isLoading}
+          departmentsError={departmentsError}
           isLoading={editor.mode === "edit" && personDetail.isPending}
           isSaving={savePerson.isPending}
           loadError={
@@ -472,6 +540,7 @@ function ItStaffPage() {
               : undefined
           }
           onClose={closeEditor}
+          onRetryDepartments={() => void departmentsQuery.refetch()}
           onRetry={() => void personDetail.refetch()}
           onReload={reloadCurrentPerson}
           onSave={handleSave}
