@@ -98,6 +98,9 @@ const token: AgentEnrollmentToken = {
   id: "token-1",
   label: "Lote Contaduría",
   expiresAt: "2026-07-14T12:00:00.000Z",
+  maxUses: 10,
+  useCount: 4,
+  remainingUses: 6,
   status: "AVAILABLE",
   createdAt: "2026-07-13T12:00:00.000Z",
 };
@@ -223,82 +226,92 @@ function installMocks() {
       });
     return Promise.reject(new Error(`Unexpected GET ${url}`));
   });
-  apiMock.post.mockImplementation((url: string) => {
-    if (url === "/api/it/agents/enrollment-tokens")
-      return Promise.resolve({
-        data: {
-          success: true,
-          data: { token, plainToken: "enroll-once-secret" },
-        },
-      });
-    if (url === `/api/it/agents/devices/${device.id}/remote-sessions`)
-      return Promise.resolve({
-        data: {
-          success: true,
+  apiMock.post.mockImplementation(
+    (url: string, body?: Record<string, unknown>) => {
+      if (url === "/api/it/agents/enrollment-tokens")
+        return Promise.resolve({
           data: {
-            session,
-            connection: {
-              protocol: "SSH",
-              target: device.primaryIp,
-              port: 22,
-              uri: `ssh://${device.primaryIp}:22`,
-              scope: "DIRECT",
-              requiresNetworkReachability: true,
-              warning: "Requiere alcance directo de red.",
+            success: true,
+            data: {
+              token: {
+                ...token,
+                maxUses: Number(body?.maxUses ?? 1),
+                useCount: 0,
+                remainingUses: Number(body?.maxUses ?? 1),
+              },
+              plainToken: "enroll-once-secret",
             },
           },
-        },
-      });
-    if (url === `/api/it/agents/remote-sessions/${session.id}/close`)
-      return Promise.resolve({
-        data: {
-          success: true,
+        });
+      if (url === `/api/it/agents/devices/${device.id}/remote-sessions`)
+        return Promise.resolve({
           data: {
-            session: {
-              ...session,
-              status: "CLOSED",
-              endedAt: "2026-07-13T12:10:00.000Z",
+            success: true,
+            data: {
+              session,
+              connection: {
+                protocol: "SSH",
+                target: device.primaryIp,
+                port: 22,
+                uri: `ssh://${device.primaryIp}:22`,
+                scope: "DIRECT",
+                requiresNetworkReachability: true,
+                warning: "Requiere alcance directo de red.",
+              },
             },
           },
-        },
-      });
-    if (url === `/api/it/agents/devices/${device.id}/register-asset`)
-      return Promise.resolve({
-        data: {
-          success: true,
+        });
+      if (url === `/api/it/agents/remote-sessions/${session.id}/close`)
+        return Promise.resolve({
           data: {
-            device: {
-              ...device,
-              assetId: "asset-new",
+            success: true,
+            data: {
+              session: {
+                ...session,
+                status: "CLOSED",
+                endedAt: "2026-07-13T12:10:00.000Z",
+              },
+            },
+          },
+        });
+      if (url === `/api/it/agents/devices/${device.id}/register-asset`)
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              device: {
+                ...device,
+                assetId: "asset-new",
+                asset: {
+                  id: "asset-new",
+                  assetTag: "NB-0001",
+                  type: "NOTEBOOK",
+                  brand: "Dell",
+                  model: "Latitude 5440",
+                  serialNumber: "DL-5440-001",
+                },
+                updatedAt: "2026-07-13T12:10:00.000Z",
+              },
               asset: {
                 id: "asset-new",
                 assetTag: "NB-0001",
                 type: "NOTEBOOK",
+                status: "ASSIGNED",
                 brand: "Dell",
                 model: "Latitude 5440",
                 serialNumber: "DL-5440-001",
+                updatedAt: "2026-07-13T12:10:00.000Z",
               },
-              updatedAt: "2026-07-13T12:10:00.000Z",
-            },
-            asset: {
-              id: "asset-new",
-              assetTag: "NB-0001",
-              type: "NOTEBOOK",
-              status: "ASSIGNED",
-              brand: "Dell",
-              model: "Latitude 5440",
-              serialNumber: "DL-5440-001",
-              updatedAt: "2026-07-13T12:10:00.000Z",
             },
           },
-        },
+        });
+      if (url.endsWith("/activate") || url.endsWith("/revoke"))
+        return Promise.resolve({ data: { success: true, data: { device } } });
+      return Promise.resolve({
+        data: { success: true, data: { revoked: true } },
       });
-    if (url.endsWith("/activate") || url.endsWith("/revoke"))
-      return Promise.resolve({ data: { success: true, data: { device } } });
-    return Promise.resolve({
-      data: { success: true, data: { revoked: true } },
-    });
-  });
+    },
+  );
   apiMock.patch.mockResolvedValue({
     data: {
       success: true,
@@ -399,7 +412,7 @@ describe("ItLiveDevicesPage", () => {
     );
   });
 
-  it("AGENT genera un token sin enviar expiresAt y copia el secreto una sola vez", async () => {
+  it("AGENT genera un token por lote sin expiresAt y copia el secreto una sola vez", async () => {
     authMock.role = "AGENT";
     const user = userEvent.setup();
     const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText");
@@ -409,14 +422,22 @@ describe("ItLiveDevicesPage", () => {
     const dialog = screen.getByRole("dialog", {
       name: "Tokens de enrolamiento",
     });
+    expect(
+      within(dialog).getByText("Usados 4 de 10 · quedan 6"),
+    ).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Etiqueta"), "Lote Sistemas");
+    const quantity = within(dialog).getByRole("spinbutton", {
+      name: /Cantidad de equipos/,
+    });
+    await user.clear(quantity);
+    await user.type(quantity, "25");
     await user.click(
       within(dialog).getByRole("button", { name: "Generar token" }),
     );
     await waitFor(() =>
       expect(apiMock.post).toHaveBeenCalledWith(
         "/api/it/agents/enrollment-tokens",
-        { label: "Lote Sistemas" },
+        { label: "Lote Sistemas", maxUses: 25 },
       ),
     );
     expect(within(dialog).getByLabelText("Token generado")).toHaveValue(

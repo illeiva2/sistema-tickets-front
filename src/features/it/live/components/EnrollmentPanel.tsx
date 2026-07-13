@@ -43,6 +43,7 @@ const statusLabels = {
   AVAILABLE: "Disponible",
   USED: "Utilizado",
   EXPIRED: "Vencido",
+  REVOKED: "Revocado",
 } as const;
 
 export function EnrollmentPanel({
@@ -61,7 +62,9 @@ export function EnrollmentPanel({
   const revealFocusRef = useRef<HTMLInputElement>(null);
   const [label, setLabel] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [maxUses, setMaxUses] = useState("1");
   const [plainToken, setPlainToken] = useState<string>();
+  const [generatedMaxUses, setGeneratedMaxUses] = useState(1);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
   const revealRef = useRef<{ plainToken?: string; copied: boolean }>({
@@ -90,13 +93,24 @@ export function EnrollmentPanel({
   const create = async (event: FormEvent) => {
     event.preventDefault();
     setError(undefined);
+    const parsedMaxUses = Number(maxUses);
+    if (
+      !Number.isInteger(parsedMaxUses) ||
+      parsedMaxUses < 1 ||
+      parsedMaxUses > 250
+    ) {
+      setError("La cantidad de equipos debe ser un número entre 1 y 250.");
+      return;
+    }
     try {
       const cleanLabel = label.trim();
       const result = await onCreate({
         ...(cleanLabel ? { label: cleanLabel } : {}),
         ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+        maxUses: parsedMaxUses,
       });
       setPlainToken(result.plainToken);
+      setGeneratedMaxUses(result.token.maxUses);
       setCopied(false);
     } catch (caught) {
       setError(getAgentErrorInfo(caught).message);
@@ -159,10 +173,11 @@ export function EnrollmentPanel({
           <div className="live-security-notice">
             <ShieldAlert size={20} />
             <div>
-              <strong>Secreto de un solo uso</strong>
+              <strong>Secreto de enrolamiento controlado</strong>
               <p>
-                El valor plano aparece una sola vez. Guardalo en el canal seguro
-                usado para instalar el agente; no lo pegues en tickets ni chats.
+                El valor plano aparece una sola vez, pero puede autorizar entre
+                1 y 250 equipos. Guardalo en el canal seguro usado para instalar
+                el agente; no lo pegues en tickets ni chats.
               </p>
             </div>
           </div>
@@ -191,6 +206,9 @@ export function EnrollmentPanel({
                 </button>
               </div>
               <p>
+                {generatedMaxUses === 1
+                  ? "Autoriza un equipo. "
+                  : `Autoriza un lote de hasta ${generatedMaxUses} equipos. `}
                 Al cerrar este panel el secreto desaparece de la interfaz y no
                 puede recuperarse.
               </p>
@@ -213,6 +231,20 @@ export function EnrollmentPanel({
                   type="datetime-local"
                   value={expiresAt}
                   onChange={(event) => setExpiresAt(event.target.value)}
+                />
+              </label>
+              <label>
+                Cantidad de equipos{" "}
+                <span>1 para instalación individual; hasta 250 por lote.</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={250}
+                  step={1}
+                  required
+                  inputMode="numeric"
+                  value={maxUses}
+                  onChange={(event) => setMaxUses(event.target.value)}
                 />
               </label>
               <button
@@ -285,8 +317,19 @@ export function EnrollmentPanel({
                         Creado {formatDate(token.createdAt)} · vence{" "}
                         {formatDate(token.expiresAt)}
                       </small>
-                      {token.usedByDevice ? (
-                        <small>Usado por {token.usedByDevice.hostname}</small>
+                      <small>
+                        Usados {token.useCount} de {token.maxUses} · quedan{" "}
+                        {token.remainingUses}
+                      </small>
+                      {token.enrolledDevices?.length ? (
+                        <small>
+                          Equipos:{" "}
+                          {token.enrolledDevices
+                            .map((device) => device.hostname)
+                            .join(", ")}
+                        </small>
+                      ) : token.usedByDevice ? (
+                        <small>Equipo: {token.usedByDevice.hostname}</small>
                       ) : null}
                     </div>
                     {token.status === "AVAILABLE" ? (

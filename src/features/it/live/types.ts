@@ -119,11 +119,15 @@ export interface AgentEnrollmentToken {
   id: string;
   label?: string | null;
   expiresAt: string;
+  maxUses: number;
+  useCount: number;
+  remainingUses: number;
   usedAt?: string | null;
   revokedAt?: string | null;
-  status: "AVAILABLE" | "USED" | "EXPIRED";
+  status: "AVAILABLE" | "USED" | "EXPIRED" | "REVOKED";
   usedByDeviceId?: string | null;
   usedByDevice?: Pick<AgentDevice, "id" | "hostname"> | null;
+  enrolledDevices?: Array<Pick<AgentDevice, "id" | "hostname" | "isActive">>;
   createdBy?: AgentOperator;
   createdAt: string;
 }
@@ -136,6 +140,7 @@ export interface AgentEnrollmentTokenResult {
 export interface EnrollmentTokenPayload {
   label?: string;
   expiresAt?: string;
+  maxUses?: number;
 }
 
 export interface RemoteConnection {

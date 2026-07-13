@@ -890,6 +890,10 @@
 .live-token-status[data-status="EXPIRED"] {
   color: var(--lv-red);
 }
+.live-token-status[data-status="REVOKED"] {
+  color: var(--lv-red);
+  text-decoration: line-through;
+}
 .live-token-list li > div {
   display: grid;
   gap: 3px;
