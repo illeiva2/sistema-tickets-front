@@ -28,6 +28,7 @@ const AUTH_BYPASS_PATHS = [
   "/api/auth/register",
   "/api/auth/refresh",
   "/api/auth/logout",
+  "/api/auth/google/exchange",
   "/api/auth/google",
   "/api/auth/setup-password",
 ];

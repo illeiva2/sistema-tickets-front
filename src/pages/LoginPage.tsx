@@ -184,7 +184,7 @@ const LoginPage: React.FC = () => {
                 className="w-full"
               >
                 <UserPlus className="mr-2 h-4 w-4" />
-                ¿Nuevo usuario? Regístrate
+                Acceso corporativo de IT
               </Button>
             </div>
 
@@ -197,13 +197,13 @@ const LoginPage: React.FC = () => {
                 </div>
                 <div className="text-sm text-blue-700 space-y-2">
                   <p>
-                    • El registro solo está disponible para usuarios con dominio corporativo autorizado
+                    • El acceso con Google está limitado a cuentas provisionadas por IT
                   </p>
                   <p>
-                    • Usa &quot;Continuar con Google&quot; para crear tu cuenta
+                    • Usa &quot;Continuar con Google&quot; para ingresar con tu cuenta corporativa
                   </p>
                   <p>
-                    • Después del primer login, podrás configurar una contraseña personal
+                    • Si tu cuenta todavía no está habilitada, contactá a un administrador
                   </p>
                   <p>
                     • Los usuarios existentes pueden iniciar sesión con email y contraseña

@@ -35,8 +35,6 @@ const ProjectEditorPage = lazy(() => import("./pages/ProjectEditorPage"));
 const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 const SetupPasswordPage = lazy(() => import("./pages/SetupPasswordPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
-const OAuthHandler = lazy(() => import("./components/OAuthHandler"));
-const OAuthWrapper = lazy(() => import("./components/OAuthWrapper"));
 
 // Gestión IT (solo AGENT/ADMIN): todas lazy, viven bajo /it/*.
 const ItDashboardPage = lazy(() =>
@@ -71,7 +69,6 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
-              <Route path="/oauth" element={<OAuthHandler />} />
               <Route
                 path="/"
                 element={
@@ -84,7 +81,7 @@ function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<OAuthWrapper />} />
+                <Route index element={<DashboardPage />} />
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="tickets" element={<TicketsPage />} />
                 <Route path="tickets/new" element={<NewTicketPage />} />
