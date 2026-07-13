@@ -5,6 +5,7 @@ import {
   fetchLink,
   fetchLinks,
   fetchNetworkLookups,
+  fetchSite,
   fetchSites,
   fetchTopologyView,
   fetchTopologyViews,
@@ -31,6 +32,7 @@ export const networkKeys = {
   all: ["it", "network"] as const,
   lookups: ["it", "network", "lookups"] as const,
   sites: ["it", "network", "sites"] as const,
+  siteDetail: (id: string) => [...networkKeys.sites, "detail", id] as const,
   devices: ["it", "network", "devices"] as const,
   deviceList: (query: DeviceListQuery) =>
     [...networkKeys.devices, "list", query] as const,
@@ -61,6 +63,18 @@ export function useSites() {
     queryKey: networkKeys.sites,
     queryFn: fetchSites,
     staleTime: 60_000,
+  });
+}
+
+export function useSiteDetail(id: string | null) {
+  return useQuery({
+    queryKey: networkKeys.siteDetail(id ?? "pending"),
+    queryFn: () => {
+      if (!id) throw new Error("Site id is required");
+      return fetchSite(id);
+    },
+    enabled: Boolean(id),
+    staleTime: 30_000,
   });
 }
 

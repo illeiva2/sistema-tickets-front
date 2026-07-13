@@ -66,6 +66,7 @@ import {
   useSaveSite,
   useSaveTopologyLayout,
   useSaveTopologyView,
+  useSiteDetail,
   useSites,
   useTopologyView,
   useTopologyViews,
@@ -126,8 +127,10 @@ function ItNetworkPage() {
   const viewsQuery = useTopologyViews();
   const deviceId = deviceEditor?.mode === "edit" ? deviceEditor.id : null;
   const linkId = linkEditor?.mode === "edit" ? linkEditor.id : null;
+  const siteId = siteEditor && siteEditor !== "create" ? siteEditor.id : null;
   const deviceDetail = useDeviceDetail(deviceId);
   const linkDetail = useLinkDetail(linkId);
+  const siteDetail = useSiteDetail(siteId);
   const topologyDetail = useTopologyView(selectedViewId);
   const saveDeviceMutation = useSaveDevice();
   const saveLinkMutation = useSaveLink();
@@ -144,8 +147,51 @@ function ItNetworkPage() {
     setSelectedViewId(preferred.id);
   }, [selectedViewId, viewsQuery.data?.items]);
 
+  useEffect(() => {
+    if (!topologyDirty) return;
+    const guardInternalNavigation = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const anchor = target?.closest<HTMLAnchorElement>("a[href]");
+      if (
+        !anchor ||
+        anchor.target === "_blank" ||
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const destination = new URL(anchor.href, window.location.href);
+      if (destination.origin !== window.location.origin) return;
+      if (
+        destination.pathname === window.location.pathname &&
+        destination.search === window.location.search &&
+        destination.hash === window.location.hash
+      )
+        return;
+      if (
+        !window.confirm(
+          "Hay posiciones sin guardar. El borrador local se conservará. ¿Salir?",
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return;
+      }
+      setTopologyDirty(false);
+    };
+    document.addEventListener("click", guardInternalNavigation, true);
+    return () =>
+      document.removeEventListener("click", guardInternalNavigation, true);
+  }, [topologyDirty]);
+
   const closeDevice = useCallback(() => setDeviceEditor(null), []);
   const closeLink = useCallback(() => setLinkEditor(null), []);
+  const closeSite = useCallback(() => setSiteEditor(null), []);
+  const closeView = useCallback(() => setViewEditor(null), []);
 
   const selectTab = (tab: ActiveTab) => {
     if (
@@ -153,7 +199,7 @@ function ItNetworkPage() {
       tab !== "topology" &&
       topologyDirty &&
       !window.confirm(
-        "Hay posiciones sin guardar. ¿Descartarlas y cambiar de sección?",
+        "Hay posiciones sin guardar. El borrador local se conservará. ¿Cambiar de sección?",
       )
     )
       return;
@@ -193,13 +239,13 @@ function ItNetworkPage() {
     toast.success(
       command.mode === "create" ? "Sitio creado" : "Sitio actualizado",
     );
-    setSiteEditor(null);
+    closeSite();
   };
   const saveView = async (command: SaveCommand<TopologyViewPayload>) => {
     const saved = await saveViewMutation.mutateAsync(command);
     setSelectedViewId(saved.id);
     setTopologyRevision((revision) => revision + 1);
-    setViewEditor(null);
+    closeView();
     toast.success(
       command.mode === "create" ? "Vista creada" : "Vista actualizada",
     );
@@ -237,6 +283,17 @@ function ItNetworkPage() {
     }
     return result.data;
   };
+  const reloadSite = async () => {
+    if (!siteId) return null;
+    const result = await siteDetail.refetch();
+    if (result.isError || !result.data) {
+      toast.error(
+        "El sitio no pudo recargarse. El borrador local sigue protegido.",
+      );
+      return null;
+    }
+    return result.data;
+  };
   const reloadTopology = async () => {
     const result = await topologyDetail.refetch();
     if (result.isError || !result.data) return null;
@@ -267,7 +324,13 @@ function ItNetworkPage() {
       : activeTab === "links"
         ? linksQuery
         : topologyDetail;
-  const sites = sitesQuery.data ?? lookupsQuery.data?.sites ?? [];
+  const sites = Array.from(
+    new Map(
+      [...(sitesQuery.data ?? []), ...(lookupsQuery.data?.sites ?? [])].map(
+        (site) => [site.id, site],
+      ),
+    ).values(),
+  );
   const devices = devicesQuery.data?.items ?? [];
   const links = linksQuery.data?.items ?? [];
   const lookups = lookupsQuery.data ?? { sites: [], devices: [], assets: [] };
@@ -741,7 +804,7 @@ function ItNetworkPage() {
                       if (
                         topologyDirty &&
                         !window.confirm(
-                          "Hay posiciones sin guardar. ¿Descartarlas y cambiar de vista?",
+                          "Hay posiciones sin guardar. El borrador local se conservará. ¿Cambiar de vista?",
                         )
                       )
                         return;
@@ -865,7 +928,8 @@ function ItNetworkPage() {
           key={siteEditor === "create" ? "new-site" : siteEditor.id}
           site={siteEditor === "create" ? null : siteEditor}
           isSaving={saveSiteMutation.isPending}
-          onClose={() => setSiteEditor(null)}
+          onClose={closeSite}
+          onReload={reloadSite}
           onSave={saveSite}
         />
       ) : null}
@@ -875,7 +939,8 @@ function ItNetworkPage() {
           view={viewEditor === "create" ? null : viewEditor}
           sites={sites}
           isSaving={saveViewMutation.isPending}
-          onClose={() => setViewEditor(null)}
+          onClose={closeView}
+          onReload={reloadTopology}
           onSave={saveView}
         />
       ) : null}

@@ -69,10 +69,17 @@ export async function fetchNetworkLookups(): Promise<NetworkLookups> {
 export async function fetchSites(): Promise<NetworkSite[]> {
   const response = await api.get<
     ApiEnvelope<NetworkSite[] | ListResult<NetworkSite>>
-  >("/api/it/network/sites");
+  >("/api/it/network/sites", { params: { page: 1, pageSize: 100 } });
   return Array.isArray(response.data.data)
     ? response.data.data
     : response.data.data.items;
+}
+
+export async function fetchSite(id: string): Promise<NetworkSite> {
+  const response = await api.get<ApiEnvelope<Named<NetworkSite>>>(
+    `/api/it/network/sites/${id}`,
+  );
+  return unwrap(response.data.data);
 }
 
 export async function fetchDevices(

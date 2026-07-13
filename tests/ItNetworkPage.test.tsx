@@ -33,6 +33,8 @@ vi.mock("../src/contexts/AuthContext", () => ({
 }));
 
 import api from "../src/lib/api";
+import { calculateTopologyPlaneSize } from "../src/features/it/network/components/TopologyCanvas";
+import { parseVlans } from "../src/features/it/network/validation";
 import type {
   NetworkDevice,
   NetworkLink,
@@ -110,6 +112,7 @@ const view: TopologyView = {
   links: [link],
   updatedAt: "2026-07-12T12:00:00.000Z",
 };
+let currentSiteDetail = site;
 
 function list<T>(items: T[]) {
   return {
@@ -134,6 +137,10 @@ function installMocks() {
       return Promise.resolve(list([device, deviceB]));
     if (url === "/api/it/network/links") return Promise.resolve(list([link]));
     if (url === "/api/it/network/sites") return Promise.resolve(list([site]));
+    if (url === `/api/it/network/sites/${site.id}`)
+      return Promise.resolve({
+        data: { success: true, data: { site: currentSiteDetail } },
+      });
     if (url === "/api/it/network/lookups")
       return Promise.resolve({
         data: {
@@ -220,7 +227,9 @@ function renderPage() {
 describe("ItNetworkPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     authMock.role = "ADMIN";
+    currentSiteDetail = site;
     installMocks();
   });
 
@@ -384,6 +393,36 @@ describe("ItNetworkPage", () => {
     );
   });
 
+  it("restaura el borrador de layout tras un desmontaje programático", async () => {
+    const user = userEvent.setup();
+    const firstRender = renderPage();
+    await screen.findAllByText(device.name);
+    await user.click(screen.getByRole("tab", { name: /Topología/ }));
+    const node = await screen.findByRole("button", {
+      name: `${device.name}, Switch, ${device.managementIp}`,
+    });
+    node.focus();
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() =>
+      expect(
+        window.sessionStorage.getItem(`it-network-topology-draft:${view.id}`),
+      ).toContain('"x":50'),
+    );
+
+    firstRender.unmount();
+    renderPage();
+    await screen.findAllByText(device.name);
+    await user.click(screen.getByRole("tab", { name: /Topología/ }));
+    expect(
+      await screen.findByText(/Borrador local de posiciones restaurado/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: `${device.name}, Switch, ${device.managementIp}`,
+      }),
+    ).toHaveStyle({ transform: "translate(50px, 42px)" });
+  });
+
   it("implementa navegación de tabs y restringe escritura a perfiles IT", async () => {
     authMock.role = "USER";
     const user = userEvent.setup();
@@ -402,5 +441,76 @@ describe("ItNetworkPage", () => {
     expect(
       screen.getAllByRole("button", { name: `Ver ${device.name}` }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("recupera un conflicto de sitio con detalle fresco y nueva versión CAS", async () => {
+    const user = userEvent.setup();
+    currentSiteDetail = {
+      ...site,
+      name: "Casa Central actualizada",
+      updatedAt: "2026-07-12T15:00:00.000Z",
+    };
+    apiMock.patch.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: {
+            code: "SITE_VERSION_CONFLICT",
+            message: "El sitio cambió en el servidor.",
+          },
+        },
+      },
+    });
+    renderPage();
+    await screen.findAllByText(device.name);
+    await user.click(
+      screen.getByRole("button", { name: `Editar sitio ${site.name}` }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Editar sitio" });
+    const name = within(dialog).getByLabelText("Nombre");
+    await user.clear(name);
+    await user.type(name, "Borrador local");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar sitio" }),
+    );
+    expect(
+      await within(dialog).findByText("Existe una versión más reciente"),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: "Recargar versión actual",
+      }),
+    );
+    await waitFor(() => expect(name).toHaveValue("Casa Central actualizada"));
+    await user.clear(name);
+    await user.type(name, "Casa Central final");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar sitio" }),
+    );
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+    expect(apiMock.patch).toHaveBeenLastCalledWith(
+      `/api/it/network/sites/${site.id}`,
+      expect.objectContaining({
+        name: "Casa Central final",
+        expectedUpdatedAt: currentSiteDetail.updatedAt,
+      }),
+    );
+  });
+
+  it("dimensiona un plano desplazable para decenas de nodos", () => {
+    const points = Array.from({ length: 65 }, (_, index) => ({
+      x: 38 + (index % 8) * 190,
+      y: 42 + Math.floor(index / 8) * 126,
+    }));
+    const size = calculateTopologyPlaneSize(points);
+    expect(size.width).toBeGreaterThan(1_400);
+    expect(size.height).toBeGreaterThan(1_000);
+  });
+
+  it("valida etiquetas VLAN como la API y deduplica sin distinguir mayúsculas", () => {
+    expect(parseVlans("20-Voz Planta, 20-voz planta, 30-Cámaras")).toEqual({
+      vlans: ["20-Voz Planta", "30-Cámaras"],
+    });
+    expect(parseVlans("20-Voz-Invitados").error).toMatch(/no es válida/i);
   });
 });

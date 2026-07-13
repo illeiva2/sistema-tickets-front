@@ -33,13 +33,52 @@ interface TopologyCanvasProps {
   onDirtyChange: (dirty: boolean) => void;
 }
 
-interface Point {
+export interface TopologyPoint {
   x: number;
   y: number;
 }
 
+interface TopologyDraft {
+  expectedUpdatedAt: string;
+  positions: Record<string, TopologyPoint>;
+}
+
 const NODE_WIDTH = 154;
 const NODE_HEIGHT = 68;
+const NODE_COLUMN_GAP = 190;
+const NODE_ROW_GAP = 126;
+
+function draftKey(viewId: string) {
+  return `it-network-topology-draft:${viewId}`;
+}
+
+function readDraft(viewId: string): TopologyDraft | null {
+  try {
+    const raw = window.sessionStorage.getItem(draftKey(viewId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<TopologyDraft>;
+    if (!parsed.expectedUpdatedAt || !parsed.positions) return null;
+    return {
+      expectedUpdatedAt: parsed.expectedUpdatedAt,
+      positions: parsed.positions,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function gridColumns(total: number) {
+  return Math.max(1, Math.min(8, Math.ceil(Math.sqrt(total))));
+}
+
+export function calculateTopologyPlaneSize(points: TopologyPoint[]) {
+  const maxX = points.reduce((maximum, point) => Math.max(maximum, point.x), 0);
+  const maxY = points.reduce((maximum, point) => Math.max(maximum, point.y), 0);
+  return {
+    width: Math.max(900, Math.ceil(maxX + NODE_WIDTH + 42)),
+    height: Math.max(550, Math.ceil(maxY + NODE_HEIGHT + 42)),
+  };
+}
 
 function getDevices(view: TopologyView): NetworkDeviceSummary[] {
   if (view.devices?.length) return view.devices;
@@ -51,7 +90,8 @@ function getDevices(view: TopologyView): NetworkDeviceSummary[] {
 function initialPositions(
   view: TopologyView,
   devices: NetworkDeviceSummary[],
-): Record<string, Point> {
+): Record<string, TopologyPoint> {
+  const columns = gridColumns(devices.length);
   const stored = new Map(
     (view.nodes ?? []).map((node) => [node.deviceId, { x: node.x, y: node.y }]),
   );
@@ -59,10 +99,33 @@ function initialPositions(
     devices.map((device, index) => [
       device.id,
       stored.get(device.id) ?? {
-        x: 38 + (index % 4) * 190,
-        y: 42 + Math.floor(index / 4) * 126,
+        x: 38 + (index % columns) * NODE_COLUMN_GAP,
+        y: 42 + Math.floor(index / columns) * NODE_ROW_GAP,
       },
     ]),
+  );
+}
+
+function positionsWithDraft(
+  view: TopologyView,
+  devices: NetworkDeviceSummary[],
+  draft: TopologyDraft | null,
+) {
+  const base = initialPositions(view, devices);
+  if (!draft) return base;
+  return Object.fromEntries(
+    devices.map((device) => {
+      const saved = draft.positions[device.id];
+      const valid =
+        saved &&
+        Number.isFinite(saved.x) &&
+        Number.isFinite(saved.y) &&
+        saved.x >= 0 &&
+        saved.y >= 0 &&
+        saved.x <= 1_000_000 &&
+        saved.y <= 1_000_000;
+      return [device.id, valid ? saved : base[device.id]];
+    }),
   );
 }
 
@@ -74,14 +137,21 @@ export function TopologyCanvas({
   onReload,
   onDirtyChange,
 }: TopologyCanvasProps) {
+  const initialDraftRef = useRef(readDraft(view.id));
   const [snapshot, setSnapshot] = useState(view);
   const devices = getDevices(snapshot);
   const [positions, setPositions] = useState(() =>
-    initialPositions(view, getDevices(view)),
+    positionsWithDraft(view, getDevices(view), initialDraftRef.current),
   );
-  const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(view.updatedAt);
-  const [dirty, setDirty] = useState(false);
-  const [message, setMessage] = useState("Posiciones cargadas");
+  const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(
+    initialDraftRef.current?.expectedUpdatedAt ?? view.updatedAt,
+  );
+  const [dirty, setDirty] = useState(Boolean(initialDraftRef.current));
+  const [message, setMessage] = useState(
+    initialDraftRef.current
+      ? "Borrador local de posiciones restaurado"
+      : "Posiciones cargadas",
+  );
   const [error, setError] = useState<string>();
   const [conflict, setConflict] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
@@ -90,12 +160,28 @@ export function TopologyCanvas({
     id: string;
     clientX: number;
     clientY: number;
-    origin: Point;
+    origin: TopologyPoint;
   } | null>(null);
+  const planeSize = calculateTopologyPlaneSize(Object.values(positions));
 
   useEffect(() => {
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    try {
+      if (dirty) {
+        window.sessionStorage.setItem(
+          draftKey(view.id),
+          JSON.stringify({ expectedUpdatedAt, positions }),
+        );
+      } else {
+        window.sessionStorage.removeItem(draftKey(view.id));
+      }
+    } catch {
+      // El editor sigue funcionando aunque el navegador bloquee storage.
+    }
+  }, [dirty, expectedUpdatedAt, positions, view.id]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -201,23 +287,29 @@ export function TopologyCanvas({
   };
 
   const autoLayout = () => {
-    const columns = Math.max(
-      1,
-      Math.min(4, Math.ceil(Math.sqrt(devices.length))),
-    );
+    const columns = gridColumns(devices.length);
     setPositions(
       Object.fromEntries(
         devices.map((device, index) => [
           device.id,
           {
-            x: 38 + (index % columns) * 190,
-            y: 42 + Math.floor(index / columns) * 126,
+            x: 38 + (index % columns) * NODE_COLUMN_GAP,
+            y: 42 + Math.floor(index / columns) * NODE_ROW_GAP,
           },
         ]),
       ),
     );
     setDirty(true);
     setMessage("Distribución automática aplicada localmente");
+  };
+
+  const discardDraft = () => {
+    setPositions(initialPositions(snapshot, devices));
+    setExpectedUpdatedAt(snapshot.updatedAt);
+    setDirty(false);
+    setConflict(false);
+    setError(undefined);
+    setMessage("Borrador local descartado");
   };
 
   const save = async () => {
@@ -280,6 +372,16 @@ export function TopologyCanvas({
             <button
               type="button"
               className="network-button network-button--ghost"
+              disabled={!dirty || isSaving}
+              onClick={discardDraft}
+            >
+              Descartar
+            </button>
+          ) : null}
+          {canWrite ? (
+            <button
+              type="button"
+              className="network-button network-button--ghost"
               onClick={autoLayout}
             >
               <Grid3X3 size={15} />
@@ -309,44 +411,56 @@ export function TopologyCanvas({
         más rápido. Los cambios permanecen locales hasta guardar.
       </p>
       {devices.length ? (
-        <div ref={boardRef} className="topology-board" data-dirty={dirty}>
-          <svg className="topology-edges" aria-hidden="true">
-            {(snapshot.links ?? []).map((link) => {
-              const from = positions[link.deviceAId];
-              const to = positions[link.deviceBId];
-              if (!from || !to) return null;
+        <div
+          className="topology-board-scroll"
+          role="region"
+          tabIndex={0}
+          aria-label="Plano desplazable de topología"
+        >
+          <div
+            ref={boardRef}
+            className="topology-board"
+            data-dirty={dirty}
+            style={planeSize}
+          >
+            <svg className="topology-edges" aria-hidden="true">
+              {(snapshot.links ?? []).map((link) => {
+                const from = positions[link.deviceAId];
+                const to = positions[link.deviceBId];
+                if (!from || !to) return null;
+                return (
+                  <line
+                    key={link.id}
+                    x1={from.x + NODE_WIDTH / 2}
+                    y1={from.y + NODE_HEIGHT / 2}
+                    x2={to.x + NODE_WIDTH / 2}
+                    y2={to.y + NODE_HEIGHT / 2}
+                    data-type={link.type}
+                  />
+                );
+              })}
+            </svg>
+            {devices.map((device) => {
+              const point = positions[device.id];
               return (
-                <line
-                  key={link.id}
-                  x1={from.x + NODE_WIDTH / 2}
-                  y1={from.y + NODE_HEIGHT / 2}
-                  x2={to.x + NODE_WIDTH / 2}
-                  y2={to.y + NODE_HEIGHT / 2}
-                  data-type={link.type}
-                />
+                <button
+                  key={device.id}
+                  type="button"
+                  className="topology-node"
+                  data-type={device.type}
+                  data-status={device.status}
+                  style={{ transform: `translate(${point.x}px, ${point.y}px)` }}
+                  aria-label={`${device.name}, ${DEVICE_TYPE_LABELS[device.type]}, ${device.managementIp || "sin IP"}`}
+                  onPointerDown={(event) => startDrag(event, device.id)}
+                  onKeyDown={(event) => moveWithKeyboard(event, device.id)}
+                >
+                  <span>{DEVICE_TYPE_LABELS[device.type]}</span>
+                  <strong>{device.name}</strong>
+                  <small>{device.managementIp || "IP —"}</small>
+                </button>
               );
             })}
-          </svg>
-          {devices.map((device) => {
-            const point = positions[device.id];
-            return (
-              <button
-                key={device.id}
-                type="button"
-                className="topology-node"
-                data-type={device.type}
-                data-status={device.status}
-                style={{ transform: `translate(${point.x}px, ${point.y}px)` }}
-                aria-label={`${device.name}, ${DEVICE_TYPE_LABELS[device.type]}, ${device.managementIp || "sin IP"}`}
-                onPointerDown={(event) => startDrag(event, device.id)}
-                onKeyDown={(event) => moveWithKeyboard(event, device.id)}
-              >
-                <span>{DEVICE_TYPE_LABELS[device.type]}</span>
-                <strong>{device.name}</strong>
-                <small>{device.managementIp || "IP —"}</small>
-              </button>
-            );
-          })}
+          </div>
         </div>
       ) : (
         <div className="network-empty network-empty--inline">

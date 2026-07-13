@@ -85,6 +85,18 @@ export function DeviceEditorPanel({
     device?.asset && !assets.some((asset) => asset.id === device.asset!.id)
       ? [device.asset, ...assets]
       : assets;
+  const siteOptions =
+    device?.site && !sites.some((site) => site.id === device.site!.id)
+      ? [
+          {
+            id: device.site.id,
+            name: device.site.name,
+            isActive: false,
+            updatedAt: device.updatedAt,
+          },
+          ...sites,
+        ]
+      : sites;
   useNetworkDialogFocus(dialogRef, initialFocusRef, onClose, busy);
 
   useEffect(() => {
@@ -276,7 +288,7 @@ export function DeviceEditorPanel({
                   onChange={(event) => update("siteId", event.target.value)}
                 >
                   <option value="">Seleccionar…</option>
-                  {sites
+                  {siteOptions
                     .filter((site) => site.isActive || site.id === form.siteId)
                     .map((site) => (
                       <option key={site.id} value={site.id}>

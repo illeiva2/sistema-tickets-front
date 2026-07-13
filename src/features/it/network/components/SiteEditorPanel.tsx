@@ -8,28 +8,48 @@ interface SiteEditorPanelProps {
   site: NetworkSite | null;
   isSaving: boolean;
   onClose: () => void;
+  onReload: () => Promise<NetworkSite | null>;
   onSave: (command: SaveCommand<SitePayload>) => Promise<void>;
+}
+
+function formFromSite(site: NetworkSite | null) {
+  return {
+    name: site?.name ?? "",
+    slug: site?.slug ?? "",
+    address: site?.address ?? "",
+    description: site?.description ?? "",
+    isActive: site?.isActive ?? true,
+  };
 }
 
 export function SiteEditorPanel({
   site,
   isSaving,
   onClose,
+  onReload,
   onSave,
 }: SiteEditorPanelProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const initialFocusRef = useRef<HTMLInputElement>(null);
   const expectedRef = useRef(site?.updatedAt ?? null);
-  const [form, setForm] = useState({
-    name: site?.name ?? "",
-    slug: site?.slug ?? "",
-    address: site?.address ?? "",
-    description: site?.description ?? "",
-    isActive: site?.isActive ?? true,
-  });
+  const [form, setForm] = useState(() => formFromSite(site));
   const [error, setError] = useState<string>();
   const [conflict, setConflict] = useState(false);
-  useNetworkDialogFocus(dialogRef, initialFocusRef, onClose, isSaving);
+  const [isReloading, setIsReloading] = useState(false);
+  const busy = isSaving || isReloading;
+  useNetworkDialogFocus(dialogRef, initialFocusRef, onClose, busy);
+
+  const reload = async () => {
+    setIsReloading(true);
+    const current = await onReload();
+    if (current) {
+      expectedRef.current = current.updatedAt;
+      setForm(formFromSite(current));
+      setConflict(false);
+      setError(undefined);
+    }
+    setIsReloading(false);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -54,11 +74,7 @@ export function SiteEditorPanel({
     } catch (caught) {
       const info = getNetworkErrorInfo(caught);
       setConflict(info.isConflict);
-      setError(
-        info.isConflict
-          ? `${info.message} Cerrá esta ventana y volvé a abrir el sitio para cargar la versión actual.`
-          : info.message,
-      );
+      setError(info.message);
     }
   };
 
@@ -82,14 +98,14 @@ export function SiteEditorPanel({
             type="button"
             className="network-icon-button"
             aria-label="Cerrar"
-            disabled={isSaving}
+            disabled={busy}
             onClick={onClose}
           >
             <X size={18} />
           </button>
         </header>
         <form className="network-form" onSubmit={submit}>
-          <fieldset disabled={isSaving}>
+          <fieldset disabled={busy}>
             <legend>Ubicación empresarial</legend>
             <label>
               Nombre{" "}
@@ -156,14 +172,32 @@ export function SiteEditorPanel({
               role="alert"
             >
               {conflict ? <RefreshCw size={16} /> : <AlertTriangle size={16} />}
-              {error}
+              <div>
+                <strong>
+                  {conflict
+                    ? "Existe una versión más reciente"
+                    : "No se pudo guardar"}
+                </strong>
+                <p>{error}</p>
+                {conflict ? (
+                  <button
+                    type="button"
+                    className="network-button network-button--ghost"
+                    disabled={isReloading}
+                    onClick={() => void reload()}
+                  >
+                    <RefreshCw size={14} />
+                    Recargar versión actual
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <footer className="network-dialog__footer">
             <button
               type="button"
               className="network-button network-button--ghost"
-              disabled={isSaving}
+              disabled={busy}
               onClick={onClose}
             >
               Cancelar
@@ -171,9 +205,9 @@ export function SiteEditorPanel({
             <button
               type="submit"
               className="network-button network-button--primary"
-              disabled={isSaving || conflict}
+              disabled={busy || conflict}
             >
-              {isSaving ? <Loader2 size={15} className="network-spin" /> : null}
+              {busy ? <Loader2 size={15} className="network-spin" /> : null}
               {site ? "Guardar sitio" : "Crear sitio"}
             </button>
           </footer>

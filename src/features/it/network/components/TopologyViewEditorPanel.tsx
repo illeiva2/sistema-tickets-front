@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, X } from "lucide-react";
 import { getNetworkErrorInfo } from "../api";
 import type {
   NetworkSite,
@@ -14,7 +14,17 @@ interface TopologyViewEditorPanelProps {
   sites: NetworkSite[];
   isSaving: boolean;
   onClose: () => void;
+  onReload: () => Promise<TopologyView | null>;
   onSave: (command: SaveCommand<TopologyViewPayload>) => Promise<void>;
+}
+
+function formFromView(view: TopologyView | null) {
+  return {
+    name: view?.name ?? "",
+    description: view?.description ?? "",
+    siteId: view?.siteId ?? "",
+    isDefault: view?.isDefault ?? false,
+  };
 }
 
 export function TopologyViewEditorPanel({
@@ -22,20 +32,31 @@ export function TopologyViewEditorPanel({
   sites,
   isSaving,
   onClose,
+  onReload,
   onSave,
 }: TopologyViewEditorPanelProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const initialFocusRef = useRef<HTMLInputElement>(null);
   const expectedRef = useRef(view?.updatedAt ?? null);
-  const [form, setForm] = useState({
-    name: view?.name ?? "",
-    description: view?.description ?? "",
-    siteId: view?.siteId ?? "",
-    isDefault: view?.isDefault ?? false,
-  });
+  const [form, setForm] = useState(() => formFromView(view));
   const [error, setError] = useState<string>();
   const [conflict, setConflict] = useState(false);
-  useNetworkDialogFocus(dialogRef, initialFocusRef, onClose, isSaving);
+  const [isReloading, setIsReloading] = useState(false);
+  const busy = isSaving || isReloading;
+  useNetworkDialogFocus(dialogRef, initialFocusRef, onClose, busy);
+
+  const reload = async () => {
+    setIsReloading(true);
+    const current = await onReload();
+    if (current) {
+      expectedRef.current = current.updatedAt;
+      setForm(formFromView(current));
+      setConflict(false);
+      setError(undefined);
+    }
+    setIsReloading(false);
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(undefined);
@@ -58,13 +79,10 @@ export function TopologyViewEditorPanel({
     } catch (caught) {
       const info = getNetworkErrorInfo(caught);
       setConflict(info.isConflict);
-      setError(
-        info.isConflict
-          ? `${info.message} Cerrá esta ventana y volvé a abrir la vista para cargar la versión actual.`
-          : info.message,
-      );
+      setError(info.message);
     }
   };
+
   return (
     <div className="network-dialog-backdrop" role="presentation">
       <section
@@ -85,14 +103,14 @@ export function TopologyViewEditorPanel({
             type="button"
             className="network-icon-button"
             aria-label="Cerrar"
-            disabled={isSaving}
+            disabled={busy}
             onClick={onClose}
           >
             <X size={18} />
           </button>
         </header>
         <form className="network-form" onSubmit={submit}>
-          <fieldset disabled={isSaving}>
+          <fieldset disabled={busy}>
             <legend>Mapa lógico</legend>
             <label className="network-form__wide">
               Nombre{" "}
@@ -152,25 +170,43 @@ export function TopologyViewEditorPanel({
               className={conflict ? "network-conflict" : "network-error"}
               role="alert"
             >
-              <AlertTriangle size={16} />
-              {error}
+              {conflict ? <RefreshCw size={16} /> : <AlertTriangle size={16} />}
+              <div>
+                <strong>
+                  {conflict
+                    ? "Existe una versión más reciente"
+                    : "No se pudo guardar"}
+                </strong>
+                <p>{error}</p>
+                {conflict ? (
+                  <button
+                    type="button"
+                    className="network-button network-button--ghost"
+                    disabled={isReloading}
+                    onClick={() => void reload()}
+                  >
+                    <RefreshCw size={14} />
+                    Recargar versión actual
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <footer className="network-dialog__footer">
             <button
               type="button"
               className="network-button network-button--ghost"
-              disabled={isSaving}
+              disabled={busy}
               onClick={onClose}
             >
-              {conflict ? "Cerrar y recargar" : "Cancelar"}
+              Cancelar
             </button>
             <button
               type="submit"
               className="network-button network-button--primary"
-              disabled={isSaving || conflict}
+              disabled={busy || conflict}
             >
-              {isSaving ? <Loader2 size={15} className="network-spin" /> : null}
+              {busy ? <Loader2 size={15} className="network-spin" /> : null}
               {view ? "Guardar vista" : "Crear vista"}
             </button>
           </footer>
