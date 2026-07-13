@@ -46,7 +46,12 @@ import "@/features/it/maintenance/maintenance.css";
 
 type EditorState =
   | { mode: "create" }
-  | { mode: "edit"; maintenanceId: string }
+  | {
+      mode: "edit";
+      maintenanceId: string;
+      recoveryRevision: number;
+      recoveryMessage?: string;
+    }
   | null;
 
 const INITIAL_FILTERS: MaintenanceListQuery = {
@@ -89,7 +94,11 @@ function ItMaintenancePage() {
 
   const openEdit = (maintenance: ItMaintenance) => {
     saveMaintenance.reset();
-    setEditor({ mode: "edit", maintenanceId: maintenance.id });
+    setEditor({
+      mode: "edit",
+      maintenanceId: maintenance.id,
+      recoveryRevision: 0,
+    });
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -141,6 +150,15 @@ function ItMaintenancePage() {
         if (command.mode === "edit") {
           const refreshed = await detailQuery.refetch();
           if (refreshed.isSuccess && refreshed.data) {
+            setEditor((current) =>
+              current?.mode === "edit" && current.maintenanceId === command.id
+                ? {
+                    ...current,
+                    recoveryRevision: current.recoveryRevision + 1,
+                    recoveryMessage: getMaintenanceErrorInfo(error).message,
+                  }
+                : current,
+            );
             toast.error(
               "El flujo cambió y la intervención fue recargada. Revisá su estado actual.",
             );
@@ -160,8 +178,8 @@ function ItMaintenancePage() {
     }
   };
 
-  const reloadCurrentMaintenance = async (): Promise<boolean> => {
-    if (!editingId) return false;
+  const reloadCurrentMaintenance = async (): Promise<ItMaintenance | null> => {
+    if (!editingId) return null;
     const result = await detailQuery.refetch();
     if (result.isError || !result.data) {
       queryClient.removeQueries({
@@ -173,9 +191,9 @@ function ItMaintenancePage() {
       toast.error(
         "La intervención no pudo recargarse y se cerró para evitar sobrescribir datos.",
       );
-      return false;
+      return null;
     }
-    return true;
+    return result.data;
   };
 
   const hasActiveFilters = Boolean(
@@ -577,9 +595,7 @@ function ItMaintenancePage() {
           key={
             editor.mode === "create"
               ? "create"
-              : detailQuery.data
-                ? `${detailQuery.data.id}-${detailQuery.data.updatedAt}`
-                : `loading-${editor.maintenanceId}`
+              : `edit-${editor.maintenanceId}-${editor.recoveryRevision}`
           }
           mode={editor.mode}
           maintenance={
@@ -600,6 +616,9 @@ function ItMaintenancePage() {
           onRetryLookups={() => void lookupsQuery.refetch()}
           onReload={reloadCurrentMaintenance}
           onSave={handleSave}
+          initialSubmitError={
+            editor.mode === "edit" ? editor.recoveryMessage : undefined
+          }
         />
       ) : null}
     </section>

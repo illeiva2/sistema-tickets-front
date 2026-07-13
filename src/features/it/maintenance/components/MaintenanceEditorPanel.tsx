@@ -42,8 +42,9 @@ interface MaintenanceEditorPanelProps {
   onClose: () => void;
   onRetry: () => void;
   onRetryLookups: () => void;
-  onReload: () => Promise<boolean>;
+  onReload: () => Promise<ItMaintenance | null>;
   onSave: (command: MaintenanceSaveCommand) => Promise<void>;
+  initialSubmitError?: string;
 }
 
 interface PartFormState {
@@ -149,14 +150,20 @@ export function MaintenanceEditorPanel({
   onRetryLookups,
   onReload,
   onSave,
+  initialSubmitError,
 }: MaintenanceEditorPanelProps) {
   const [form, setForm] = useState<MaintenanceFormState>(() =>
     formStateFromMaintenance(maintenance),
   );
+  const [baseMaintenance, setBaseMaintenance] = useState<ItMaintenance | null>(
+    maintenance,
+  );
   const [assetSearchDraft, setAssetSearchDraft] = useState("");
   const [assetSearch, setAssetSearch] = useState("");
   const [hasSearchedAssets, setHasSearchedAssets] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(
+    initialSubmitError ?? null,
+  );
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [isReloading, setIsReloading] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
@@ -164,11 +171,6 @@ export function MaintenanceEditorPanel({
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const isSavingRef = useRef(isSaving);
   const isMountedRef = useRef(true);
-  const hydratedVersionRef = useRef(
-    mode === "edit" && maintenance
-      ? `${maintenance.id}:${maintenance.updatedAt}`
-      : null,
-  );
   const assetSearchQuery = useMaintenanceAssetSearch(
     assetSearch,
     mode === "create" && hasSearchedAssets,
@@ -177,20 +179,20 @@ export function MaintenanceEditorPanel({
     mode === "edit"
       ? "maintenance-editor-title-edit"
       : "maintenance-editor-title-new";
-  const statusOptions = allowedStatuses(mode, maintenance?.status);
+  const statusOptions = allowedStatuses(mode, baseMaintenance?.status);
   const performerOptions =
-    maintenance?.performedBy &&
+    baseMaintenance?.performedBy &&
     !lookups.performers.some(
-      (performer) => performer.id === maintenance.performedBy?.id,
+      (performer) => performer.id === baseMaintenance.performedBy?.id,
     )
-      ? [maintenance.performedBy, ...lookups.performers]
+      ? [baseMaintenance.performedBy, ...lookups.performers]
       : lookups.performers;
   const supplierOptions =
-    maintenance?.supplier &&
+    baseMaintenance?.supplier &&
     !lookups.suppliers.some(
-      (supplier) => supplier.id === maintenance.supplier?.id,
+      (supplier) => supplier.id === baseMaintenance.supplier?.id,
     )
-      ? [maintenance.supplier, ...lookups.suppliers]
+      ? [baseMaintenance.supplier, ...lookups.suppliers]
       : lookups.suppliers;
 
   useEffect(() => {
@@ -198,14 +200,12 @@ export function MaintenanceEditorPanel({
   }, [isSaving]);
 
   useEffect(() => {
-    if (mode !== "edit" || !maintenance) return;
-    const version = `${maintenance.id}:${maintenance.updatedAt}`;
-    if (hydratedVersionRef.current === version) return;
-    hydratedVersionRef.current = version;
+    if (mode !== "edit" || baseMaintenance || !maintenance) return;
+    setBaseMaintenance(maintenance);
     setForm(formStateFromMaintenance(maintenance));
     setSubmitError(null);
     setConflictMessage(null);
-  }, [maintenance, mode]);
+  }, [baseMaintenance, maintenance, mode]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -302,7 +302,11 @@ export function MaintenanceEditorPanel({
     setSubmitError(null);
     try {
       const reloaded = await onReload();
-      if (reloaded && isMountedRef.current) setConflictMessage(null);
+      if (reloaded && isMountedRef.current) {
+        setBaseMaintenance(reloaded);
+        setForm(formStateFromMaintenance(reloaded));
+        setConflictMessage(null);
+      }
     } catch (error) {
       if (isMountedRef.current)
         setSubmitError(getMaintenanceErrorInfo(error).message);
@@ -388,12 +392,15 @@ export function MaintenanceEditorPanel({
 
     try {
       if (mode === "edit") {
-        if (!maintenance)
+        if (!baseMaintenance)
           throw new Error("No se pudo identificar el mantenimiento a editar.");
         await onSave({
           mode: "edit",
-          id: maintenance.id,
-          payload: { ...payload, expectedUpdatedAt: maintenance.updatedAt },
+          id: baseMaintenance.id,
+          payload: {
+            ...payload,
+            expectedUpdatedAt: baseMaintenance.updatedAt,
+          },
         });
       } else {
         await onSave({ mode: "create", payload });
@@ -435,7 +442,7 @@ export function MaintenanceEditorPanel({
           </button>
         </header>
 
-        {isLoading ? (
+        {isLoading || (mode === "edit" && !baseMaintenance) ? (
           <div className="maintenance-dialog__state" role="status">
             <Loader2
               size={24}
@@ -556,11 +563,13 @@ export function MaintenanceEditorPanel({
                     </>
                   )}
                 </div>
-              ) : maintenance?.asset ? (
+              ) : baseMaintenance?.asset ? (
                 <div className="maintenance-asset-selected maintenance-asset-selected--locked">
                   <div>
-                    <span>{maintenanceAssetCode(maintenance.asset)}</span>
-                    <strong>{maintenanceAssetName(maintenance.asset)}</strong>
+                    <span>{maintenanceAssetCode(baseMaintenance.asset)}</span>
+                    <strong>
+                      {maintenanceAssetName(baseMaintenance.asset)}
+                    </strong>
                   </div>
                   <small>
                     El activo queda fijo para preservar el historial.
@@ -591,8 +600,8 @@ export function MaintenanceEditorPanel({
                     value={form.status}
                     disabled={
                       mode === "edit" &&
-                      (maintenance?.status === "COMPLETED" ||
-                        maintenance?.status === "CANCELLED")
+                      (baseMaintenance?.status === "COMPLETED" ||
+                        baseMaintenance?.status === "CANCELLED")
                     }
                     onChange={(event) =>
                       handleStatusChange(
@@ -607,8 +616,8 @@ export function MaintenanceEditorPanel({
                     ))}
                   </select>
                   {mode === "edit" &&
-                  (maintenance?.status === "COMPLETED" ||
-                    maintenance?.status === "CANCELLED") ? (
+                  (baseMaintenance?.status === "COMPLETED" ||
+                    baseMaintenance?.status === "CANCELLED") ? (
                     <small>
                       Estado terminal: se pueden corregir datos, no reabrir el
                       flujo.

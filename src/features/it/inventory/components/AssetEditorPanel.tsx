@@ -94,10 +94,6 @@ export function AssetEditorPanel({
   const [form, setForm] = useState<AssetFormState>(() =>
     formStateFromAsset(asset),
   );
-  const editableStatuses =
-    asset?.status === "IN_REPAIR"
-      ? (["IN_REPAIR", ...MANUAL_ASSET_STATUSES] as AssetStatus[])
-      : MANUAL_ASSET_STATUSES;
   const [submitError, setSubmitError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -307,17 +303,20 @@ export function AssetEditorPanel({
                   </select>
                 </label>
 
-                {asset?.status === "ASSIGNED" ? (
+                {asset?.status === "ASSIGNED" ||
+                asset?.status === "IN_REPAIR" ? (
                   <div className="inventory-form__field">
                     <label htmlFor="asset-status">Estado</label>
                     <input
                       id="asset-status"
-                      value={ASSET_STATUS_LABELS.ASSIGNED}
+                      value={ASSET_STATUS_LABELS[asset.status]}
                       disabled
-                      aria-describedby="assigned-status-help"
+                      aria-describedby="managed-status-help"
                     />
-                    <small id="assigned-status-help">
-                      La asignación se administra desde el flujo de custodia.
+                    <small id="managed-status-help">
+                      {asset.status === "ASSIGNED"
+                        ? "La asignación se administra desde el flujo de custodia."
+                        : "En reparación se administra cerrando o cancelando el mantenimiento en curso."}
                     </small>
                   </div>
                 ) : (
@@ -331,20 +330,15 @@ export function AssetEditorPanel({
                         updateField("status", event.target.value as AssetStatus)
                       }
                     >
-                      {editableStatuses.map((status) => (
-                        <option
-                          key={status}
-                          value={status}
-                          disabled={status === "IN_REPAIR"}
-                        >
+                      {MANUAL_ASSET_STATUSES.map((status) => (
+                        <option key={status} value={status}>
                           {ASSET_STATUS_LABELS[status]}
                         </option>
                       ))}
                     </select>
                     <small id="available-status-help">
-                      {asset?.status === "IN_REPAIR"
-                        ? "En reparación es controlado por Mantenimientos. Podés retirar el activo del circuito eligiendo En depósito, Dado de baja o Extraviado."
-                        : "Asignado se establece desde Custodia y En reparación desde Mantenimientos."}
+                      Asignado se establece desde Custodia y En reparación desde
+                      Mantenimientos.
                     </small>
                   </div>
                 )}

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,7 @@ import type {
   MaintenanceLookups,
 } from "../src/features/it/maintenance/types";
 import ItMaintenancePage from "../src/pages/it/ItMaintenancePage";
+import { maintenanceKeys } from "../src/features/it/maintenance/useMaintenance";
 
 const apiMock = api as unknown as {
   get: ReturnType<typeof vi.fn>;
@@ -100,11 +101,12 @@ function renderMaintenance() {
       mutations: { retry: false },
     },
   });
-  return render(
+  const rendered = render(
     <QueryClientProvider client={queryClient}>
       <ItMaintenancePage />
     </QueryClientProvider>,
   );
+  return { ...rendered, queryClient };
 }
 
 function installDefaultMocks(maintenance = baseMaintenance) {
@@ -378,6 +380,38 @@ describe("ItMaintenancePage", () => {
     ]);
   });
 
+  it("preserva borrador y versión base ante una actualización de caché", async () => {
+    const externalVersion: ItMaintenance = {
+      ...baseMaintenance,
+      description: "Cambio realizado por otro técnico",
+      updatedAt: "2026-07-12T13:30:00.000Z",
+    };
+    const user = userEvent.setup();
+    const { queryClient } = renderMaintenance();
+    const dialog = await openEditDialog();
+    const description = await within(dialog).findByLabelText("Descripción");
+    await user.clear(description);
+    await user.type(description, "Borrador local sin guardar");
+
+    act(() => {
+      queryClient.setQueryData(
+        maintenanceKeys.detail(baseMaintenance.id),
+        externalVersion,
+      );
+    });
+
+    expect(description).toHaveValue("Borrador local sin guardar");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+    expect(apiMock.patch.mock.calls[0][1]).toMatchObject({
+      description: "Borrador local sin guardar",
+      expectedUpdatedAt: baseMaintenance.updatedAt,
+    });
+  });
+
   it("recarga únicamente MAINTENANCE_VERSION_CONFLICT", async () => {
     const refreshed: ItMaintenance = {
       ...baseMaintenance,
@@ -403,17 +437,21 @@ describe("ItMaintenancePage", () => {
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     });
-    apiMock.patch.mockRejectedValue({
-      response: {
-        status: 409,
-        data: {
-          error: {
-            code: "MAINTENANCE_VERSION_CONFLICT",
-            message: "La intervención cambió.",
+    apiMock.patch
+      .mockRejectedValueOnce({
+        response: {
+          status: 409,
+          data: {
+            error: {
+              code: "MAINTENANCE_VERSION_CONFLICT",
+              message: "La intervención cambió.",
+            },
           },
         },
-      },
-    });
+      })
+      .mockResolvedValueOnce({
+        data: { success: true, data: { maintenance: refreshed } },
+      });
 
     const user = userEvent.setup();
     renderMaintenance();
@@ -432,6 +470,15 @@ describe("ItMaintenancePage", () => {
       await screen.findByDisplayValue("Versión actual del servidor"),
     ).toBeInTheDocument();
     expect(detailCalls).toBe(2);
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+    expect(apiMock.patch.mock.calls[1][1]).toMatchObject({
+      description: "Versión actual del servidor",
+      expectedUpdatedAt: refreshed.updatedAt,
+    });
   });
 
   it("cierra y descarta el detalle si falla la recarga del conflicto", async () => {

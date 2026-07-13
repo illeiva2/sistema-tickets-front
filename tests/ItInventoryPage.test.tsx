@@ -431,7 +431,7 @@ describe("ItInventoryPage", () => {
     ).toBeNull();
   });
 
-  it("deja salir de reparación sin permitir ingresar manualmente al estado", async () => {
+  it("bloquea el estado en reparación y deriva su cierre a Mantenimientos", async () => {
     const repairAsset: ItAsset = { ...baseAsset, status: "IN_REPAIR" };
     apiMock.get.mockImplementation((url: string) => {
       if (url === "/api/it/assets") {
@@ -444,13 +444,6 @@ describe("ItInventoryPage", () => {
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
     });
-    apiMock.patch.mockResolvedValue({
-      data: {
-        success: true,
-        data: { asset: { ...repairAsset, status: "IN_STOCK" } },
-      },
-    });
-
     const user = userEvent.setup();
     renderInventory();
     await screen.findAllByText("NB-0001");
@@ -460,26 +453,14 @@ describe("ItInventoryPage", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Editar activo" });
     const status = within(dialog).getByLabelText("Estado");
-    expect(status).toBeEnabled();
-    expect(status).toHaveValue("IN_REPAIR");
+    expect(status).toBeDisabled();
+    expect(status).toHaveValue("En reparación");
     expect(
-      within(status).getByRole("option", { name: "En reparación" }),
-    ).toBeDisabled();
-    expect(
-      within(dialog).getByText(/controlado por Mantenimientos/i),
+      within(dialog).getByText(
+        /se administra cerrando o cancelando el mantenimiento en curso/i,
+      ),
     ).toBeInTheDocument();
-
-    await user.selectOptions(status, "IN_STOCK");
-    expect(status).toHaveValue("IN_STOCK");
-    await user.click(
-      within(dialog).getByRole("button", { name: "Guardar cambios" }),
-    );
-
-    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
-    expect(apiMock.patch.mock.calls[0][1]).toMatchObject({
-      status: "IN_STOCK",
-      expectedUpdatedAt: repairAsset.updatedAt,
-    });
+    expect(apiMock.patch).not.toHaveBeenCalled();
   });
 
   it("mantiene abierto el panel y muestra el error al asignar", async () => {
