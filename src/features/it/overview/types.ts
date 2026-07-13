@@ -1,6 +1,13 @@
 export interface ItOverviewCounts {
   people: { total: number; active: number };
   assets: { total: number; assigned: number; inRepair: number };
+  managedDevices: {
+    total: number;
+    workstations: number;
+    phones: number;
+    networkInfrastructure: number;
+    cameras: number;
+  };
   assetAssignments: { active: number };
   maintenances: { open: number };
   suppliers: { active: number };
@@ -12,10 +19,33 @@ export interface ItOverviewCounts {
   remoteSessions: { active: number };
 }
 
+export type ItModuleAvailability = "available" | "limited" | "preparing";
+
+export interface ItOverviewCoverage {
+  modules: {
+    inventory: ItModuleAvailability;
+    people: ItModuleAvailability;
+    maintenance: ItModuleAvailability;
+    procurement: ItModuleAvailability;
+    network: ItModuleAvailability;
+    monitoring: ItModuleAvailability;
+    cameras: ItModuleAvailability;
+    phoneLines: ItModuleAvailability;
+  };
+  apiSurface: {
+    overview: string;
+    crud: string;
+    agentGateway: string;
+    telemetry: string;
+    remoteControl: string;
+  };
+}
+
 export interface ItOverview {
   schemaVersion: string;
   generatedAt: string;
   counts: ItOverviewCounts;
+  coverage: ItOverviewCoverage;
 }
 
 export interface ApiDataResponse<T> {

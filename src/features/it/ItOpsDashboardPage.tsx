@@ -4,67 +4,17 @@ import {
   Camera,
   Database,
   HardDrive,
-  Monitor,
   Network,
   ShoppingCart,
   Smartphone,
   Users,
   Wrench,
 } from "lucide-react";
-import { BaselineMetricCard } from "./components/BaselineMetricCard";
 import { ModulePreviewCard } from "./components/ModulePreviewCard";
 import { PersistedOverviewPanel } from "./overview/PersistedOverviewPanel";
 import "./it-ops.css";
 
-const BASELINE_METRICS = [
-  {
-    id: "pcs",
-    code: "INV.PC",
-    label: "PCs",
-    note: "Equipos de puesto declarados",
-    value: 60,
-    icon: Monitor,
-    tone: "cyan",
-  },
-  {
-    id: "mobiles",
-    code: "INV.CEL",
-    label: "Celulares",
-    note: "Líneas y terminales declaradas",
-    value: 100,
-    icon: Smartphone,
-    tone: "cyan",
-  },
-  {
-    id: "network",
-    code: "INV.NET",
-    label: "Dispositivos de red",
-    note: "Nodos de infraestructura declarados",
-    value: 25,
-    icon: Network,
-    tone: "amber",
-  },
-  {
-    id: "cameras",
-    code: "INV.CCTV",
-    label: "Cámaras",
-    note: "Puntos CCTV declarados",
-    value: 40,
-    icon: Camera,
-    tone: "amber",
-  },
-  {
-    id: "people",
-    code: "ORG.USR",
-    label: "Personas",
-    note: "Dotación pendiente de vinculación",
-    value: 90,
-    icon: Users,
-    tone: "neutral",
-  },
-] as const;
-
-const UPCOMING_MODULES = [
+const MODULES = [
   {
     code: "MOD-01",
     title: "Activos",
@@ -81,6 +31,7 @@ const UPCOMING_MODULES = [
       "Sectores, responsables y activos vinculados a cada integrante.",
     icon: Users,
     href: "/it/staff",
+    status: "available",
   },
   {
     code: "MOD-03",
@@ -88,6 +39,7 @@ const UPCOMING_MODULES = [
     description: "Intervenciones, repuestos, responsables y evidencia técnica.",
     icon: Wrench,
     href: "/it/maintenance",
+    status: "available",
   },
   {
     code: "MOD-04",
@@ -96,6 +48,7 @@ const UPCOMING_MODULES = [
       "Proveedores, precios, autorizaciones y motivo de cada decisión.",
     icon: ShoppingCart,
     href: "/it/purchases",
+    status: "available",
   },
   {
     code: "MOD-05",
@@ -104,6 +57,7 @@ const UPCOMING_MODULES = [
       "Nodos, enlaces, direccionamiento y representación de topología.",
     icon: Network,
     href: "/it/network",
+    status: "available",
   },
   {
     code: "MOD-06",
@@ -111,6 +65,7 @@ const UPCOMING_MODULES = [
     description: "Inventario CCTV, ubicación, grabación y cobertura declarada.",
     icon: Camera,
     href: "/it/network",
+    status: "limited",
   },
   {
     code: "MOD-07",
@@ -118,14 +73,24 @@ const UPCOMING_MODULES = [
     description: "Salud, batería, uptime, IP y hostname cuando exista agente.",
     icon: Activity,
     href: "/it/live",
+    status: "available",
+  },
+  {
+    code: "MOD-08",
+    title: "Líneas",
+    description:
+      "Números, operadoras, planes y trazabilidad de asignaciones de SIM.",
+    icon: Smartphone,
+    href: "/it/staff",
+    status: "preparing",
   },
 ] as const;
 
 const INTEGRATION_STATUS = [
-  { label: "Baseline", value: "Referencia fija", tone: "amber" },
-  { label: "Persistencia", value: "Overview conectado", tone: "cyan" },
-  { label: "Telemetría", value: "Último estado guardado", tone: "muted" },
-  { label: "Control remoto", value: "En preparación", tone: "muted" },
+  { label: "Persistencia", value: "Datos operativos reales", tone: "cyan" },
+  { label: "Telemetría", value: "Agentes en vivo", tone: "cyan" },
+  { label: "Control remoto", value: "Directo por LAN/VPN", tone: "cyan" },
+  { label: "Líneas", value: "En preparación", tone: "amber" },
 ] as const;
 
 export function ItOpsDashboardPage() {
@@ -135,83 +100,62 @@ export function ItOpsDashboardPage() {
         <div className="ops-command-bar">
           <span className="ops-wordmark">GRF//OPS</span>
           <span className="ops-command-bar__descriptor">
-            Control de infraestructura · corte 00
+            Control de infraestructura · estado operativo
           </span>
           <span className="ops-source-badge">
             <Database size={13} aria-hidden="true" />
-            Baseline + persistencia
+            Persistencia + telemetría
           </span>
         </div>
 
         <div className="ops-hero__grid">
           <div className="ops-hero__copy">
-            <p className="ops-eyebrow">Matriz operativa / Estado inicial</p>
-            <h1 id="ops-title">Mapa operativo inicial</h1>
+            <p className="ops-eyebrow">Matriz operativa / Estado actual</p>
+            <h1 id="ops-title">Consola operativa IT</h1>
             <p className="ops-hero__lede">
-              Primer corte visual para ordenar activos, personas y operación IT
-              en una sola consola. Los valores actuales son una línea base
-              cargada manualmente. La lectura persistida aparece por separado y
-              no debe confundirse con telemetría en tiempo real.
+              Activos, personas, red y monitoreo en una lectura única basada en
+              registros persistidos y telemetría reportada por los agentes.
             </p>
-            <ul className="ops-hero__tags" aria-label="Alcance de este corte">
-              <li>Inventario declarado</li>
-              <li>Datos persistidos conectados</li>
-              <li>Sin sesiones remotas</li>
+            <ul className="ops-hero__tags" aria-label="Capacidades operativas">
+              <li>Conteos persistidos</li>
+              <li>Telemetría real</li>
+              <li>Remoto directo LAN/VPN</li>
             </ul>
           </div>
 
           <aside
             className="ops-readout"
-            aria-label="Resumen del baseline de activos"
+            aria-label="Origen de la lectura operativa"
           >
-            <span className="ops-readout__label">Activos declarados</span>
-            <strong>225</strong>
-            <span className="ops-readout__unit">PC + CEL + NET + CCTV</span>
+            <span className="ops-readout__label">Fuente operativa</span>
+            <strong>REAL</strong>
+            <span className="ops-readout__unit">API + agentes instalados</span>
             <dl>
               <div>
-                <dt>Personas</dt>
-                <dd>90</dd>
+                <dt>Persistencia</dt>
+                <dd>Conectada</dd>
               </div>
               <div>
-                <dt>Origen</dt>
-                <dd>Manual</dd>
+                <dt>Telemetría</dt>
+                <dd>Disponible</dd>
               </div>
               <div>
-                <dt>Señal</dt>
-                <dd>No conectada</dd>
+                <dt>Remoto</dt>
+                <dd>LAN / VPN</dd>
               </div>
             </dl>
           </aside>
         </div>
       </header>
 
-      <section className="ops-section" aria-labelledby="ops-baseline-title">
-        <div className="ops-section__heading">
-          <div>
-            <span className="ops-section__index">01 / BASELINE</span>
-            <h2 id="ops-baseline-title">Superficie declarada</h2>
-          </div>
-          <p>
-            Cantidades de referencia para iniciar la carga y validación del
-            inventario.
-          </p>
-        </div>
-        <div className="ops-metrics" role="list">
-          {BASELINE_METRICS.map((metric) => (
-            <BaselineMetricCard key={metric.id} {...metric} />
-          ))}
-        </div>
-      </section>
-
       <PersistedOverviewPanel />
 
       <section className="ops-status-panel" aria-labelledby="ops-status-title">
         <div className="ops-status-panel__copy">
-          <span className="ops-section__index">03 / INTEGRACIÓN</span>
+          <span className="ops-section__index">02 / INTEGRACIÓN</span>
           <h2 id="ops-status-title">Estado del sistema</h2>
           <p>
-            Esta vista separa datos conocidos de señales todavía inexistentes
-            para no convertir un estimado en una falsa lectura operativa.
+            Capacidades disponibles hoy y límites explícitos de la operación.
           </p>
         </div>
         <dl className="ops-status-grid">
@@ -227,16 +171,16 @@ export function ItOpsDashboardPage() {
       <section className="ops-section" aria-labelledby="ops-modules-title">
         <div className="ops-section__heading">
           <div>
-            <span className="ops-section__index">04 / MÓDULOS</span>
+            <span className="ops-section__index">03 / MÓDULOS</span>
             <h2 id="ops-modules-title">Superficie de módulos</h2>
           </div>
           <p>
-            Accesos a la estructura inicial. Cada módulo indica con claridad qué
-            está disponible y qué continúa en preparación.
+            Accesos a cada dominio. Cámaras tiene cobertura básica dentro de Red
+            y Líneas continúa en preparación.
           </p>
         </div>
         <div className="ops-modules">
-          {UPCOMING_MODULES.map((module) => (
+          {MODULES.map((module) => (
             <ModulePreviewCard key={module.code} {...module} />
           ))}
         </div>
@@ -245,11 +189,11 @@ export function ItOpsDashboardPage() {
       <footer className="ops-disclaimer" role="note">
         <AlertTriangle size={18} aria-hidden="true" />
         <div>
-          <strong>Lectura controlada</strong>
+          <strong>Alcance de la lectura</strong>
           <p>
-            Estos datos son baseline manual. IP, hostname, batería, uptime,
-            disponibilidad y salud permanecerán sin estado hasta conectar y
-            validar el agente de monitoreo.
+            Los conteos excluyen bajas lógicas. La telemetría refleja el último
+            estado reportado; el acceso remoto funciona de forma directa cuando
+            existe alcance por LAN o VPN.
           </p>
         </div>
       </footer>

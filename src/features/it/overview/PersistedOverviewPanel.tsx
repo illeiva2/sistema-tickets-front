@@ -1,9 +1,12 @@
 import {
   Activity,
   AlertTriangle,
+  Camera,
   HardDrive,
+  Monitor,
   Network,
   RefreshCw,
+  Smartphone,
   Users,
   Wrench,
   type LucideIcon,
@@ -19,7 +22,7 @@ interface PersistedMetric {
   tone: "cyan" | "amber" | "neutral";
 }
 
-const LOADING_CARDS = Array.from({ length: 7 }, (_, index) => index);
+const LOADING_CARDS = Array.from({ length: 9 }, (_, index) => index);
 
 const formatCount = (value: number) => value.toLocaleString("es-AR");
 
@@ -35,27 +38,43 @@ export function PersistedOverviewPanel() {
   const metrics: PersistedMetric[] = data
     ? [
         {
-          id: "assets-total",
-          label: "Activos registrados",
-          value: formatCount(data.counts.assets.total),
-          note: "Registros persistidos en inventario",
+          id: "managed-total",
+          label: "Dispositivos gestionados",
+          value: formatCount(data.counts.managedDevices.total),
+          note: "Suma disjunta de puestos, celulares, red y cámaras",
           icon: HardDrive,
           tone: "cyan",
         },
         {
-          id: "assets-assigned",
-          label: "Activos asignados",
-          value: formatCount(data.counts.assets.assigned),
-          note: "Estado ASSIGNED y activos",
-          icon: HardDrive,
+          id: "workstations",
+          label: "Puestos de trabajo",
+          value: formatCount(data.counts.managedDevices.workstations),
+          note: "Desktops y notebooks del inventario",
+          icon: Monitor,
           tone: "cyan",
         },
         {
-          id: "assets-repair",
-          label: "En reparación",
-          value: formatCount(data.counts.assets.inRepair),
-          note: "Estado IN_REPAIR y activos",
-          icon: Wrench,
+          id: "phones",
+          label: "Celulares",
+          value: formatCount(data.counts.managedDevices.phones),
+          note: "Terminales PHONE del inventario",
+          icon: Smartphone,
+          tone: "cyan",
+        },
+        {
+          id: "network-infrastructure",
+          label: "Infraestructura de red",
+          value: formatCount(data.counts.managedDevices.networkInfrastructure),
+          note: "Dispositivos operativos, sin incluir cámaras",
+          icon: Network,
+          tone: "cyan",
+        },
+        {
+          id: "cameras",
+          label: "Cámaras",
+          value: formatCount(data.counts.managedDevices.cameras),
+          note: "Inventario CCTV con cobertura básica",
+          icon: Camera,
           tone: "amber",
         },
         {
@@ -65,14 +84,6 @@ export function PersistedOverviewPanel() {
           note: `${formatCount(data.counts.people.total)} personas persistidas`,
           icon: Users,
           tone: "neutral",
-        },
-        {
-          id: "network-active",
-          label: "Red activa",
-          value: `${formatCount(data.counts.networkDevices.active)}/${formatCount(data.counts.networkDevices.total)}`,
-          note: "Activos sobre dispositivos registrados",
-          icon: Network,
-          tone: "cyan",
         },
         {
           id: "agents-online",
@@ -90,6 +101,14 @@ export function PersistedOverviewPanel() {
           icon: Wrench,
           tone: "amber",
         },
+        {
+          id: "purchases-pending",
+          label: "Compras pendientes",
+          value: formatCount(data.counts.purchases.pendingApproval),
+          note: "Solicitudes a la espera de autorización",
+          icon: HardDrive,
+          tone: "amber",
+        },
       ]
     : [];
 
@@ -97,11 +116,11 @@ export function PersistedOverviewPanel() {
     <section className="ops-live-panel" aria-labelledby="ops-live-title">
       <div className="ops-live-panel__heading">
         <div>
-          <span className="ops-section__index">02 / PERSISTENCIA</span>
+          <span className="ops-section__index">01 / ESTADO REAL</span>
           <h2 id="ops-live-title">Lectura operativa real</h2>
           <p>
-            Conteos actuales almacenados por el sistema. No reemplazan el
-            baseline: permiten medir cuánto de esa referencia ya fue cargado.
+            Conteos actuales del sistema. El total suma categorías disjuntas: un
+            activo patrimonial vinculado a red no se vuelve a contar.
           </p>
         </div>
 
@@ -142,8 +161,8 @@ export function PersistedOverviewPanel() {
           <div>
             <strong>No se pudo leer el estado persistido</strong>
             <p>
-              El baseline sigue disponible. Reintentá la consulta a
-              `/api/it/overview`.
+              Reintentá la consulta a `/api/it/overview` para recuperar la
+              lectura operativa.
             </p>
           </div>
           <button type="button" onClick={() => void refetch()}>

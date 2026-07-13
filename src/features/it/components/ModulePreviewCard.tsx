@@ -1,7 +1,13 @@
 import { CheckCircle2, CircleDashed, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
-type ModuleStatus = "available" | "preparing";
+type ModuleStatus = "available" | "limited" | "preparing";
+
+const STATUS_LABELS: Record<ModuleStatus, string> = {
+  available: "Disponible",
+  limited: "Cobertura básica",
+  preparing: "En preparación",
+};
 
 interface ModulePreviewCardProps {
   code: string;
@@ -42,9 +48,7 @@ export function ModulePreviewCard({
         ) : (
           <CircleDashed size={13} aria-hidden="true" />
         )}
-        <span>
-          Abrir módulo · {isAvailable ? "Disponible" : "En preparación"}
-        </span>
+        <span>Abrir módulo · {STATUS_LABELS[status]}</span>
       </div>
     </Link>
   );

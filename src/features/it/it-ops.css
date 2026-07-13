@@ -562,6 +562,17 @@
   color: var(--ops-cyan);
 }
 
+.ops-module-card[data-status="limited"] {
+  border-color: rgba(255, 184, 77, 0.5);
+  background:
+    linear-gradient(135deg, rgba(255, 184, 77, 0.1), transparent 48%),
+    var(--ops-panel-raised);
+}
+
+.ops-module-card[data-status="limited"] .ops-module-card__status {
+  color: var(--ops-amber);
+}
+
 @keyframes ops-spin {
   to {
     transform: rotate(360deg);
