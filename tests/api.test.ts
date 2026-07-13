@@ -1,6 +1,26 @@
 import axios, { AxiosError, type AxiosAdapter } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import api from "../src/lib/api";
+import api, { resolveApiUrl } from "../src/lib/api";
+
+describe("API URL resolution", () => {
+  it("fuerza el backend productivo en el dominio productivo", () => {
+    expect(
+      resolveApiUrl(
+        "soporte.grf.com.ar",
+        "https://sistema-tickets-back-staging.onrender.com",
+      ),
+    ).toBe("https://sistema-tickets-back.onrender.com");
+  });
+
+  it("respeta la URL configurada en previews", () => {
+    expect(
+      resolveApiUrl(
+        "sistema-tickets-front-git-feat.example.vercel.app",
+        "https://sistema-tickets-back-staging.onrender.com",
+      ),
+    ).toBe("https://sistema-tickets-back-staging.onrender.com");
+  });
+});
 
 describe("auth API interceptors", () => {
   afterEach(() => {

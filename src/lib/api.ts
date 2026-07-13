@@ -5,7 +5,24 @@ import axios, {
 } from "axios";
 import toast from "react-hot-toast";
 
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const PRODUCTION_FRONTEND_HOST = "soporte.grf.com.ar";
+const PRODUCTION_API_URL = "https://sistema-tickets-back.onrender.com";
+
+export const resolveApiUrl = (
+  hostname: string | undefined,
+  configuredUrl: string | undefined,
+) => {
+  if (hostname?.toLowerCase() === PRODUCTION_FRONTEND_HOST) {
+    return PRODUCTION_API_URL;
+  }
+
+  return configuredUrl || "http://localhost:3001";
+};
+
+export const API_URL = resolveApiUrl(
+  typeof window === "undefined" ? undefined : window.location.hostname,
+  import.meta.env.VITE_API_URL,
+);
 
 const api = axios.create({
   baseURL: API_URL,
