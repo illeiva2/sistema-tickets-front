@@ -22,6 +22,16 @@ import {
 import { AssetEditorPanel } from "@/features/it/inventory/components/AssetEditorPanel";
 import { AssetMetrics } from "@/features/it/inventory/components/AssetMetrics";
 import { AssetTable } from "@/features/it/inventory/components/AssetTable";
+import { CustodyPanel } from "@/features/it/inventory/custody/CustodyPanel";
+import type {
+  AssignAssetPayload,
+  ReturnAssetPayload,
+} from "@/features/it/inventory/custody/types";
+import {
+  useAssignAssetCustody,
+  useCustodyLookups,
+  useReturnAssetCustody,
+} from "@/features/it/inventory/custody/useCustody";
 import {
   ASSET_STATUSES,
   ASSET_STATUS_LABELS,
@@ -60,11 +70,18 @@ function ItInventoryPage() {
   const [filters, setFilters] = useState<AssetListQuery>(INITIAL_FILTERS);
   const [searchDraft, setSearchDraft] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
+  const [custodyAssetId, setCustodyAssetId] = useState<string | null>(null);
 
   const assetsQuery = useAssets(filters);
   const editingAssetId = editor?.mode === "edit" ? editor.assetId : null;
   const assetDetail = useAssetDetail(editingAssetId);
+  const custodyDetail = useAssetDetail(custodyAssetId);
+  const custodyLookups = useCustodyLookups(
+    Boolean(custodyAssetId && custodyDetail.data?.status === "IN_STOCK"),
+  );
   const saveAsset = useSaveAsset();
+  const assignCustody = useAssignAssetCustody();
+  const returnCustody = useReturnAssetCustody();
 
   const closeEditor = useCallback(() => {
     setEditor(null);
@@ -78,6 +95,28 @@ function ItInventoryPage() {
   const openEdit = (asset: ItAsset) => {
     saveAsset.reset();
     setEditor({ mode: "edit", assetId: asset.id });
+  };
+
+  const closeCustody = useCallback(() => {
+    setCustodyAssetId(null);
+  }, []);
+
+  const openCustody = (asset: ItAsset) => {
+    setCustodyAssetId(asset.id);
+  };
+
+  const handleAssignCustody = async (payload: AssignAssetPayload) => {
+    if (!custodyAssetId) throw new Error("No se pudo identificar el activo.");
+    await assignCustody.mutateAsync({ assetId: custodyAssetId, payload });
+    toast.success("Custodia asignada");
+    closeCustody();
+  };
+
+  const handleReturnCustody = async (payload: ReturnAssetPayload) => {
+    if (!custodyAssetId) throw new Error("No se pudo identificar el activo.");
+    await returnCustody.mutateAsync({ assetId: custodyAssetId, payload });
+    toast.success("Devolución registrada");
+    closeCustody();
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -356,7 +395,9 @@ function ItInventoryPage() {
           <AssetTable
             assets={assets}
             openingAssetId={assetDetail.isFetching ? editingAssetId : null}
+            openingCustodyId={custodyDetail.isFetching ? custodyAssetId : null}
             onEdit={openEdit}
+            onCustody={openCustody}
           />
         )}
 
@@ -424,6 +465,46 @@ function ItInventoryPage() {
           onSave={handleSave}
         />
       )}
+
+      {custodyAssetId ? (
+        <CustodyPanel
+          key={
+            custodyDetail.data
+              ? `${custodyDetail.data.id}-${custodyDetail.data.updatedAt}-custody`
+              : `loading-${custodyAssetId}-custody`
+          }
+          asset={custodyDetail.data ?? null}
+          isLoading={custodyDetail.isPending}
+          loadError={
+            custodyDetail.isError
+              ? getInventoryErrorMessage(custodyDetail.error)
+              : undefined
+          }
+          people={custodyLookups.people.data?.items ?? []}
+          departments={custodyLookups.departments.data ?? []}
+          lookupsLoading={
+            custodyLookups.people.isPending ||
+            custodyLookups.departments.isPending
+          }
+          lookupsError={
+            custodyLookups.people.isError || custodyLookups.departments.isError
+              ? getInventoryErrorMessage(
+                  custodyLookups.people.error ??
+                    custodyLookups.departments.error,
+                )
+              : undefined
+          }
+          isSubmitting={assignCustody.isPending || returnCustody.isPending}
+          onClose={closeCustody}
+          onRetryAsset={() => void custodyDetail.refetch()}
+          onRetryLookups={() => {
+            void custodyLookups.people.refetch();
+            void custodyLookups.departments.refetch();
+          }}
+          onAssign={handleAssignCustody}
+          onReturn={handleReturnCustody}
+        />
+      ) : null}
     </section>
   );
 }

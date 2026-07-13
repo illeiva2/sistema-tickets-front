@@ -49,6 +49,24 @@ const baseAsset: ItAsset = {
   updatedAt: "2026-07-12T12:00:00.000Z",
 };
 
+const activePerson = {
+  id: "person-1",
+  employeeNumber: "EMP-090",
+  firstName: "Ada",
+  lastName: "Lovelace",
+  workEmail: "ada@grf.com.ar",
+  status: "ACTIVE" as const,
+  department: { id: "department-1", name: "Administración" },
+};
+
+const department = {
+  id: "department-1",
+  name: "Administración",
+  slug: "administracion",
+  color: "#54e6ef",
+  icon: null,
+};
+
 function listResponse(items: ItAsset[]) {
   return {
     data: {
@@ -91,6 +109,27 @@ describe("ItInventoryPage", () => {
       if (url === `/api/it/assets/${baseAsset.id}`) {
         return Promise.resolve({
           data: { success: true, data: { asset: baseAsset } },
+        });
+      }
+      if (url === "/api/it/people") {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              items: [activePerson],
+              pagination: {
+                page: 1,
+                pageSize: 100,
+                total: 1,
+                totalPages: 1,
+              },
+            },
+          },
+        });
+      }
+      if (url === "/api/departments") {
+        return Promise.resolve({
+          data: { success: true, data: [department] },
         });
       }
       return Promise.reject(new Error(`Unexpected GET ${url}`));
@@ -217,6 +256,213 @@ describe("ItInventoryPage", () => {
       expectedUpdatedAt: "2026-07-12T12:00:00.000Z",
       specs: { importedBy: "legacy-cmdb" },
     });
+  });
+
+  it("asigna la custodia a persona y sector desde un activo en stock", async () => {
+    apiMock.post.mockImplementation((url: string) => {
+      if (url === `/api/it/assets/${baseAsset.id}/assign`) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              asset: {
+                ...baseAsset,
+                status: "ASSIGNED",
+                assignedPerson: activePerson,
+                assignedDepartment: department,
+              },
+            },
+          },
+        });
+      }
+      return Promise.resolve({
+        data: { success: true, data: { asset: baseAsset } },
+      });
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    await user.selectOptions(
+      await within(dialog).findByLabelText(/Persona/),
+      activePerson.id,
+    );
+    await user.selectOptions(
+      within(dialog).getByLabelText(/Sector/),
+      department.id,
+    );
+    await user.type(
+      within(dialog).getByLabelText(/Observación de entrega/),
+      "Entrega con cargador",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Asignar activo" }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/api/it/assets/${baseAsset.id}/assign`,
+        {
+          personId: activePerson.id,
+          departmentId: department.id,
+          note: "Entrega con cargador",
+        },
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Custodia asignada");
+  });
+
+  it("muestra titular e historial sin notas y registra la devolución", async () => {
+    const assignedAsset: ItAsset = {
+      ...baseAsset,
+      status: "ASSIGNED",
+      assignedPerson: activePerson,
+      assignedDepartment: department,
+      assignments: [
+        {
+          id: "assignment-1",
+          startAt: "2026-07-01T12:00:00.000Z",
+          endAt: null,
+          person: activePerson,
+          department,
+          assignedBy: {
+            id: "user-1",
+            name: "Operador IT",
+            email: "it@grf.com.ar",
+          },
+          note: "nota que no debe mostrarse",
+        },
+      ] as unknown as NonNullable<ItAsset["assignments"]>,
+    };
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([assignedAsset]));
+      }
+      if (url === `/api/it/assets/${assignedAsset.id}`) {
+        return Promise.resolve({
+          data: { success: true, data: { asset: assignedAsset } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMock.post.mockResolvedValue({
+      data: {
+        success: true,
+        data: { asset: { ...baseAsset, status: "IN_STOCK" } },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    expect(within(dialog).getAllByText("Ada Lovelace").length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      within(dialog).getAllByText("Administración").length,
+    ).toBeGreaterThan(0);
+    expect(within(dialog).queryByText("nota que no debe mostrarse")).toBeNull();
+    await user.type(
+      within(dialog).getByLabelText(/Estado al devolver/),
+      "Devuelto completo",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar devolución" }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/api/it/assets/${baseAsset.id}/return`,
+        { returnNote: "Devuelto completo" },
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Devolución registrada");
+  });
+
+  it("explica por qué un activo en reparación no es asignable", async () => {
+    const repairAsset: ItAsset = { ...baseAsset, status: "IN_REPAIR" };
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([repairAsset]));
+      }
+      if (url === `/api/it/assets/${repairAsset.id}`) {
+        return Promise.resolve({
+          data: { success: true, data: { asset: repairAsset } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    expect(within(dialog).getByText("Activo no asignable")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Debe volver a En depósito antes de asignarlo/),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Asignar activo" }),
+    ).toBeNull();
+  });
+
+  it("mantiene abierto el panel y muestra el error al asignar", async () => {
+    apiMock.post.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: {
+            code: "ASSET_ALREADY_ASSIGNED",
+            message: "El activo ya tiene una asignación vigente",
+          },
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    await user.selectOptions(
+      await within(dialog).findByLabelText(/Persona/),
+      activePerson.id,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Asignar activo" }),
+    );
+
+    expect(
+      await within(dialog).findByText(
+        "El activo ya tiene una asignación vigente",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Custodia de NB-0001" }),
+    ).toBeInTheDocument();
   });
 
   it("recarga la ficha y usa la versión nueva después de un conflicto", async () => {

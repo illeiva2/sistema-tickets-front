@@ -1,10 +1,12 @@
-import { Pencil } from "lucide-react";
+import { PackageCheck, Pencil } from "lucide-react";
 import { ASSET_STATUS_LABELS, ASSET_TYPE_LABELS, type ItAsset } from "../types";
 
 interface AssetTableProps {
   assets: ItAsset[];
   openingAssetId: string | null;
+  openingCustodyId: string | null;
   onEdit: (asset: ItAsset) => void;
+  onCustody: (asset: ItAsset) => void;
 }
 
 function formatDate(value?: string | null): string {
@@ -25,7 +27,9 @@ function assetName(asset: ItAsset): string {
 export function AssetTable({
   assets,
   openingAssetId,
+  openingCustodyId,
   onEdit,
+  onCustody,
 }: AssetTableProps) {
   return (
     <>
@@ -69,15 +73,26 @@ export function AssetTable({
                 <td>{asset.location || "Sin ubicación"}</td>
                 <td>{formatDate(asset.warrantyUntil)}</td>
                 <td className="inventory-table__action">
-                  <button
-                    type="button"
-                    className="inventory-icon-button"
-                    aria-label={`Editar ${asset.assetTag || assetName(asset)}`}
-                    disabled={openingAssetId === asset.id}
-                    onClick={() => onEdit(asset)}
-                  >
-                    <Pencil size={16} aria-hidden="true" />
-                  </button>
+                  <div className="inventory-table__actions">
+                    <button
+                      type="button"
+                      className="inventory-icon-button inventory-icon-button--custody"
+                      aria-label={`Gestionar custodia ${asset.assetTag || assetName(asset)}`}
+                      disabled={openingCustodyId === asset.id}
+                      onClick={() => onCustody(asset)}
+                    >
+                      <PackageCheck size={16} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="inventory-icon-button"
+                      aria-label={`Editar ${asset.assetTag || assetName(asset)}`}
+                      disabled={openingAssetId === asset.id}
+                      onClick={() => onEdit(asset)}
+                    >
+                      <Pencil size={16} aria-hidden="true" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -113,15 +128,26 @@ export function AssetTable({
                   <dd>{formatDate(asset.warrantyUntil)}</dd>
                 </div>
               </dl>
-              <button
-                type="button"
-                className="inventory-button inventory-button--ghost"
-                disabled={openingAssetId === asset.id}
-                onClick={() => onEdit(asset)}
-              >
-                <Pencil size={15} aria-hidden="true" />
-                Editar activo
-              </button>
+              <div className="inventory-mobile-card__actions">
+                <button
+                  type="button"
+                  className="inventory-button inventory-button--ghost"
+                  disabled={openingCustodyId === asset.id}
+                  onClick={() => onCustody(asset)}
+                >
+                  <PackageCheck size={15} aria-hidden="true" />
+                  Custodia
+                </button>
+                <button
+                  type="button"
+                  className="inventory-button inventory-button--ghost"
+                  disabled={openingAssetId === asset.id}
+                  onClick={() => onEdit(asset)}
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  Editar activo
+                </button>
+              </div>
             </article>
           </li>
         ))}

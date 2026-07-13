@@ -1,3 +1,9 @@
+import type {
+  AssetAssignmentSummary,
+  CustodyDepartment,
+  CustodyPerson,
+} from "./custody/types";
+
 export const ASSET_TYPES = [
   "DESKTOP",
   "NOTEBOOK",
@@ -66,6 +72,9 @@ export interface ItAsset {
   warrantyUntil?: string | null;
   notes?: string | null;
   specs?: AssetSpecs | null;
+  assignedPerson?: CustodyPerson | null;
+  assignedDepartment?: CustodyDepartment | null;
+  assignments?: AssetAssignmentSummary[];
   createdAt?: string;
   updatedAt: string;
 }
