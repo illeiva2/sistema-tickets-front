@@ -76,8 +76,8 @@ function optionalValue(value: string): string | null {
   return trimmed || null;
 }
 
-const EDITABLE_ASSET_STATUSES = ASSET_STATUSES.filter(
-  (status) => status !== "ASSIGNED",
+const MANUAL_ASSET_STATUSES = ASSET_STATUSES.filter(
+  (status) => status !== "ASSIGNED" && status !== "IN_REPAIR",
 );
 
 export function AssetEditorPanel({
@@ -94,6 +94,10 @@ export function AssetEditorPanel({
   const [form, setForm] = useState<AssetFormState>(() =>
     formStateFromAsset(asset),
   );
+  const editableStatuses =
+    asset?.status === "IN_REPAIR"
+      ? (["IN_REPAIR", ...MANUAL_ASSET_STATUSES] as AssetStatus[])
+      : MANUAL_ASSET_STATUSES;
   const [submitError, setSubmitError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -327,14 +331,20 @@ export function AssetEditorPanel({
                         updateField("status", event.target.value as AssetStatus)
                       }
                     >
-                      {EDITABLE_ASSET_STATUSES.map((status) => (
-                        <option key={status} value={status}>
+                      {editableStatuses.map((status) => (
+                        <option
+                          key={status}
+                          value={status}
+                          disabled={status === "IN_REPAIR"}
+                        >
                           {ASSET_STATUS_LABELS[status]}
                         </option>
                       ))}
                     </select>
                     <small id="available-status-help">
-                      Asignado solo se establece desde el flujo de custodia.
+                      {asset?.status === "IN_REPAIR"
+                        ? "En reparación es controlado por Mantenimientos. Podés retirar el activo del circuito eligiendo En depósito, Dado de baja o Extraviado."
+                        : "Asignado se establece desde Custodia y En reparación desde Mantenimientos."}
                     </small>
                   </div>
                 )}
