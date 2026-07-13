@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Loader2, RotateCcw, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  PackageCheck,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { getInventoryErrorMessage } from "../api";
 import {
   ASSET_STATUSES,
@@ -12,7 +18,15 @@ import {
   type AssetStatus,
   type AssetType,
   type ItAsset,
+  type AssetWritablePayload,
 } from "../types";
+
+export interface AssetPurchaseOrigin {
+  purchaseId: string;
+  purchaseItemId: string;
+  purchaseCode: string;
+  itemDescription: string;
+}
 
 interface AssetEditorPanelProps {
   mode: "create" | "edit";
@@ -21,6 +35,7 @@ interface AssetEditorPanelProps {
   isLoading: boolean;
   isSaving: boolean;
   loadError?: string;
+  purchaseOrigin?: AssetPurchaseOrigin | null;
   onClose: () => void;
   onRetry: () => void;
   onSave: (command: AssetSaveCommand) => Promise<void>;
@@ -87,6 +102,7 @@ export function AssetEditorPanel({
   isLoading,
   isSaving,
   loadError,
+  purchaseOrigin,
   onClose,
   onRetry,
   onSave,
@@ -202,7 +218,7 @@ export function AssetEditorPanel({
         Boolean(assetTag)
       : canEditAssetTag && Boolean(assetTag);
 
-    const payload: AssetCreatePayload = {
+    const payload: AssetWritablePayload = {
       type: form.type,
       status: form.status,
       brand: form.brand.trim(),
@@ -225,7 +241,10 @@ export function AssetEditorPanel({
           payload: { ...payload, expectedUpdatedAt: asset.updatedAt },
         });
       } else {
-        await onSave({ mode: "create", payload });
+        const createPayload: AssetCreatePayload = purchaseOrigin
+          ? { ...payload, purchaseItemId: purchaseOrigin.purchaseItemId }
+          : payload;
+        await onSave({ mode: "create", payload: createPayload });
       }
     } catch (error) {
       setSubmitError(getInventoryErrorMessage(error));
@@ -284,6 +303,21 @@ export function AssetEditorPanel({
           </div>
         ) : (
           <form className="inventory-form" onSubmit={handleSubmit}>
+            {mode === "create" && purchaseOrigin ? (
+              <div className="inventory-purchase-origin" role="note">
+                <PackageCheck size={18} aria-hidden="true" />
+                <div>
+                  <strong>
+                    Alta vinculada a {purchaseOrigin.purchaseCode}
+                  </strong>
+                  <p>{purchaseOrigin.itemDescription}</p>
+                  <small>
+                    El activo quedará asociado al renglón recibido para medir el
+                    avance de inventariado.
+                  </small>
+                </div>
+              </div>
+            ) : null}
             <fieldset>
               <legend>Identificación y estado</legend>
               <div className="inventory-form__grid">

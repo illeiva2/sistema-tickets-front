@@ -722,6 +722,29 @@
   font-size: 0.76rem;
 }
 
+.inventory-purchase-origin {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  color: #b8f6fa;
+  border: 1px solid rgba(84, 230, 239, 0.42);
+  background: rgba(84, 230, 239, 0.08);
+}
+
+.inventory-purchase-origin > div {
+  flex: 1;
+}
+
+.inventory-purchase-origin p,
+.inventory-purchase-origin small {
+  display: block;
+  margin: 4px 0 0;
+  color: var(--inv-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
 .inventory-dialog__footer {
   display: flex;
   justify-content: flex-end;

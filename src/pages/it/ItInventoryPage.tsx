@@ -1,5 +1,13 @@
-import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -20,6 +28,7 @@ import {
   getInventoryErrorMessage,
 } from "@/features/it/inventory/api";
 import { AssetEditorPanel } from "@/features/it/inventory/components/AssetEditorPanel";
+import type { AssetPurchaseOrigin } from "@/features/it/inventory/components/AssetEditorPanel";
 import { AssetMetrics } from "@/features/it/inventory/components/AssetMetrics";
 import { AssetTable } from "@/features/it/inventory/components/AssetTable";
 import { CustodyPanel } from "@/features/it/inventory/custody/CustodyPanel";
@@ -49,6 +58,8 @@ import {
   useAssets,
   useSaveAsset,
 } from "@/features/it/inventory/useAssets";
+import { purchaseCode } from "@/features/it/procurement/format";
+import { usePurchaseDetail } from "@/features/it/procurement/useProcurement";
 import "@/features/it/inventory/inventory.css";
 
 type EditorState =
@@ -74,14 +85,19 @@ const CUSTODY_ASSET_CONFLICT_CODES = new Set([
 function ItInventoryPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<AssetListQuery>(INITIAL_FILTERS);
   const [searchDraft, setSearchDraft] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
   const [custodyAssetId, setCustodyAssetId] = useState<string | null>(null);
+  const handledPurchaseOriginRef = useRef<string | null>(null);
+  const originPurchaseId = searchParams.get("purchaseId");
+  const originPurchaseItemId = searchParams.get("purchaseItemId");
 
   const assetsQuery = useAssets(filters);
   const editingAssetId = editor?.mode === "edit" ? editor.assetId : null;
   const assetDetail = useAssetDetail(editingAssetId);
+  const originPurchase = usePurchaseDetail(originPurchaseId);
   const custodyDetail = useAssetDetail(custodyAssetId);
   const custodyLookups = useCustodyLookups(
     Boolean(custodyAssetId && custodyDetail.data?.status === "IN_STOCK"),
@@ -90,14 +106,101 @@ function ItInventoryPage() {
   const assignCustody = useAssignAssetCustody();
   const returnCustody = useReturnAssetCustody();
 
+  const clearPurchaseOrigin = useCallback(() => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("purchaseId");
+        next.delete("purchaseItemId");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+
   const closeEditor = useCallback(() => {
     setEditor(null);
-  }, []);
+    if (originPurchaseId || originPurchaseItemId) clearPurchaseOrigin();
+  }, [clearPurchaseOrigin, originPurchaseId, originPurchaseItemId]);
 
   const openCreate = () => {
+    if (originPurchaseId || originPurchaseItemId) clearPurchaseOrigin();
     saveAsset.reset();
     setEditor({ mode: "create" });
   };
+
+  useEffect(() => {
+    if (!originPurchaseId && !originPurchaseItemId) {
+      handledPurchaseOriginRef.current = null;
+      return;
+    }
+    const originKey = `${originPurchaseId ?? "missing"}:${originPurchaseItemId ?? "missing"}`;
+    if (handledPurchaseOriginRef.current === originKey) return;
+    if (!originPurchaseId || !originPurchaseItemId) {
+      handledPurchaseOriginRef.current = originKey;
+      toast.error(
+        "El origen de compra está incompleto. Abrí el alta nuevamente desde la orden recibida.",
+      );
+      clearPurchaseOrigin();
+      return;
+    }
+    if (originPurchase.isPending || editor) return;
+    if (originPurchase.isError || !originPurchase.data) {
+      handledPurchaseOriginRef.current = originKey;
+      toast.error(
+        "No se pudo validar la orden de compra para vincular el activo.",
+      );
+      clearPurchaseOrigin();
+      return;
+    }
+    const item = originPurchase.data.items.find(
+      (entry) => entry.id === originPurchaseItemId,
+    );
+    const linked = item?.linkedAssetsCount ?? item?.linkedAssets?.length ?? 0;
+    if (
+      originPurchase.data.status !== "RECEIVED" ||
+      !item ||
+      linked >= item.quantity
+    ) {
+      handledPurchaseOriginRef.current = originKey;
+      toast.error(
+        "La orden o el renglón ya no admite nuevas altas de inventario.",
+      );
+      clearPurchaseOrigin();
+      return;
+    }
+    handledPurchaseOriginRef.current = originKey;
+    saveAsset.reset();
+    setEditor({ mode: "create" });
+  }, [
+    clearPurchaseOrigin,
+    editor,
+    originPurchase.data,
+    originPurchase.isError,
+    originPurchase.isPending,
+    originPurchaseId,
+    originPurchaseItemId,
+    saveAsset.reset,
+  ]);
+
+  const purchaseOrigin: AssetPurchaseOrigin | null = (() => {
+    if (
+      !originPurchaseId ||
+      !originPurchaseItemId ||
+      originPurchase.data?.status !== "RECEIVED"
+    )
+      return null;
+    const item = originPurchase.data.items.find(
+      (entry) => entry.id === originPurchaseItemId,
+    );
+    if (!item) return null;
+    return {
+      purchaseId: originPurchaseId,
+      purchaseItemId: originPurchaseItemId,
+      purchaseCode: purchaseCode(originPurchase.data),
+      itemDescription: item.description,
+    };
+  })();
 
   const openEdit = (asset: ItAsset) => {
     saveAsset.reset();
@@ -490,7 +593,7 @@ function ItInventoryPage() {
         <AssetEditorPanel
           key={
             editor.mode === "create"
-              ? "create"
+              ? `create-${purchaseOrigin?.purchaseItemId ?? "manual"}`
               : assetDetail.data
                 ? `${assetDetail.data.id}-${assetDetail.data.updatedAt}`
                 : `loading-${editor.assetId}`
@@ -505,6 +608,7 @@ function ItInventoryPage() {
               ? getInventoryErrorMessage(assetDetail.error)
               : undefined
           }
+          purchaseOrigin={purchaseOrigin}
           onClose={closeEditor}
           onRetry={() => void assetDetail.refetch()}
           onSave={handleSave}

@@ -99,7 +99,7 @@ export interface AssetListQuery {
   pageSize: number;
 }
 
-export interface AssetCreatePayload {
+export interface AssetWritablePayload {
   type: AssetType;
   status: AssetStatus;
   brand: string;
@@ -112,7 +112,11 @@ export interface AssetCreatePayload {
   specs?: AssetSpecs | null;
 }
 
-export interface AssetUpdatePayload extends AssetCreatePayload {
+export interface AssetCreatePayload extends AssetWritablePayload {
+  purchaseItemId?: string | null;
+}
+
+export interface AssetUpdatePayload extends AssetWritablePayload {
   expectedUpdatedAt: string;
 }
 

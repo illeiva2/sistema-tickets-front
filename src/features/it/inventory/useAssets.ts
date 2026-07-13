@@ -39,6 +39,10 @@ export function useSaveAsset() {
     onSuccess: async (asset) => {
       queryClient.setQueryData(assetKeys.detail(asset.id), asset);
       await queryClient.invalidateQueries({ queryKey: assetKeys.all });
+      await queryClient.invalidateQueries({
+        queryKey: ["it", "procurement", "purchases"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["it", "overview"] });
     },
   });
 }

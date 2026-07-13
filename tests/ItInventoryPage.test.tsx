@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => ({ role: "ADMIN" as "ADMIN" | "AGENT" }));
@@ -84,7 +85,7 @@ function listResponse(items: ItAsset[]) {
   };
 }
 
-function renderInventory() {
+function renderInventory(initialEntry = "/it/inventory") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -93,9 +94,11 @@ function renderInventory() {
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ItInventoryPage />
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <QueryClientProvider client={queryClient}>
+        <ItInventoryPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -208,6 +211,78 @@ describe("ItInventoryPage", () => {
     });
     expect(JSON.stringify(payload)).not.toMatch(
       /password|credential|phoneNumber|iccid/i,
+    );
+  });
+
+  it("valida una compra recibida y vincula el activo al renglón", async () => {
+    const purchaseId = "purchase-1";
+    const purchaseItemId = "purchase-item-1";
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets")
+        return Promise.resolve(listResponse([baseAsset]));
+      if (url === `/api/it/purchases/${purchaseId}`) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              purchase: {
+                id: purchaseId,
+                purchaseNumber: 42,
+                status: "RECEIVED",
+                supplierId: null,
+                supplier: null,
+                currency: "ARS",
+                totalAmount: "950000.00",
+                exchangeRate: null,
+                justification: "Renovación",
+                requestedById: "admin-1",
+                requestedBy: { id: "admin-1", name: "Admin IT" },
+                items: [
+                  {
+                    id: purchaseItemId,
+                    description: "Notebook Lenovo T14",
+                    quantity: 2,
+                    unitPrice: "475000.00",
+                    linkedAssetsCount: 1,
+                    linkedAssets: [],
+                  },
+                ],
+                createdAt: "2026-07-12T10:00:00.000Z",
+                updatedAt: "2026-07-13T12:00:00.000Z",
+              },
+            },
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    const user = userEvent.setup();
+    renderInventory(
+      `/it/inventory?purchaseId=${purchaseId}&purchaseItemId=${purchaseItemId}`,
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar activo",
+    });
+    expect(
+      within(dialog).getByText("Alta vinculada a OC-0042"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Notebook Lenovo T14")).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText("Marca"), "Lenovo");
+    await user.type(within(dialog).getByLabelText("Modelo"), "ThinkPad T14");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar activo" }),
+    );
+
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/it/assets",
+      expect.objectContaining({
+        brand: "Lenovo",
+        model: "ThinkPad T14",
+        purchaseItemId,
+      }),
     );
   });
 
