@@ -144,6 +144,21 @@ export function CustodyPanel({
     return () => window.clearTimeout(timer);
   }, [asset?.status, isLoading, lookupsLoading]);
 
+  useEffect(() => {
+    if (personId && !people.some((person) => person.id === personId)) {
+      setPersonId("");
+    }
+  }, [people, personId]);
+
+  useEffect(() => {
+    if (
+      departmentId &&
+      !departments.some((department) => department.id === departmentId)
+    ) {
+      setDepartmentId("");
+    }
+  }, [departmentId, departments]);
+
   const handleAssign = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError(null);

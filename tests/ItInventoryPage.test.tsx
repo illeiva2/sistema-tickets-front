@@ -465,6 +465,222 @@ describe("ItInventoryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("recarga la custodia cuando otro operador asignó el activo", async () => {
+    const concurrentlyAssigned: ItAsset = {
+      ...baseAsset,
+      status: "ASSIGNED",
+      assignedPerson: activePerson,
+      assignedDepartment: department,
+      assignments: [
+        {
+          id: "assignment-concurrent",
+          startAt: "2026-07-12T13:00:00.000Z",
+          endAt: null,
+          person: activePerson,
+          department,
+        },
+      ],
+      updatedAt: "2026-07-12T13:00:00.000Z",
+    };
+    let detailRequests = 0;
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([baseAsset]));
+      }
+      if (url === `/api/it/assets/${baseAsset.id}`) {
+        detailRequests += 1;
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              asset: detailRequests === 1 ? baseAsset : concurrentlyAssigned,
+            },
+          },
+        });
+      }
+      if (url === "/api/it/people") {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: { items: [activePerson], pagination: undefined },
+          },
+        });
+      }
+      if (url === "/api/departments") {
+        return Promise.resolve({
+          data: { success: true, data: [department] },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMock.post.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: {
+            code: "ASSET_ALREADY_ASSIGNED",
+            message: "El activo ya tiene una asignación vigente",
+          },
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    await user.selectOptions(
+      await within(dialog).findByLabelText(/Persona/),
+      activePerson.id,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Asignar activo" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Registrar devolución" }),
+    ).toBeInTheDocument();
+    expect(detailRequests).toBe(2);
+    expect(toast.error).toHaveBeenCalledWith(
+      "La custodia cambió y fue recargada. Revisá el estado actualizado antes de continuar.",
+    );
+  });
+
+  it("cierra la custodia si el conflicto no puede recargarse", async () => {
+    let detailRequests = 0;
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([baseAsset]));
+      }
+      if (url === `/api/it/assets/${baseAsset.id}`) {
+        detailRequests += 1;
+        if (detailRequests === 1) {
+          return Promise.resolve({
+            data: { success: true, data: { asset: baseAsset } },
+          });
+        }
+        return Promise.reject(new Error("network unavailable"));
+      }
+      if (url === "/api/it/people") {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: { items: [activePerson], pagination: undefined },
+          },
+        });
+      }
+      if (url === "/api/departments") {
+        return Promise.resolve({
+          data: { success: true, data: [department] },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMock.post.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: {
+            code: "ASSET_WRITE_CONFLICT",
+            message: "El activo cambió mientras se procesaba la operación",
+          },
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    await user.selectOptions(
+      await within(dialog).findByLabelText(/Persona/),
+      activePerson.id,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Asignar activo" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Custodia de NB-0001" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(toast.error).toHaveBeenCalledWith(
+      "La custodia cambió, pero no pudo recargarse. Abrila nuevamente antes de operar.",
+    );
+  });
+
+  it("refresca personas y descarta una selección que dejó de estar activa", async () => {
+    let peopleRequests = 0;
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(listResponse([baseAsset]));
+      }
+      if (url === `/api/it/assets/${baseAsset.id}`) {
+        return Promise.resolve({
+          data: { success: true, data: { asset: baseAsset } },
+        });
+      }
+      if (url === "/api/it/people") {
+        peopleRequests += 1;
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              items: peopleRequests === 1 ? [activePerson] : [],
+              pagination: undefined,
+            },
+          },
+        });
+      }
+      if (url === "/api/departments") {
+        return Promise.resolve({
+          data: { success: true, data: [department] },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMock.post.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: {
+            code: "PERSON_NOT_FOUND",
+            message: "Persona activa no encontrada",
+          },
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getByRole("button", { name: "Gestionar custodia NB-0001" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Custodia de NB-0001",
+    });
+    const personSelect = await within(dialog).findByLabelText(/Persona/);
+    await user.selectOptions(personSelect, activePerson.id);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Asignar activo" }),
+    );
+
+    expect(
+      await within(dialog).findByText("Persona activa no encontrada"),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(personSelect).toHaveValue(""));
+    expect(peopleRequests).toBe(2);
+  });
+
   it("recarga la ficha y usa la versión nueva después de un conflicto", async () => {
     const refreshedAsset: ItAsset = {
       ...baseAsset,

@@ -64,6 +64,13 @@ const INITIAL_FILTERS: AssetListQuery = {
   pageSize: 10,
 };
 
+const CUSTODY_ASSET_CONFLICT_CODES = new Set([
+  "ASSET_ALREADY_ASSIGNED",
+  "ASSET_NOT_ASSIGNED",
+  "ASSET_ASSIGNMENT_CONFLICT",
+  "ASSET_WRITE_CONFLICT",
+]);
+
 function ItInventoryPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -105,18 +112,56 @@ function ItInventoryPage() {
     setCustodyAssetId(asset.id);
   };
 
+  const recoverCustodyError = async (error: unknown, assetId: string) => {
+    const code = getInventoryErrorCode(error);
+    if (code && CUSTODY_ASSET_CONFLICT_CODES.has(code)) {
+      const refreshed = await custodyDetail.refetch();
+      if (refreshed.isSuccess && refreshed.data) {
+        toast.error(
+          "La custodia cambió y fue recargada. Revisá el estado actualizado antes de continuar.",
+        );
+      } else {
+        queryClient.removeQueries({
+          queryKey: assetKeys.detail(assetId),
+          exact: true,
+        });
+        closeCustody();
+        toast.error(
+          "La custodia cambió, pero no pudo recargarse. Abrila nuevamente antes de operar.",
+        );
+      }
+      return;
+    }
+
+    if (code === "PERSON_NOT_FOUND") {
+      await custodyLookups.people.refetch();
+    } else if (code === "DEPARTMENT_NOT_FOUND") {
+      await custodyLookups.departments.refetch();
+    }
+  };
+
   const handleAssignCustody = async (payload: AssignAssetPayload) => {
     if (!custodyAssetId) throw new Error("No se pudo identificar el activo.");
-    await assignCustody.mutateAsync({ assetId: custodyAssetId, payload });
-    toast.success("Custodia asignada");
-    closeCustody();
+    try {
+      await assignCustody.mutateAsync({ assetId: custodyAssetId, payload });
+      toast.success("Custodia asignada");
+      closeCustody();
+    } catch (error) {
+      await recoverCustodyError(error, custodyAssetId);
+      throw error;
+    }
   };
 
   const handleReturnCustody = async (payload: ReturnAssetPayload) => {
     if (!custodyAssetId) throw new Error("No se pudo identificar el activo.");
-    await returnCustody.mutateAsync({ assetId: custodyAssetId, payload });
-    toast.success("Devolución registrada");
-    closeCustody();
+    try {
+      await returnCustody.mutateAsync({ assetId: custodyAssetId, payload });
+      toast.success("Devolución registrada");
+      closeCustody();
+    } catch (error) {
+      await recoverCustodyError(error, custodyAssetId);
+      throw error;
+    }
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
