@@ -6,6 +6,7 @@ import { useTickets } from "../hooks";
 import api from "../lib/api";
 import type { ResourceSuggestion } from "../types/resources";
 import type { KbSugerencia } from "../types/kb";
+import TicketAssistantChat from "../components/TicketAssistantChat";
 import {
   RESOURCE_CATEGORY_GLYPH,
   RESOURCE_CATEGORY_LABEL,
@@ -241,6 +242,14 @@ const NewTicketPage: React.FC = () => {
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
             </div>
+
+            {/* Asistente IA: intenta resolver el problema antes de crear el
+                ticket, buscando en la KB oficial de Finnegans + la interna.
+                Se oculta solo si la IA no está configurada en el server. */}
+            <TicketAssistantChat
+              title={formData.title}
+              description={formData.description}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
