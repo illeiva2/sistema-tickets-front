@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -22,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { PhoneLinesPanel } from "@/features/it/phone-lines/PhoneLinesPanel";
 import { getStaffErrorInfo } from "@/features/it/staff/api";
 import { PersonEditorPanel } from "@/features/it/staff/components/PersonEditorPanel";
 import { StaffMetrics } from "@/features/it/staff/components/StaffMetrics";
@@ -59,7 +61,9 @@ const INITIAL_FILTERS: StaffListQuery = {
 
 function ItStaffPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<StaffTab>("people");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab: StaffTab =
+    searchParams.get("tab") === "lines" ? "lines" : "people";
   const [filters, setFilters] = useState<StaffListQuery>(INITIAL_FILTERS);
   const [searchDraft, setSearchDraft] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
@@ -108,6 +112,13 @@ function ItStaffPage() {
     setFilters(INITIAL_FILTERS);
   };
 
+  const selectTab = (tab: StaffTab) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (tab === "lines") nextParams.set("tab", "lines");
+    else nextParams.delete("tab");
+    setSearchParams(nextParams, { replace: true });
+  };
+
   const handleTabKeyDown = (
     event: KeyboardEvent<HTMLButtonElement>,
     currentTab: StaffTab,
@@ -123,7 +134,7 @@ function ItStaffPage() {
 
     if (!nextTab) return;
     event.preventDefault();
-    setActiveTab(nextTab);
+    selectTab(nextTab);
     (nextTab === "people" ? peopleTabRef : linesTabRef).current?.focus();
   };
 
@@ -172,19 +183,26 @@ function ItStaffPage() {
         </span>
         <span className="staff-commandbar__sync" aria-live="polite">
           <Database size={13} aria-hidden="true" />
-          {peopleQuery.isFetching && !peopleQuery.isLoading
-            ? "Sincronizando"
-            : "API / IT-PEOPLE"}
+          {activeTab === "lines"
+            ? "API / IT-PHONE-LINES"
+            : peopleQuery.isFetching && !peopleQuery.isLoading
+              ? "Sincronizando"
+              : "API / IT-PEOPLE"}
         </span>
       </div>
 
       <header className="staff-header">
         <div>
-          <p className="staff-eyebrow">Padrón laboral / Control 02</p>
+          <p className="staff-eyebrow">
+            {activeTab === "people"
+              ? "Padrón laboral / Control 02"
+              : "Telecomunicaciones / Control 08"}
+          </p>
           <h1 id="staff-title">Personal y líneas</h1>
           <p>
-            Personas, estado laboral y sector para sostener la custodia de
-            activos. El padrón almacena sólo información de trabajo.
+            {activeTab === "people"
+              ? "Personas, estado laboral y sector para sostener la custodia de activos. El padrón almacena sólo información de trabajo."
+              : "Líneas corporativas, planes, responsables y cambios de chip en una única trazabilidad operativa."}
           </p>
         </div>
         {activeTab === "people" && (
@@ -224,7 +242,7 @@ function ItStaffPage() {
           aria-controls="staff-panel-people"
           tabIndex={activeTab === "people" ? 0 : -1}
           onKeyDown={(event) => handleTabKeyDown(event, "people")}
-          onClick={() => setActiveTab("people")}
+          onClick={() => selectTab("people")}
         >
           <Users size={16} aria-hidden="true" />
           Personal
@@ -239,31 +257,16 @@ function ItStaffPage() {
           aria-controls="staff-panel-lines"
           tabIndex={activeTab === "lines" ? 0 : -1}
           onKeyDown={(event) => handleTabKeyDown(event, "lines")}
-          onClick={() => setActiveTab("lines")}
+          onClick={() => selectTab("lines")}
         >
           <Smartphone size={16} aria-hidden="true" />
           Líneas
-          <span data-state="pending">En preparación</span>
+          <span>Operativo</span>
         </button>
       </div>
 
       {activeTab === "lines" ? (
-        <div
-          id="staff-panel-lines"
-          className="staff-lines-panel"
-          role="tabpanel"
-          aria-labelledby="staff-tab-lines"
-          tabIndex={0}
-        >
-          <Smartphone size={34} aria-hidden="true" />
-          <span>PRÓXIMO MÓDULO / LÍNEAS</span>
-          <h2>Gestión de líneas en preparación</h2>
-          <p>
-            Operadora, plan, costo e historial de tenencia se incorporarán en un
-            corte posterior. Esta vista todavía no muestra ni solicita números
-            de línea.
-          </p>
-        </div>
+        <PhoneLinesPanel />
       ) : (
         <div
           id="staff-panel-people"

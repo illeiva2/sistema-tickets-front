@@ -22,7 +22,7 @@ interface PersistedMetric {
   tone: "cyan" | "amber" | "neutral";
 }
 
-const LOADING_CARDS = Array.from({ length: 9 }, (_, index) => index);
+const LOADING_CARDS = Array.from({ length: 10 }, (_, index) => index);
 
 const formatCount = (value: number) => value.toLocaleString("es-AR");
 
@@ -91,6 +91,14 @@ export function PersistedOverviewPanel() {
           value: `${formatCount(data.counts.agentDevices.online)}/${formatCount(data.counts.agentDevices.total)}`,
           note: "Online sobre agentes registrados",
           icon: Activity,
+          tone: "cyan",
+        },
+        {
+          id: "phone-lines",
+          label: "Líneas asignadas",
+          value: `${formatCount(data.counts.phoneLines.inUse)}/${formatCount(data.counts.phoneLines.total)}`,
+          note: "En uso sobre líneas corporativas registradas",
+          icon: Smartphone,
           tone: "cyan",
         },
         {

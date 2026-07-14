@@ -1,10 +1,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/lib/api", () => ({
-  default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+}));
+
+vi.mock("../src/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "admin-1", role: "ADMIN" } }),
 }));
 
 vi.mock("react-hot-toast", () => ({
@@ -19,11 +30,16 @@ import type {
   StaffDepartment,
   StaffPerson,
 } from "../src/features/it/staff/types";
+import type {
+  PhoneLine,
+  PhoneSimChange,
+} from "../src/features/it/phone-lines/types";
 
 const apiMock = api as unknown as {
   get: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
   patch: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
 };
 
 const toastMock = toast as unknown as {
@@ -53,6 +69,56 @@ const basePerson: StaffPerson = {
   updatedAt: "2026-07-12T12:00:00.000Z",
 };
 
+const baseLine: PhoneLine = {
+  id: "line-1",
+  phoneNumber: "+5493415551234",
+  carrier: "CLARO",
+  carrierOther: null,
+  planName: "Corporativo 20 GB",
+  dataAllowanceGb: 20,
+  monthlyCost: "12500.00",
+  currency: "ARS",
+  simIccid: "8954012345678901234",
+  status: "ACTIVE",
+  contractEndsAt: null,
+  notes: "Línea de guardia",
+  isActive: true,
+  holderId: basePerson.id,
+  holder: basePerson,
+  assetId: null,
+  asset: null,
+  assignments: [],
+  updatedAt: "2026-07-13T12:00:00.000Z",
+};
+
+const availableLine: PhoneLine = {
+  ...baseLine,
+  id: "line-available",
+  phoneNumber: "+5493415554321",
+  status: "AVAILABLE",
+  holderId: null,
+  holder: null,
+  assetId: null,
+  asset: null,
+  updatedAt: "2026-07-13T14:00:00.000Z",
+};
+
+let listedLines: PhoneLine[];
+let detailLine: PhoneLine;
+let phoneAssets: Array<{
+  id: string;
+  type: string;
+  status: string;
+  brand: string;
+  model: string;
+  assetTag: string;
+  serialNumber: null;
+  assignedPersonId: string | null;
+}>;
+let phoneAssetsError: Error | null;
+let simHistoryPages: Record<number, PhoneSimChange[]>;
+let simHistoryTotal: number;
+
 function listResponse(items: StaffPerson[]) {
   return {
     data: {
@@ -70,7 +136,24 @@ function listResponse(items: StaffPerson[]) {
   };
 }
 
-function renderStaff() {
+function phoneLineListResponse(items: PhoneLine[]) {
+  return {
+    data: {
+      success: true,
+      data: {
+        items,
+        pagination: {
+          page: 1,
+          pageSize: 10,
+          total: items.length,
+          totalPages: 1,
+        },
+      },
+    },
+  };
+}
+
+function renderStaff(initialEntry = "/it/staff") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -79,7 +162,9 @@ function renderStaff() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ItStaffPage />
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <ItStaffPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -88,26 +173,108 @@ describe("ItStaffPage", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
-    apiMock.get.mockImplementation((url: string) => {
-      if (url === "/api/departments") {
-        return Promise.resolve({ data: { success: true, data: [department] } });
-      }
-      if (url === "/api/it/people") {
-        return Promise.resolve(listResponse([basePerson]));
-      }
-      if (url === `/api/it/people/${basePerson.id}`) {
+    listedLines = [baseLine];
+    detailLine = baseLine;
+    phoneAssets = [];
+    phoneAssetsError = null;
+    simHistoryPages = { 1: [] };
+    simHistoryTotal = 0;
+    apiMock.get.mockImplementation(
+      (url: string, config?: { params?: { page?: number } }) => {
+        if (url === "/api/departments") {
+          return Promise.resolve({
+            data: { success: true, data: [department] },
+          });
+        }
+        if (url === "/api/it/people") {
+          return Promise.resolve(listResponse([basePerson]));
+        }
+        if (url === `/api/it/people/${basePerson.id}`) {
+          return Promise.resolve({
+            data: { success: true, data: { person: basePerson } },
+          });
+        }
+        if (url === "/api/it/phone-lines") {
+          return Promise.resolve(phoneLineListResponse(listedLines));
+        }
+        if (url === `/api/it/phone-lines/${detailLine.id}`) {
+          return Promise.resolve({
+            data: { success: true, data: { phoneLine: detailLine } },
+          });
+        }
+        if (url === `/api/it/phone-lines/${detailLine.id}/sim-changes`) {
+          const page = config?.params?.page ?? 1;
+          return Promise.resolve({
+            data: {
+              success: true,
+              data: {
+                items: simHistoryPages[page] ?? [],
+                pagination: {
+                  page,
+                  pageSize: 25,
+                  total: simHistoryTotal,
+                  totalPages: Math.ceil(simHistoryTotal / 25),
+                },
+              },
+            },
+          });
+        }
+        if (url === "/api/it/assets") {
+          if (phoneAssetsError) return Promise.reject(phoneAssetsError);
+          return Promise.resolve({
+            data: {
+              success: true,
+              data: {
+                items: phoneAssets,
+                pagination: {
+                  page: 1,
+                  pageSize: 100,
+                  total: phoneAssets.length,
+                  totalPages: phoneAssets.length ? 1 : 0,
+                },
+              },
+            },
+          });
+        }
+        return Promise.reject(new Error(`Unexpected GET ${url}`));
+      },
+    );
+    apiMock.post.mockImplementation((url: string) => {
+      if (url === "/api/it/phone-lines") {
         return Promise.resolve({
-          data: { success: true, data: { person: basePerson } },
+          data: { success: true, data: { phoneLine: baseLine } },
         });
       }
-      return Promise.reject(new Error(`Unexpected GET ${url}`));
+      if (url === `/api/it/phone-lines/${baseLine.id}/sim-changes`) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              simChange: {
+                id: "sim-change-1",
+                previousIccid: baseLine.simIccid,
+                newIccid: "8954098765432101234",
+                changedAt: "2026-07-14T12:00:00.000Z",
+              },
+            },
+          },
+        });
+      }
+      return Promise.resolve({
+        data: { success: true, data: { person: basePerson } },
+      });
     });
-    apiMock.post.mockResolvedValue({
-      data: { success: true, data: { person: basePerson } },
+    apiMock.patch.mockImplementation((url: string) => {
+      if (url === `/api/it/phone-lines/${baseLine.id}`) {
+        return Promise.resolve({
+          data: { success: true, data: { phoneLine: baseLine } },
+        });
+      }
+      return Promise.resolve({
+        data: { success: true, data: { person: basePerson } },
+      });
     });
-    apiMock.patch.mockResolvedValue({
-      data: { success: true, data: { person: basePerson } },
-    });
+    apiMock.delete.mockResolvedValue({ data: { success: true } });
   });
 
   it("renderiza la lista y envía búsqueda, estado y sector a la API", async () => {
@@ -397,7 +564,7 @@ describe("ItStaffPage", () => {
     });
   });
 
-  it("expone el aviso de privacidad y mantiene Líneas en preparación", async () => {
+  it("expone el aviso de privacidad y muestra Líneas operativo", async () => {
     const user = userEvent.setup();
     renderStaff();
     await screen.findAllByText("L-0042");
@@ -413,11 +580,348 @@ describe("ItStaffPage", () => {
 
     await user.click(screen.getByRole("tab", { name: /Líneas/i }));
     expect(
-      screen.getByRole("heading", { name: "Gestión de líneas en preparación" }),
+      await screen.findByRole("heading", { name: "Gestión de líneas" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/todavía no muestra ni solicita números/i),
+      (await screen.findAllByText(baseLine.phoneNumber)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/en preparación/i)).toBeNull();
+  });
+
+  it("registra número, gigas e ICCID sin solicitar secretos de SIM", async () => {
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+    await user.click(screen.getByRole("tab", { name: /Líneas/i }));
+    await screen.findAllByText(baseLine.phoneNumber);
+    await user.click(screen.getByRole("button", { name: "Nueva línea" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Registrar línea" });
+    expect(within(dialog).queryByLabelText(/PIN|PUK|eSIM|cuenta/i)).toBeNull();
+    await user.type(
+      within(dialog).getByLabelText("Número de línea"),
+      "+5493415559999",
+    );
+    await user.type(within(dialog).getByLabelText(/Datos del plan/), "25");
+    await user.type(
+      within(dialog).getByLabelText(/ICCID actual/),
+      "8954098765432101234",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar línea" }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/it/phone-lines",
+        expect.objectContaining({
+          phoneNumber: "+5493415559999",
+          dataAllowanceGb: 25,
+          simIccid: "8954098765432101234",
+          status: "AVAILABLE",
+        }),
+      ),
+    );
+    const payload = apiMock.post.mock.calls.find(
+      ([url]: [string]) => url === "/api/it/phone-lines",
+    )?.[1];
+    expect(JSON.stringify(payload)).not.toMatch(/pin|puk|esim|account/i);
+  });
+
+  it("muestra detalle, custodia y registro de cambios de chip", async () => {
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+    await user.click(screen.getByRole("tab", { name: /Líneas/i }));
+    await screen.findAllByText(baseLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${baseLine.phoneNumber}`,
+      })[0],
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: baseLine.phoneNumber,
+    });
+    expect(within(dialog).getByText("Ana Pérez")).toBeInTheDocument();
+    expect(within(dialog).getByText(baseLine.simIccid!)).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("heading", { name: "Cambios de chip" }),
     ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Dar de baja" }),
+    ).toBeDisabled();
+
+    await user.type(
+      within(dialog).getByLabelText("Nuevo ICCID"),
+      "8954098765432101234",
+    );
+    fireEvent.change(within(dialog).getByLabelText(/Fecha del cambio/), {
+      target: { value: "2026-07-14T09:30" },
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar cambio de chip" }),
+    );
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/api/it/phone-lines/${baseLine.id}/sim-changes`,
+        {
+          expectedUpdatedAt: baseLine.updatedAt,
+          newIccid: "8954098765432101234",
+          changedAt: expect.stringMatching(/Z$/),
+        },
+      ),
+    );
+  });
+
+  it("permite asignar sin celular si falla ese lookup y envía CAS", async () => {
+    const user = userEvent.setup();
+    listedLines = [availableLine];
+    detailLine = availableLine;
+    phoneAssetsError = new Error("assets unavailable");
+    apiMock.post.mockImplementation((url: string) => {
+      if (url === `/api/it/phone-lines/${availableLine.id}/assign`) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              phoneLine: {
+                ...availableLine,
+                status: "ACTIVE",
+                holderId: basePerson.id,
+                holder: basePerson,
+              },
+            },
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(availableLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${availableLine.phoneNumber}`,
+      })[0],
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: availableLine.phoneNumber,
+    });
+    expect(
+      await within(dialog).findByText(/Podés asignar la línea sin equipo/i),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Reintentar celulares" }),
+    ).toBeEnabled();
+    await user.selectOptions(
+      within(dialog).getByLabelText("Persona activa"),
+      basePerson.id,
+    );
+    const assignButton = within(dialog).getByRole("button", {
+      name: "Confirmar asignación",
+    });
+    expect(assignButton).toBeEnabled();
+    await user.click(assignButton);
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/api/it/phone-lines/${availableLine.id}/assign`,
+        {
+          expectedUpdatedAt: availableLine.updatedAt,
+          personId: basePerson.id,
+          assetId: null,
+          note: null,
+        },
+      ),
+    );
+  });
+
+  it("ofrece sólo celulares elegibles y rotula su estado", async () => {
+    const user = userEvent.setup();
+    listedLines = [availableLine];
+    detailLine = availableLine;
+    phoneAssets = [
+      {
+        id: "asset-stock",
+        type: "PHONE",
+        status: "IN_STOCK",
+        brand: "Samsung",
+        model: "Stock",
+        assetTag: "CEL-01",
+        serialNumber: null,
+        assignedPersonId: null,
+      },
+      {
+        id: "asset-own",
+        type: "PHONE",
+        status: "ASSIGNED",
+        brand: "Motorola",
+        model: "Propio",
+        assetTag: "CEL-02",
+        serialNumber: null,
+        assignedPersonId: basePerson.id,
+      },
+      {
+        id: "asset-other",
+        type: "PHONE",
+        status: "ASSIGNED",
+        brand: "Apple",
+        model: "Ajeno",
+        assetTag: "CEL-03",
+        serialNumber: null,
+        assignedPersonId: "person-other",
+      },
+      {
+        id: "asset-repair",
+        type: "PHONE",
+        status: "IN_REPAIR",
+        brand: "Nokia",
+        model: "Taller",
+        assetTag: "CEL-04",
+        serialNumber: null,
+        assignedPersonId: null,
+      },
+    ];
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(availableLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${availableLine.phoneNumber}`,
+      })[0],
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: availableLine.phoneNumber,
+    });
+    await user.selectOptions(
+      within(dialog).getByLabelText("Persona activa"),
+      basePerson.id,
+    );
+    const assetSelect = within(dialog).getByLabelText(/Celular/);
+    expect(
+      within(assetSelect).getByRole("option", { name: /Stock.*En depósito/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(assetSelect).getByRole("option", {
+        name: /Propio.*asignado a esta persona/,
+      }),
+    ).toBeInTheDocument();
+    expect(within(assetSelect).queryByText(/Ajeno|Taller/)).toBeNull();
+  });
+
+  it("recarga una edición en conflicto y reintenta con el updatedAt nuevo", async () => {
+    const user = userEvent.setup();
+    const refreshedLine = {
+      ...baseLine,
+      planName: "Corporativo actualizado",
+      updatedAt: "2026-07-14T15:00:00.000Z",
+    };
+    let patchCalls = 0;
+    apiMock.patch.mockImplementation((url: string) => {
+      if (url !== `/api/it/phone-lines/${baseLine.id}`) {
+        return Promise.reject(new Error(`Unexpected PATCH ${url}`));
+      }
+      patchCalls += 1;
+      if (patchCalls === 1) {
+        detailLine = refreshedLine;
+        return Promise.reject({
+          response: {
+            status: 409,
+            data: {
+              error: {
+                code: "PHONE_LINE_VERSION_CONFLICT",
+                message: "La línea cambió.",
+              },
+            },
+          },
+        });
+      }
+      return Promise.resolve({
+        data: { success: true, data: { phoneLine: refreshedLine } },
+      });
+    });
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(baseLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${baseLine.phoneNumber}`,
+      })[0],
+    );
+    const detailDialog = await screen.findByRole("dialog", {
+      name: baseLine.phoneNumber,
+    });
+    await user.click(
+      within(detailDialog).getByRole("button", { name: "Editar" }),
+    );
+    let editor = await screen.findByRole("dialog", { name: "Editar línea" });
+    await user.click(
+      within(editor).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    expect(
+      await screen.findByText("Versión actual recargada"),
+    ).toBeInTheDocument();
+    editor = screen.getByRole("dialog", { name: "Editar línea" });
+    expect(
+      within(editor).getByDisplayValue("Corporativo actualizado"),
+    ).toBeInTheDocument();
+    await user.click(
+      within(editor).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+    expect(apiMock.patch.mock.calls[1][1]).toMatchObject({
+      expectedUpdatedAt: refreshedLine.updatedAt,
+    });
+  });
+
+  it("carga páginas adicionales del historial de SIM", async () => {
+    const user = userEvent.setup();
+    simHistoryTotal = 26;
+    simHistoryPages = {
+      1: [
+        {
+          id: "change-1",
+          previousIccid: null,
+          newIccid: "8954011111111111111",
+          changedAt: "2026-07-01T12:00:00.000Z",
+        },
+      ],
+      2: [
+        {
+          id: "change-2",
+          previousIccid: "8954011111111111111",
+          newIccid: "8954022222222222222",
+          changedAt: "2026-07-02T12:00:00.000Z",
+        },
+      ],
+    };
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(baseLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${baseLine.phoneNumber}`,
+      })[0],
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: baseLine.phoneNumber,
+    });
+    expect(
+      await within(dialog).findByText("8954011111111111111"),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Cargar más cambios" }),
+    );
+    expect(
+      await within(dialog).findByText("8954022222222222222"),
+    ).toBeInTheDocument();
+    expect(apiMock.get).toHaveBeenCalledWith(
+      `/api/it/phone-lines/${baseLine.id}/sim-changes`,
+      { params: { page: 2, pageSize: 25 } },
+    );
   });
 
   it("navega las pestañas con flechas, Inicio y Fin", async () => {
@@ -442,6 +946,16 @@ describe("ItStaffPage", () => {
     expect(linesTab).toHaveFocus();
     await user.keyboard("{ArrowLeft}");
     expect(peopleTab).toHaveFocus();
+  });
+
+  it("abre Líneas desde el deep-link y mantiene la pestaña en la URL", async () => {
+    renderStaff("/it/staff?tab=lines");
+
+    const linesTab = await screen.findByRole("tab", { name: /Líneas/i });
+    expect(linesTab).toHaveAttribute("aria-selected", "true");
+    expect(
+      await screen.findByRole("heading", { name: "Gestión de líneas" }),
+    ).toBeInTheDocument();
   });
 
   it("informa el fallo de sectores y conserva el sector al editar", async () => {
