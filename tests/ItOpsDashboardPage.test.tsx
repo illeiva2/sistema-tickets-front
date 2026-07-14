@@ -47,7 +47,7 @@ const overviewResponse = {
           network: "available",
           monitoring: "available",
           cameras: "limited",
-          phoneLines: "preparing",
+          phoneLines: "available",
         },
         apiSurface: {
           overview: "available",
@@ -112,6 +112,9 @@ describe("ItOpsDashboardPage", () => {
     expect(within(camerasCard!).getByText("40")).toBeInTheDocument();
 
     expect(apiMock.get).toHaveBeenCalledWith("/api/it/overview");
+    const phoneLinesCard = screen.getByText("Líneas asignadas").parentElement;
+    expect(phoneLinesCard).not.toBeNull();
+    expect(within(phoneLinesCard!).getByText("15/18")).toBeInTheDocument();
   });
 
   it("refleja la disponibilidad real de módulos y sus límites", async () => {
@@ -122,10 +125,11 @@ describe("ItOpsDashboardPage", () => {
     const inventoryLink = screen.getByRole("link", { name: "Activos" });
     expect(inventoryLink).toHaveAttribute("href", "/it/inventory");
     expect(inventoryLink).toHaveAttribute("data-status", "available");
-    expect(screen.getAllByText(/Abrir módulo · Disponible/i)).toHaveLength(6);
+    expect(screen.getAllByText(/Abrir módulo · Disponible/i)).toHaveLength(7);
 
     const peopleLink = screen.getByRole("link", { name: "Personas" });
     expect(peopleLink).toHaveAttribute("data-status", "available");
+    expect(peopleLink).toHaveAttribute("href", "/it/staff");
 
     for (const moduleName of ["Mantenimiento", "Compras", "Red", "Monitoreo"]) {
       expect(screen.getByRole("link", { name: moduleName })).toHaveAttribute(
@@ -141,10 +145,10 @@ describe("ItOpsDashboardPage", () => {
     ).toBeInTheDocument();
 
     const phoneLinesLink = screen.getByRole("link", { name: "Líneas" });
-    expect(phoneLinesLink).toHaveAttribute("data-status", "preparing");
-    expect(screen.getAllByText(/Abrir módulo · En preparación/i).length).toBe(
-      1,
-    );
+    expect(phoneLinesLink).toHaveAttribute("data-status", "available");
+    expect(phoneLinesLink).toHaveAttribute("href", "/it/staff?tab=lines");
+    expect(screen.queryByText(/Abrir módulo · En preparación/i)).toBeNull();
+    expect(screen.getByText("Gestión operativa")).toBeInTheDocument();
 
     expect(screen.getAllByText("Agentes en vivo").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Directo por LAN/VPN").length).toBeGreaterThan(

@@ -81,8 +81,8 @@ const MODULES = [
     description:
       "Números, operadoras, planes y trazabilidad de asignaciones de SIM.",
     icon: Smartphone,
-    href: "/it/staff",
-    status: "preparing",
+    href: "/it/staff?tab=lines",
+    status: "available",
   },
 ] as const;
 
@@ -90,7 +90,7 @@ const INTEGRATION_STATUS = [
   { label: "Persistencia", value: "Datos operativos reales", tone: "cyan" },
   { label: "Telemetría", value: "Agentes en vivo", tone: "cyan" },
   { label: "Control remoto", value: "Directo por LAN/VPN", tone: "cyan" },
-  { label: "Líneas", value: "En preparación", tone: "amber" },
+  { label: "Líneas", value: "Gestión operativa", tone: "cyan" },
 ] as const;
 
 export function ItOpsDashboardPage() {
@@ -175,8 +175,8 @@ export function ItOpsDashboardPage() {
             <h2 id="ops-modules-title">Superficie de módulos</h2>
           </div>
           <p>
-            Accesos a cada dominio. Cámaras tiene cobertura básica dentro de Red
-            y Líneas continúa en preparación.
+            Accesos a cada dominio. Cámaras mantiene cobertura básica dentro de
+            Red; el resto de la superficie está operativo.
           </p>
         </div>
         <div className="ops-modules">
