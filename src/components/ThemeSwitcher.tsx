@@ -1,11 +1,14 @@
 import { Palette } from "lucide-react";
 import { useTheme, ThemeName } from "../contexts/ThemeContext";
+import { useAuth } from "../hooks";
 
 interface ThemeOption {
   id: ThemeName;
   label: string;
   description: string;
   swatches: string[];
+  /** Roles que pueden ver esta opción. Sin la prop, la ven todos. */
+  showFor?: ("USER" | "AGENT" | "ADMIN")[];
 }
 
 const THEMES: ThemeOption[] = [
@@ -21,10 +24,22 @@ const THEMES: ThemeOption[] = [
     description: "Cálido. Petróleo + crema.",
     swatches: ["hsl(188 60% 32%)", "hsl(22 65% 55%)", "hsl(36 30% 96%)"],
   },
+  {
+    id: "dystopia",
+    label: "Distópico",
+    description: "Terminal CRT. Fósforo verde sobre negro.",
+    swatches: ["hsl(135 95% 55%)", "hsl(45 95% 58%)", "hsl(120 10% 4%)"],
+    showFor: ["AGENT", "ADMIN"],
+  },
 ];
 
 export const ThemeSwitcher = () => {
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
+
+  const visibleThemes = THEMES.filter(
+    (t) => !t.showFor || (user?.role && t.showFor.includes(user.role)),
+  );
 
   return (
     <div className="px-4 py-3 border-t border-border">
@@ -33,7 +48,7 @@ export const ThemeSwitcher = () => {
         <span>Apariencia</span>
       </div>
       <div className="grid grid-cols-1 gap-2">
-        {THEMES.map((t) => {
+        {visibleThemes.map((t) => {
           const active = t.id === theme;
           return (
             <button

@@ -6,8 +6,14 @@ import {
   ReactNode,
 } from "react";
 
-export type ThemeName = "quiet-pro" | "workshop";
+export type ThemeName = "quiet-pro" | "workshop" | "dystopia";
 export type Mode = "light" | "dark";
+
+// Lista canónica de themes. "dystopia" existe para todos a nivel de tokens,
+// pero solo AGENT/ADMIN lo ven en el selector (gating en ThemeSwitcher) y
+// Layout lo resetea a default si un USER lo tuviera persistido.
+export const THEME_NAMES: ThemeName[] = ["quiet-pro", "workshop", "dystopia"];
+export const DEFAULT_THEME: ThemeName = "quiet-pro";
 
 interface ThemeContextValue {
   theme: ThemeName;
@@ -24,7 +30,11 @@ const MODE_KEY = "ui:dark";
 
 const readTheme = (): ThemeName => {
   const v = localStorage.getItem(THEME_KEY);
-  return v === "workshop" ? "workshop" : "quiet-pro";
+  // Cualquier valor fuera de la lista (viejo, corrupto o inventado) cae
+  // al default sin romper nada.
+  return THEME_NAMES.includes(v as ThemeName)
+    ? (v as ThemeName)
+    : DEFAULT_THEME;
 };
 
 const readMode = (): Mode => {

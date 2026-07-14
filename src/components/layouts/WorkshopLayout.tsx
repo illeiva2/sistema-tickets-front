@@ -13,6 +13,7 @@ import {
   useNavItems,
   UnreadDot,
   useDarkToggle,
+  IT_NAV_GROUP_LABEL,
 } from "./_shared";
 
 // Topbar layout, estilo Workshop: nav horizontal arriba, fondo cálido
@@ -21,6 +22,8 @@ const WorkshopLayout: React.FC = () => {
   const location = useLocation();
   const navItems = useNavItems();
   const navRoutes = navItems.map((i) => i.to);
+  // Índice del primer ítem IT: antes de él va el separador "Gestión IT".
+  const firstItIndex = navItems.findIndex((i) => i.section === "it");
   const { dark, toggleMode } = useDarkToggle();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
@@ -46,20 +49,30 @@ const WorkshopLayout: React.FC = () => {
               </span>
               <span className="hidden sm:inline">Empresa Tickets</span>
             </Link>
-            {/* Nav horizontal en desktop */}
-            <nav className="hidden lg:flex items-center gap-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  icon={item.icon}
-                  siblings={navRoutes}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>{item.label}</span>
-                    {item.showUnreadCount && <UnreadDot />}
-                  </span>
-                </NavLink>
+            {/* Nav horizontal en desktop. flex-wrap: con el grupo IT la
+                lista puede superar el ancho y baja de línea sin cortarse. */}
+            <nav className="hidden lg:flex flex-wrap items-center gap-1">
+              {navItems.map((item, index) => (
+                <React.Fragment key={item.to}>
+                  {index === firstItIndex && (
+                    <span
+                      className="ml-2 pl-3 border-l border-border text-xs font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap"
+                      aria-hidden
+                    >
+                      {IT_NAV_GROUP_LABEL}
+                    </span>
+                  )}
+                  <NavLink
+                    to={item.to}
+                    icon={item.icon}
+                    siblings={navRoutes}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{item.label}</span>
+                      {item.showUnreadCount && <UnreadDot />}
+                    </span>
+                  </NavLink>
+                </React.Fragment>
               ))}
             </nav>
           </div>
@@ -91,19 +104,25 @@ const WorkshopLayout: React.FC = () => {
         {drawerOpen && (
           <div className="lg:hidden border-t border-border bg-card">
             <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  icon={item.icon}
-                  onNavigate={() => setDrawerOpen(false)}
-                  siblings={navRoutes}
-                >
-                  <span className="flex items-center justify-between w-full gap-2">
-                    <span>{item.label}</span>
-                    {item.showUnreadCount && <UnreadDot />}
-                  </span>
-                </NavLink>
+              {navItems.map((item, index) => (
+                <React.Fragment key={item.to}>
+                  {index === firstItIndex && (
+                    <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">
+                      {IT_NAV_GROUP_LABEL}
+                    </div>
+                  )}
+                  <NavLink
+                    to={item.to}
+                    icon={item.icon}
+                    onNavigate={() => setDrawerOpen(false)}
+                    siblings={navRoutes}
+                  >
+                    <span className="flex items-center justify-between w-full gap-2">
+                      <span>{item.label}</span>
+                      {item.showUnreadCount && <UnreadDot />}
+                    </span>
+                  </NavLink>
+                </React.Fragment>
               ))}
               <button
                 onClick={() => {
