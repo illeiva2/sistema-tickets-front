@@ -1,10 +1,11 @@
-import { Pencil } from "lucide-react";
+import { Eye, Pencil } from "lucide-react";
 import { EMPLOYMENT_STATUS_LABELS, type StaffPerson } from "../types";
 
 interface StaffTableProps {
   people: StaffPerson[];
   openingPersonId: string | null;
   onEdit: (person: StaffPerson) => void;
+  onSelect: (person: StaffPerson) => void;
 }
 
 function personName(person: StaffPerson): string {
@@ -27,6 +28,7 @@ export function StaffTable({
   people,
   openingPersonId,
   onEdit,
+  onSelect,
 }: StaffTableProps) {
   return (
     <>
@@ -50,14 +52,28 @@ export function StaffTable({
           </thead>
           <tbody>
             {people.map((person) => (
-              <tr key={person.id}>
+              <tr
+                key={person.id}
+                className="staff-row--clickable"
+                onClick={() => onSelect(person)}
+              >
                 <td>
                   <span className="staff-employee-number">
                     {person.employeeNumber || "SIN-LEGAJO"}
                   </span>
                 </td>
                 <td>
-                  <strong>{personName(person)}</strong>
+                  <button
+                    type="button"
+                    className="staff-person-link"
+                    aria-label={`Ver resumen de ${person.firstName} ${person.lastName}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSelect(person);
+                    }}
+                  >
+                    {personName(person)}
+                  </button>
                   <small>{person.workEmail || "Sin email laboral"}</small>
                 </td>
                 <td>{person.jobTitle || "Sin puesto"}</td>
@@ -74,7 +90,10 @@ export function StaffTable({
                     className="staff-icon-button"
                     aria-label={`Editar ${person.firstName} ${person.lastName}`}
                     disabled={openingPersonId === person.id}
-                    onClick={() => onEdit(person)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(person);
+                    }}
                   >
                     <Pencil size={16} aria-hidden="true" />
                   </button>
@@ -117,15 +136,27 @@ export function StaffTable({
                   <dd>{formatDate(person.startDate)}</dd>
                 </div>
               </dl>
-              <button
-                type="button"
-                className="staff-button staff-button--ghost"
-                disabled={openingPersonId === person.id}
-                onClick={() => onEdit(person)}
-              >
-                <Pencil size={15} aria-hidden="true" />
-                Editar persona
-              </button>
+              <div className="staff-mobile-card__actions">
+                <button
+                  type="button"
+                  className="staff-button staff-button--ghost"
+                  aria-label={`Ver resumen de ${person.firstName} ${person.lastName}`}
+                  disabled={openingPersonId === person.id}
+                  onClick={() => onSelect(person)}
+                >
+                  <Eye size={15} aria-hidden="true" />
+                  Ver resumen
+                </button>
+                <button
+                  type="button"
+                  className="staff-button staff-button--ghost"
+                  disabled={openingPersonId === person.id}
+                  onClick={() => onEdit(person)}
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  Editar persona
+                </button>
+              </div>
             </article>
           </li>
         ))}

@@ -5,6 +5,7 @@ import type {
   StaffListQuery,
   StaffListResult,
   StaffPerson,
+  StaffPersonDetail,
   StaffUpdatePayload,
 } from "./types";
 
@@ -53,7 +54,7 @@ export async function fetchPeople(
   return response.data.data;
 }
 
-export async function fetchPerson(id: string): Promise<StaffPerson> {
+export async function fetchPerson(id: string): Promise<StaffPersonDetail> {
   const response = await api.get<ApiEnvelope<PersonResultData>>(
     `/api/it/people/${id}`,
   );

@@ -29,6 +29,7 @@ import { getStaffErrorInfo } from "../src/features/it/staff/api";
 import type {
   StaffDepartment,
   StaffPerson,
+  StaffPersonDetail,
 } from "../src/features/it/staff/types";
 import type {
   PhoneLine,
@@ -105,6 +106,7 @@ const availableLine: PhoneLine = {
 
 let listedLines: PhoneLine[];
 let detailLine: PhoneLine;
+let detailPerson: StaffPersonDetail;
 let phoneAssets: Array<{
   id: string;
   type: string;
@@ -175,6 +177,7 @@ describe("ItStaffPage", () => {
     vi.clearAllMocks();
     listedLines = [baseLine];
     detailLine = baseLine;
+    detailPerson = basePerson;
     phoneAssets = [];
     phoneAssetsError = null;
     simHistoryPages = { 1: [] };
@@ -191,7 +194,7 @@ describe("ItStaffPage", () => {
         }
         if (url === `/api/it/people/${basePerson.id}`) {
           return Promise.resolve({
-            data: { success: true, data: { person: basePerson } },
+            data: { success: true, data: { person: detailPerson } },
           });
         }
         if (url === "/api/it/phone-lines") {
@@ -1005,6 +1008,95 @@ describe("ItStaffPage", () => {
         ),
       ).toHaveLength(2),
     );
+  });
+
+  it("abre el resumen desde la fila con custodia, línea y sector", async () => {
+    detailPerson = {
+      ...basePerson,
+      assignedAssets: [
+        {
+          id: "asset-1",
+          assetTag: "NB-0007",
+          type: "NOTEBOOK",
+          status: "ASSIGNED",
+          brand: "Lenovo",
+          model: "ThinkPad E14",
+          serialNumber: "SN-778",
+          location: "Oficina central",
+          updatedAt: "2026-07-10T12:00:00.000Z",
+        },
+      ],
+      phoneLines: [
+        {
+          id: "line-1",
+          phoneNumber: "+5493415551234",
+          carrier: "CLARO",
+          carrierOther: null,
+          planName: "Corporativo 20 GB",
+          status: "ACTIVE",
+          contractEndsAt: null,
+        },
+      ],
+      assetAssignments: [
+        {
+          id: "assignment-1",
+          startAt: "2026-07-01T12:00:00.000Z",
+          endAt: null,
+          asset: {
+            id: "asset-1",
+            assetTag: "NB-0007",
+            type: "NOTEBOOK",
+            status: "ASSIGNED",
+          },
+        },
+      ],
+      phoneLineAssignments: [],
+    } satisfies StaffPersonDetail;
+
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Ver resumen de Ana Pérez" })[0],
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "Pérez, Ana" });
+    expect(
+      within(dialog).getByText("Equipos en custodia (1)"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getAllByText("NB-0007").length).toBeGreaterThan(0);
+    expect(within(dialog).getByText(/Notebook · Lenovo ThinkPad E14/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Líneas asignadas (1)"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("+5493415551234")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Claro · Corporativo 20 GB/)).toBeInTheDocument();
+    expect(within(dialog).getByText("Tecnología")).toBeInTheDocument();
+    expect(within(dialog).getByText(/vigente/)).toBeInTheDocument();
+  });
+
+  it("muestra vacíos honestos y salta del resumen a la edición", async () => {
+    const user = userEvent.setup();
+    renderStaff();
+    await screen.findAllByText("L-0042");
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Ver resumen de Ana Pérez" })[0],
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Pérez, Ana" });
+    expect(
+      within(dialog).getByText("Sin equipos en custodia."),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Sin líneas asignadas."),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Editar" }));
+    await screen.findByRole("dialog", { name: "Editar persona" });
+    expect(
+      screen.queryByRole("dialog", { name: "Pérez, Ana" }),
+    ).toBeNull();
   });
 
   it("muestra estados vacío y error sin datos ficticios", async () => {
