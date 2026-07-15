@@ -37,6 +37,54 @@ export interface StaffPerson {
   updatedAt: string;
 }
 
+// Vistas parciales que devuelve GET /api/it/people/:id además de la ficha.
+// Los catálogos de tipo/estado viven en inventory y phone-lines; acá se
+// tipan como string para no acoplar el padrón a esos módulos.
+export interface StaffAssetPreview {
+  id: string;
+  assetTag: string;
+  type: string;
+  status: string;
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  location?: string | null;
+  updatedAt?: string;
+}
+
+export interface StaffPhoneLinePreview {
+  id: string;
+  phoneNumber: string;
+  carrier: string;
+  carrierOther?: string | null;
+  planName?: string | null;
+  status: string;
+  contractEndsAt?: string | null;
+}
+
+export interface StaffAssetAssignment {
+  id: string;
+  startAt: string;
+  endAt?: string | null;
+  asset?: StaffAssetPreview | null;
+  department?: StaffDepartment | null;
+}
+
+export interface StaffPhoneLineAssignment {
+  id: string;
+  assignedAt: string;
+  returnedAt?: string | null;
+  phoneLine?: StaffPhoneLinePreview | null;
+  asset?: StaffAssetPreview | null;
+}
+
+export interface StaffPersonDetail extends StaffPerson {
+  assignedAssets?: StaffAssetPreview[];
+  phoneLines?: StaffPhoneLinePreview[];
+  assetAssignments?: StaffAssetAssignment[];
+  phoneLineAssignments?: StaffPhoneLineAssignment[];
+}
+
 export interface StaffPagination {
   page: number;
   pageSize: number;

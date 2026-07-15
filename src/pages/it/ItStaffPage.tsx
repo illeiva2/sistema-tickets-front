@@ -26,6 +26,7 @@ import toast from "react-hot-toast";
 import { PhoneLinesPanel } from "@/features/it/phone-lines/PhoneLinesPanel";
 import { getStaffErrorInfo } from "@/features/it/staff/api";
 import { PersonEditorPanel } from "@/features/it/staff/components/PersonEditorPanel";
+import { PersonSummaryPanel } from "@/features/it/staff/components/PersonSummaryPanel";
 import { StaffMetrics } from "@/features/it/staff/components/StaffMetrics";
 import { StaffTable } from "@/features/it/staff/components/StaffTable";
 import {
@@ -67,6 +68,7 @@ function ItStaffPage() {
   const [filters, setFilters] = useState<StaffListQuery>(INITIAL_FILTERS);
   const [searchDraft, setSearchDraft] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
+  const [summaryPersonId, setSummaryPersonId] = useState<string | null>(null);
   const peopleTabRef = useRef<HTMLButtonElement>(null);
   const linesTabRef = useRef<HTMLButtonElement>(null);
 
@@ -74,6 +76,7 @@ function ItStaffPage() {
   const departmentsQuery = useStaffDepartments();
   const editingPersonId = editor?.mode === "edit" ? editor.personId : null;
   const personDetail = usePersonDetail(editingPersonId);
+  const summaryDetail = usePersonDetail(summaryPersonId);
   const savePerson = useSavePerson();
 
   const closeEditor = useCallback(() => {
@@ -88,6 +91,20 @@ function ItStaffPage() {
   const openEdit = (person: StaffPerson) => {
     savePerson.reset();
     setEditor({ mode: "edit", personId: person.id });
+  };
+
+  const openSummary = (person: StaffPerson) => {
+    setSummaryPersonId(person.id);
+  };
+
+  const closeSummary = useCallback(() => {
+    setSummaryPersonId(null);
+  }, []);
+
+  // Salto directo del resumen a la edición: mismo id, misma query cacheada.
+  const editFromSummary = (person: StaffPerson) => {
+    setSummaryPersonId(null);
+    openEdit(person);
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -477,6 +494,7 @@ function ItStaffPage() {
               people={people}
               openingPersonId={personDetail.isFetching ? editingPersonId : null}
               onEdit={openEdit}
+              onSelect={openSummary}
             />
           )}
 
@@ -519,6 +537,21 @@ function ItStaffPage() {
             </nav>
           )}
         </div>
+      )}
+
+      {summaryPersonId && !editor && (
+        <PersonSummaryPanel
+          person={summaryDetail.data ?? null}
+          isLoading={summaryDetail.isPending}
+          loadError={
+            summaryDetail.isError
+              ? getStaffErrorInfo(summaryDetail.error).message
+              : undefined
+          }
+          onClose={closeSummary}
+          onRetry={() => void summaryDetail.refetch()}
+          onEdit={editFromSummary}
+        />
       )}
 
       {editor && (

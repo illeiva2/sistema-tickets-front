@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8a70e8"/>
+      <stop offset="1" stop-color="#5a3fc0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Ticket con muescas laterales -->
+  <path fill="#fff" fill-rule="evenodd" d="M16 19h32a4 4 0 0 1 4 4v4.2a5 5 0 0 0 0 9.6V41a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4v-4.2a5 5 0 0 0 0-9.6V23a4 4 0 0 1 4-4z"/>
+  <!-- Perforación -->
+  <line x1="24.5" y1="22" x2="24.5" y2="42" stroke="#5a3fc0" stroke-width="2" stroke-dasharray="2.6 3" stroke-linecap="round"/>
+  <!-- Check de resuelto -->
+  <path d="M31.5 32.5l4.6 4.6 8.4-9" fill="none" stroke="#5a3fc0" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
