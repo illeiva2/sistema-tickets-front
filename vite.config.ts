@@ -1,9 +1,44 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // PWA instalable + service worker propio (push). injectManifest para
+    // controlar el SW a mano: precache de assets pero navegación siempre
+    // por red (evita servir un index.html viejo tras cada deploy).
+    VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      registerType: "autoUpdate",
+      injectRegister: false,
+      manifest: {
+        name: "Soporte GRF",
+        short_name: "Soporte GRF",
+        description:
+          "Mesa de ayuda interna de GRF: tickets de soporte, recursos y gestión IT.",
+        lang: "es",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        background_color: "#0f1115",
+        theme_color: "#6c53cf",
+        icons: [
+          { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+        ],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

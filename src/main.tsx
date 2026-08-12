@@ -6,6 +6,16 @@ import App from "./App.tsx";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import "./index.css";
 
+// Service worker de la PWA (instalación + Web Push). Sólo en producción:
+// en dev el SW no se genera y molestaría con caches.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Sin SW la app sigue funcionando normal (sin push ni instalación).
+    });
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
