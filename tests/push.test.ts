@@ -117,7 +117,10 @@ describe("enablePush", () => {
 
     vi.stubGlobal("navigator", {
       ...window.navigator,
-      serviceWorker: { getRegistration: vi.fn().mockResolvedValue(registration) },
+      serviceWorker: {
+        getRegistration: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration),
+      },
     });
     vi.stubGlobal("PushManager", function () {});
     vi.stubGlobal("Notification", {
@@ -144,7 +147,10 @@ describe("enablePush", () => {
 
     vi.stubGlobal("navigator", {
       ...window.navigator,
-      serviceWorker: { getRegistration: vi.fn().mockResolvedValue(registration) },
+      serviceWorker: {
+        getRegistration: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration),
+      },
     });
     vi.stubGlobal("PushManager", function () {});
     vi.stubGlobal("Notification", {
@@ -155,5 +161,52 @@ describe("enablePush", () => {
 
     expect(result).toBe(false);
     expect(apiMock.post).not.toHaveBeenCalled();
+  });
+
+  it("espera al service worker activo en vez de usar uno que todavía está activándose", async () => {
+    // Reproduce el bug reportado: justo después de instalar la PWA,
+    // getRegistration() devuelve un registro sin worker activo todavía, y
+    // pushManager.subscribe() ahí explota con "Subscribing for push
+    // requires an active worker". navigator.serviceWorker.ready sólo
+    // resuelve cuando SÍ hay un worker activo.
+    const staleSubscribe = vi.fn(() => {
+      throw new DOMException(
+        "Subscribing for push requires an active worker",
+        "InvalidStateError",
+      );
+    });
+    const staleRegistration = {
+      pushManager: { subscribe: staleSubscribe },
+    } as unknown as ServiceWorkerRegistration;
+
+    const activeSubscribe = vi.fn().mockResolvedValue({
+      endpoint: "https://web.push.apple.com/ready-endpoint",
+      keys: { p256dh: "p", auth: "a" },
+      toJSON() {
+        return { endpoint: this.endpoint, keys: this.keys };
+      },
+    });
+    const activeRegistration = {
+      pushManager: { subscribe: activeSubscribe },
+    } as unknown as ServiceWorkerRegistration;
+
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      serviceWorker: {
+        getRegistration: vi.fn().mockResolvedValue(staleRegistration),
+        ready: Promise.resolve(activeRegistration),
+      },
+    });
+    vi.stubGlobal("PushManager", function () {});
+    vi.stubGlobal("Notification", {
+      requestPermission: vi.fn().mockResolvedValue("granted"),
+    });
+    apiMock.post.mockResolvedValue({ data: { success: true } });
+
+    const result = await enablePush("clave-publica-del-server");
+
+    expect(result).toBe(true);
+    expect(activeSubscribe).toHaveBeenCalledOnce();
+    expect(staleSubscribe).not.toHaveBeenCalled();
   });
 });
