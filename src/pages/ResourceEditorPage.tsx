@@ -303,7 +303,7 @@ const ResourceEditorPage: React.FC = () => {
             {isEditing ? "Editar recurso" : "Nuevo recurso"}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <Button
             variant="outline"
             size="sm"

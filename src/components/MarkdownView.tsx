@@ -10,7 +10,7 @@ const MarkdownView: React.FC<{ source: string; className?: string }> = ({
   className = "",
 }) => {
   return (
-    <div className={`text-[14.5px] leading-relaxed text-foreground ${className}`}>
+    <div className={`text-[14.5px] leading-relaxed text-foreground break-words ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

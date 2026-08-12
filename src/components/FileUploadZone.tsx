@@ -196,10 +196,12 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
                 key={index}
                 className="flex items-center justify-between p-3 bg-muted rounded-lg"
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 min-w-0 flex-1">
                   {getFileIcon(file)}
-                  <div className="text-sm">
-                    <p className="font-medium">{file.name}</p>
+                  <div className="text-sm min-w-0 flex-1">
+                    <p className="font-medium truncate" title={file.name}>
+                      {file.name}
+                    </p>
                     <p className="text-muted-foreground">
                       {formatFileSize(file.size)}
                     </p>
@@ -209,6 +211,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="shrink-0"
                   onClick={() => removeFile(index)}
                   disabled={isUploading}
                 >

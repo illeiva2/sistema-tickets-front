@@ -170,7 +170,7 @@ const TicketAssistantChat: React.FC<{
             {messages.map((m, i) =>
               m.role === "user" ? (
                 <div key={i} className="flex justify-end">
-                  <div className="max-w-[85%] rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-[12.5px] whitespace-pre-wrap">
+                  <div className="max-w-[85%] rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-[12.5px] whitespace-pre-wrap break-words">
                     {m.content}
                   </div>
                 </div>

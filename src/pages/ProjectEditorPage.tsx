@@ -200,7 +200,7 @@ const ProjectEditorPage: React.FC = () => {
             {isEditing ? "Editar proyecto" : "Nuevo proyecto"}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <Button
             variant="outline"
             size="sm"

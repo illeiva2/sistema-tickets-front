@@ -120,10 +120,10 @@ export default function NotificationsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+      <div className="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-x-auto">
         <button
           onClick={() => setActiveTab("notifications")}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 whitespace-nowrap py-2 px-4 rounded-md text-sm font-medium transition-colors ${
             activeTab === "notifications"
               ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -134,7 +134,7 @@ export default function NotificationsPage() {
         </button>
         <button
           onClick={() => setActiveTab("preferences")}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 whitespace-nowrap py-2 px-4 rounded-md text-sm font-medium transition-colors ${
             activeTab === "preferences"
               ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -146,7 +146,7 @@ export default function NotificationsPage() {
         {isAdmin && (
           <button
             onClick={() => setActiveTab("admin")}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 whitespace-nowrap py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               activeTab === "admin"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -162,11 +162,11 @@ export default function NotificationsPage() {
       {activeTab === "notifications" && (
         <div className="space-y-4">
           {/* Header with actions */}
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               Historial de Notificaciones
             </h2>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={refreshNotifications}
                 disabled={isLoading}
