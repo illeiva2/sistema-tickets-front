@@ -5,9 +5,17 @@
     <meta name="referrer" content="no-referrer" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#6c53cf" />
+
+    <!-- iOS: "Agregar a inicio" queda a pantalla completa (sin la UI de Safari)
+         y con nombre/ícono propios. Safari no lee bien el manifest para esto
+         todavía, por eso las meta tags con prefijo apple- son necesarias
+         además del manifest.webmanifest que ya inyecta vite-plugin-pwa. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Soporte GRF" />
     <title>Soporte GRF · Sistema de Tickets</title>
     <meta
       name="description"
