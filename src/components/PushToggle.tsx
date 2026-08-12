@@ -11,6 +11,17 @@ import {
   isStandalone,
 } from "../lib/push";
 
+function pushErrorDetail(error: unknown): string | undefined {
+  if (error instanceof DOMException) return error.message || error.name;
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (error as { response?: { data?: { error?: { message?: string } } } })
+      .response;
+    return response?.data?.error?.message;
+  }
+  if (error instanceof Error) return error.message;
+  return undefined;
+}
+
 /**
  * Activar/desactivar notificaciones push en ESTE dispositivo. Se oculta si
  * el servidor no tiene el canal configurado. En iPhone/iPad sin instalar,
@@ -82,8 +93,19 @@ const PushToggle: React.FC = () => {
           );
         }
       }
-    } catch {
-      toast.error("No se pudo actualizar la suscripción. Probá de nuevo.");
+    } catch (error) {
+      // Se loguea siempre y se intenta mostrar el detalle real (nombre de
+      // la DOMException del navegador o mensaje del server) para poder
+      // diagnosticar sin acceso al inspector del dispositivo — Safari en
+      // particular es poco explícito y antes esto quedaba en un mensaje
+      // genérico sin pista de la causa.
+      console.error("Push subscription failed:", error);
+      const detail = pushErrorDetail(error);
+      toast.error(
+        detail
+          ? `No se pudo actualizar la suscripción: ${detail}`
+          : "No se pudo actualizar la suscripción. Probá de nuevo.",
+      );
     } finally {
       setBusy(false);
     }

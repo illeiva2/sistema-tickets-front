@@ -1,5 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { isIos, isStandalone } from "../src/lib/push";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../src/lib/api", () => ({
+  default: { get: vi.fn(), post: vi.fn() },
+}));
+
+import api from "../src/lib/api";
+import { enablePush, isIos, isStandalone } from "../src/lib/push";
+
+const apiMock = api as unknown as { post: ReturnType<typeof vi.fn> };
 
 const setUserAgent = (value: string) => {
   vi.stubGlobal("navigator", {
@@ -74,5 +82,78 @@ describe("isStandalone", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     vi.stubGlobal("navigator", { ...window.navigator, standalone: false });
     expect(isStandalone()).toBe(false);
+  });
+});
+
+describe("enablePush", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("manda al server sólo endpoint y keys, sin expirationTime ni otros campos", async () => {
+    // subscription.toJSON() del navegador real (Chrome/Safari) incluye
+    // expirationTime — justamente el campo que rompió el subscribe cuando
+    // se mandaba el objeto completo tal cual.
+    const browserSubscription = {
+      endpoint: "https://web.push.apple.com/abc123",
+      expirationTime: null,
+      keys: { p256dh: "clave-p256dh", auth: "clave-auth" },
+      toJSON() {
+        return {
+          endpoint: this.endpoint,
+          expirationTime: this.expirationTime,
+          keys: this.keys,
+        };
+      },
+    };
+    const subscribe = vi.fn().mockResolvedValue(browserSubscription);
+    const registration = {
+      pushManager: { subscribe },
+    } as unknown as ServiceWorkerRegistration;
+
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      serviceWorker: { getRegistration: vi.fn().mockResolvedValue(registration) },
+    });
+    vi.stubGlobal("PushManager", function () {});
+    vi.stubGlobal("Notification", {
+      requestPermission: vi.fn().mockResolvedValue("granted"),
+    });
+    apiMock.post.mockResolvedValue({ data: { success: true } });
+
+    const result = await enablePush("clave-publica-del-server");
+
+    expect(result).toBe(true);
+    expect(apiMock.post).toHaveBeenCalledWith("/api/push/subscribe", {
+      endpoint: "https://web.push.apple.com/abc123",
+      keys: { p256dh: "clave-p256dh", auth: "clave-auth" },
+    });
+    // Ningún objeto extra (expirationTime incluido) llega al server.
+    const sentPayload = apiMock.post.mock.calls[0][1];
+    expect(Object.keys(sentPayload).sort()).toEqual(["endpoint", "keys"]);
+  });
+
+  it("devuelve false si el usuario no otorga el permiso, sin llamar al server", async () => {
+    const registration = {
+      pushManager: { subscribe: vi.fn() },
+    } as unknown as ServiceWorkerRegistration;
+
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      serviceWorker: { getRegistration: vi.fn().mockResolvedValue(registration) },
+    });
+    vi.stubGlobal("PushManager", function () {});
+    vi.stubGlobal("Notification", {
+      requestPermission: vi.fn().mockResolvedValue("denied"),
+    });
+
+    const result = await enablePush("clave-publica-del-server");
+
+    expect(result).toBe(false);
+    expect(apiMock.post).not.toHaveBeenCalled();
   });
 });

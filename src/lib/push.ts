@@ -81,7 +81,14 @@ export async function enablePush(publicKey: string): Promise<boolean> {
     applicationServerKey: urlBase64ToUint8Array(publicKey).buffer as ArrayBuffer,
   });
 
-  await api.post("/api/push/subscribe", subscription.toJSON());
+  // Enviar sólo lo que el back necesita: toJSON() trae además
+  // expirationTime, y distintos navegadores (Safari incluido) no son
+  // consistentes en qué mandan ahí — mejor no depender de eso.
+  const json = subscription.toJSON();
+  await api.post("/api/push/subscribe", {
+    endpoint: json.endpoint,
+    keys: json.keys,
+  });
   return true;
 }
 
