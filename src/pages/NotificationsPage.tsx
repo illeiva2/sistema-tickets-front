@@ -28,6 +28,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useAuth } from "../hooks";
+import PushToggle from "../components/PushToggle";
 
 export default function NotificationsPage() {
   const { user } = useAuth();
@@ -106,13 +107,16 @@ export default function NotificationsPage() {
 
   return (
     <div className="container mx-auto px-3 py-4">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Notificaciones
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Gestiona tus notificaciones y preferencias
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Notificaciones
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Gestiona tus notificaciones y preferencias
+          </p>
+        </div>
+        <PushToggle />
       </div>
 
       {/* Tabs */}
