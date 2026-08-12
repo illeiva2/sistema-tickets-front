@@ -14,6 +14,33 @@ export function isPushSupported(): boolean {
   );
 }
 
+/**
+ * iOS/iPadOS. Safari sólo expone PushManager cuando la PWA está instalada
+ * (Compartir → Agregar a inicio); en una pestaña normal isPushSupported()
+ * da false aunque el dispositivo lo soporte (iOS 16.4+). iPadOS 13+ se
+ * identifica como "MacIntel" en el user agent, por eso el chequeo extra de
+ * touch points (los Mac de escritorio no tienen pantalla táctil).
+ */
+export function isIos(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** La app corre instalada (Android/desktop) o agregada a inicio (iOS). */
+export function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  const iosStandalone = (
+    window.navigator as unknown as { standalone?: boolean }
+  ).standalone;
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches === true ||
+    iosStandalone === true
+  );
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -54,7 +81,14 @@ export async function enablePush(publicKey: string): Promise<boolean> {
     applicationServerKey: urlBase64ToUint8Array(publicKey).buffer as ArrayBuffer,
   });
 
-  await api.post("/api/push/subscribe", subscription.toJSON());
+  // Enviar sólo lo que el back necesita: toJSON() trae además
+  // expirationTime, y distintos navegadores (Safari incluido) no son
+  // consistentes en qué mandan ahí — mejor no depender de eso.
+  const json = subscription.toJSON();
+  await api.post("/api/push/subscribe", {
+    endpoint: json.endpoint,
+    keys: json.keys,
+  });
   return true;
 }
 
