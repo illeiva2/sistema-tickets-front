@@ -466,24 +466,24 @@ const TicketDetailPage: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center px-2 pt-2 justify-between">
-                <span className="pr-4 pl-2">
+                <span className="pr-4 pl-2 min-w-0 break-words leading-tight">
                   {ticket?.title || `Ticket ${id}`}
                 </span>
-                <Badge variant="secondary" className="px-2 py-1 text-sm">
+                <Badge variant="secondary" className="px-2 py-1 text-sm shrink-0">
                   {statusLabel(ticket?.status)}
                 </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="px-2 pt-4">
               <div className="space-y-4">
-                <p className="text-muted-foreground leading-relaxed px-2 pb-2">
+                <p className="text-muted-foreground leading-relaxed px-2 pb-2 break-words">
                   {ticket?.description || "Sin descripción"}
                 </p>
 
-                <div className="flex items-center pb-2 space-x-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center pb-2 gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <div className="flex items-center space-x-2">
-                    <User size={14} />
-                    <span>
+                    <User size={14} className="shrink-0" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
                       Reportado por: {ticket?.requester?.email || "-"}
                     </span>
                   </div>
@@ -569,7 +569,7 @@ const TicketDetailPage: React.FC = () => {
                               {new Date(c.createdAt).toLocaleString()}
                             </span>
                           </div>
-                          <div className="text-sm whitespace-pre-wrap">
+                          <div className="text-sm whitespace-pre-wrap break-words">
                             {display}
                           </div>
                         </div>
@@ -975,10 +975,10 @@ const TicketDetailPage: React.FC = () => {
                   Asignado a
                 </label>
                 <div className="flex items-center space-x-2">
-                  <User size={14} />
+                  <User size={14} className="shrink-0" />
                   {user?.role === "ADMIN" ? (
                     <select
-                      className="px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                      className="w-full min-w-0 px-2 py-1 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                       value={ticket?.assignee?.id || ""}
                       onChange={async (e) => {
                         if (!ticket) return;

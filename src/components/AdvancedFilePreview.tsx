@@ -505,7 +505,7 @@ export const AdvancedFilePreview: React.FC<AdvancedFilePreviewProps> = ({
 
         {/* Información básica */}
         <div className="text-sm text-muted-foreground space-y-1">
-          <p>
+          <p className="break-words">
             <span className="font-medium">Tipo MIME:</span>{" "}
             {attachment.mimeType}
           </p>

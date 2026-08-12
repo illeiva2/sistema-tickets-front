@@ -435,7 +435,9 @@ export const UsersPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="text-sm text-muted-foreground">{user.email}</div>
+                <div className="text-sm text-muted-foreground break-words">
+                  {user.email}
+                </div>
 
                 {user.department && (
                   <div className="flex items-center gap-1.5">
@@ -471,7 +473,7 @@ export const UsersPage: React.FC = () => {
                     : `Creado: ${new Date(user.createdAt).toLocaleDateString()}`}
                 </div>
 
-                <div className="flex space-x-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"

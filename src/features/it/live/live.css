@@ -897,13 +897,16 @@
 .live-token-list li > div {
   display: grid;
   gap: 3px;
+  min-width: 0;
 }
 .live-token-list li strong {
   font-size: 0.72rem;
+  overflow-wrap: anywhere;
 }
 .live-token-list li small {
   color: var(--lv-muted);
   font-size: 0.61rem;
+  overflow-wrap: anywhere;
 }
 .live-inline-empty,
 .live-inline-loading {

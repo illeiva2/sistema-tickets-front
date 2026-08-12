@@ -142,7 +142,7 @@ export const Breadcrumbs: React.FC = () => {
   if (pathnames.length === 0) return null;
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+    <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground mb-4">
       <Link
         to="/"
         className="hover:text-foreground flex items-center space-x-1"
@@ -181,11 +181,14 @@ export const Breadcrumbs: React.FC = () => {
           <React.Fragment key={name}>
             <span className="text-muted-foreground">/</span>
             {isLast ? (
-              <span className="text-foreground font-medium capitalize">
+              <span className="text-foreground font-medium capitalize min-w-0 truncate">
                 {displayName}
               </span>
             ) : (
-              <Link to={routeTo} className="hover:text-foreground capitalize">
+              <Link
+                to={routeTo}
+                className="hover:text-foreground capitalize min-w-0 truncate"
+              >
                 {displayName}
               </Link>
             )}
