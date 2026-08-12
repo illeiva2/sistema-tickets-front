@@ -50,6 +50,23 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) return null;
+  try {
+    // .ready sólo resuelve cuando el registro tiene un worker activo.
+    // getRegistration() puede devolver un registro que todavía está
+    // instalando/activando (típico justo después de instalar la PWA), y
+    // pushManager.subscribe() ahí falla con "Subscribing for push requires
+    // an active worker". Con timeout por si el registro nunca llega a
+    // completarse (ej: /sw.js no se pudo servir): se cae al valor crudo de
+    // getRegistration(), que sigue siendo mejor que colgar para siempre.
+    const ready = navigator.serviceWorker.ready;
+    const timeout = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 8000);
+    });
+    const registration = await Promise.race([ready, timeout]);
+    if (registration) return registration;
+  } catch {
+    // sigue al fallback
+  }
   return (await navigator.serviceWorker.getRegistration()) ?? null;
 }
 
