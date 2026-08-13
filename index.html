@@ -21,12 +21,35 @@
       name="description"
       content="Mesa de ayuda interna de GRF: tickets de soporte, recursos, novedades y gestión IT."
     />
-    <meta property="og:title" content="Soporte GRF" />
+
+    <!-- Open Graph / WhatsApp / Facebook / Slack. og:image necesita URL
+         ABSOLUTA (WhatsApp no resuelve rutas relativas) y conviene 1200x630
+         para la tarjeta grande con foto en vez del thumbnail chico. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Soporte GRF" />
+    <meta property="og:url" content="https://soporte.grf.com.ar/" />
+    <meta property="og:title" content="Soporte GRF · Sistema de Tickets" />
     <meta
       property="og:description"
-      content="Mesa de ayuda interna de GRF: tickets de soporte, recursos y gestión IT."
+      content="Mesa de ayuda interna de GRF: tickets de soporte, recursos, novedades y gestión IT."
     />
-    <meta property="og:image" content="/apple-touch-icon.png" />
+    <meta property="og:image" content="https://soporte.grf.com.ar/og-image.png" />
+    <meta property="og:image:secure_url" content="https://soporte.grf.com.ar/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Soporte GRF — Sistema de tickets internos" />
+    <meta property="og:locale" content="es_AR" />
+
+    <!-- Twitter Card: algunos previsualizadores (Slack incluido) lo usan
+         como respaldo si no encuentran las tags og:. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Soporte GRF · Sistema de Tickets" />
+    <meta
+      name="twitter:description"
+      content="Mesa de ayuda interna de GRF: tickets de soporte, recursos, novedades y gestión IT."
+    />
+    <meta name="twitter:image" content="https://soporte.grf.com.ar/og-image.png" />
 
     <!-- Fuentes para los themes (Quiet Pro: Inter; Workshop: Plus Jakarta + Fraunces; Dystopia: IBM Plex Mono) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
