@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 // Componentes que SI van en el bundle inicial: layout, providers,
 // proteccion de rutas, error boundary. Son indispensables y livianos.
 import ProtectedRoute, { RoleProtectedRoute } from "./components/ProtectedRoute";
+import { ModulesProvider } from "./contexts/ModulesContext";
 import Layout from "./components/Layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
@@ -29,6 +30,8 @@ const ResourceDetailPage = lazy(() => import("./pages/ResourceDetailPage"));
 const ResourceEditorPage = lazy(() => import("./pages/ResourceEditorPage"));
 const AdminWorkshopsImportPage = lazy(() => import("./pages/AdminWorkshopsImportPage"));
 const AdminWorkshopsRulesPage = lazy(() => import("./pages/AdminWorkshopsRulesPage"));
+const AdminModulesPage = lazy(() => import("./pages/AdminModulesPage"));
+const LabModuleBridgePage = lazy(() => import("./pages/LabModuleBridgePage"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
 const ProjectEditorPage = lazy(() => import("./pages/ProjectEditorPage"));
@@ -73,11 +76,13 @@ function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <NotificationsProvider>
-                      <TicketsProvider>
-                        <Layout />
-                      </TicketsProvider>
-                    </NotificationsProvider>
+                    <ModulesProvider>
+                      <NotificationsProvider>
+                        <TicketsProvider>
+                          <Layout />
+                        </TicketsProvider>
+                      </NotificationsProvider>
+                    </ModulesProvider>
                   </ProtectedRoute>
                 }
               >
@@ -129,6 +134,15 @@ function App() {
                     </RoleProtectedRoute>
                   }
                 />
+                <Route
+                  path="admin/modulos"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                      <AdminModulesPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route path="modulos/laboratorio" element={<LabModuleBridgePage />} />
                 <Route path="resources" element={<ResourcesPage />} />
                 <Route
                   path="resources/new"
