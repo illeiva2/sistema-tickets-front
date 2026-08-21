@@ -46,40 +46,69 @@ const AdminModulesPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // Se guarda el fallo de cada endpoint por separado: con Promise.all un solo
+  // error dejaba la pantalla entera vacia sin decir por que.
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
   // Estado editable: userId -> (moduleKey -> level | undefined si no tiene)
   const [draft, setDraft] = useState<Record<string, Record<string, ModuleLevel | undefined>>>({});
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const [cat, usr, grt] = await Promise.all([
-          api.get("/modules/catalog"),
-          api.get("/users"),
-          api.get("/modules/grants"),
-        ]);
-        const catalogData: ModuleDefinition[] = cat.data?.data ?? [];
-        const usersRaw = usr.data?.data;
-        const usersData: UserRow[] = Array.isArray(usersRaw)
-          ? usersRaw
-          : (usersRaw?.users ?? usersRaw?.items ?? []);
-        const grantsData: Grant[] = grt.data?.data ?? [];
+      // allSettled y no all: que falle /modules/grants no tiene por que impedir
+      // ver los usuarios ni las columnas de modulos.
+      const [cat, usr, grt] = await Promise.allSettled([
+        api.get("/modules/catalog"),
+        api.get("/users"),
+        api.get("/modules/grants"),
+      ]);
 
-        setCatalog(catalogData);
-        setUsers(usersData.filter((u) => u.isActive !== false));
-        setGrants(grantsData);
+      const errs: string[] = [];
+      const describe = (r: PromiseRejectedResult) => {
+        const status = r.reason?.response?.status;
+        const msg =
+          r.reason?.response?.data?.error?.message ?? r.reason?.message ?? "error";
+        return status ? `HTTP ${status} — ${msg}` : msg;
+      };
 
-        const initial: Record<string, Record<string, ModuleLevel | undefined>> = {};
-        for (const u of usersData) initial[u.id] = {};
-        for (const g of grantsData) {
-          if (!initial[g.userId]) initial[g.userId] = {};
-          initial[g.userId][g.moduleKey] = g.level;
-        }
-        setDraft(initial);
-      } catch {
-        toast.error("No se pudieron cargar los permisos de módulos");
-      } finally {
-        setIsLoading(false);
+      let catalogData: ModuleDefinition[] = [];
+      if (cat.status === "fulfilled") {
+        catalogData = cat.value.data?.data ?? [];
+      } else {
+        errs.push(`GET /modules/catalog: ${describe(cat)}`);
+      }
+
+      let usersData: UserRow[] = [];
+      if (usr.status === "fulfilled") {
+        const raw = usr.value.data?.data;
+        usersData = Array.isArray(raw) ? raw : (raw?.users ?? raw?.items ?? []);
+      } else {
+        errs.push(`GET /users: ${describe(usr)}`);
+      }
+
+      let grantsData: Grant[] = [];
+      if (grt.status === "fulfilled") {
+        grantsData = grt.value.data?.data ?? [];
+      } else {
+        errs.push(`GET /modules/grants: ${describe(grt)}`);
+      }
+
+      setCatalog(catalogData);
+      setUsers(usersData.filter((u) => u.isActive !== false));
+      setGrants(grantsData);
+
+      const initial: Record<string, Record<string, ModuleLevel | undefined>> = {};
+      for (const u of usersData) initial[u.id] = {};
+      for (const g of grantsData) {
+        if (!initial[g.userId]) initial[g.userId] = {};
+        initial[g.userId][g.moduleKey] = g.level;
+      }
+      setDraft(initial);
+      setLoadErrors(errs);
+      setIsLoading(false);
+
+      if (errs.length > 0) {
+        toast.error("Algunos datos no se pudieron cargar");
       }
     };
     void load();
@@ -166,6 +195,26 @@ const AdminModulesPage: React.FC = () => {
           acceso a todo de forma implícita y no aparecen como asignables.
         </p>
       </div>
+
+      {loadErrors.length > 0 && (
+        <div className="rounded-md border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 text-sm">
+          <p className="font-medium text-red-800 dark:text-red-200">
+            No se pudo cargar todo
+          </p>
+          <ul className="mt-1 space-y-0.5 text-red-700 dark:text-red-300 font-mono text-xs">
+            {loadErrors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {loadErrors.length === 0 && catalog.length === 0 && (
+        <div className="rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200">
+          El catálogo de módulos vino vacío. Revisá que el backend desplegado
+          incluya <code>src/lib/modules.ts</code>.
+        </div>
+      )}
 
       <div className="relative max-w-sm">
         <Search
