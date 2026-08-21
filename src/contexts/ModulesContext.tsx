@@ -48,7 +48,7 @@ export const ModulesProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     try {
-      const res = await api.get("/modules/me");
+      const res = await api.get("/api/modules/me");
       setModules(res.data?.data ?? []);
     } catch {
       // Si falla, se asume sin modulos: es el lado seguro. El resto de la app
