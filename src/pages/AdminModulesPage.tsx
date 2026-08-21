@@ -58,9 +58,9 @@ const AdminModulesPage: React.FC = () => {
       // allSettled y no all: que falle /modules/grants no tiene por que impedir
       // ver los usuarios ni las columnas de modulos.
       const [cat, usr, grt] = await Promise.allSettled([
-        api.get("/modules/catalog"),
-        api.get("/users"),
-        api.get("/modules/grants"),
+        api.get("/api/modules/catalog"),
+        api.get("/api/users"),
+        api.get("/api/modules/grants"),
       ]);
 
       const errs: string[] = [];
@@ -151,12 +151,12 @@ const AdminModulesPage: React.FC = () => {
         .filter((m) => draft[userId]?.[m.key])
         .map((m) => ({ moduleKey: m.key, level: draft[userId][m.key] as ModuleLevel }));
 
-      const res = await api.put(`/modules/grants/${userId}`, { modules });
+      const res = await api.put(`/api/modules/grants/${userId}`, { modules });
       const result = res.data?.data;
 
       // Refrescar las concesiones para que "original" quede al día y el
       // botón de guardar se apague.
-      const grt = await api.get("/modules/grants");
+      const grt = await api.get("/api/modules/grants");
       setGrants(grt.data?.data ?? []);
 
       const n = (result?.granted?.length ?? 0) + (result?.revoked?.length ?? 0);
