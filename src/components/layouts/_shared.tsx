@@ -30,9 +30,12 @@ import {
   Smartphone,
   Network,
   Radar,
+  ShieldCheck,
+  FlaskConical,
 } from "lucide-react";
 import { replayOnboardingTour } from "../../lib/onboarding";
 import { useAuth, useTickets } from "../../hooks";
+import { useModules } from "../../contexts/ModulesContext";
 import { useNotificationsContext } from "../../contexts/NotificationsContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import ThemeSwitcher from "../ThemeSwitcher";
@@ -345,6 +348,14 @@ export interface NavItem {
   icon: React.ReactNode;
   showFor?: ("USER" | "AGENT" | "ADMIN")[];
   showUnreadCount?: boolean;
+  /**
+   * Clave de modulo que el usuario tiene que tener habilitada para ver el item.
+   * Es un eje distinto de showFor: el rol dice que puede hacer en ESTA app, el
+   * modulo dice a que herramientas de la plataforma tiene acceso.
+   */
+  requiresModule?: string;
+  /** true = el link sale de esta app (se abre en otra pestaña). */
+  externalHint?: boolean;
   /** Grupo de navegación. "it" se renderiza bajo el separador "Gestión IT". */
   section?: "general" | "it";
 }
@@ -354,6 +365,7 @@ export const IT_NAV_GROUP_LABEL = "Gestión IT";
 
 export const useNavItems = (): NavItem[] => {
   const { user } = useAuth();
+  const { has: hasModule } = useModules();
   const items: NavItem[] = [
     { to: "/", label: "Dashboard", icon: <BarChart3 size={16} /> },
     { to: "/tickets", label: "Tickets", icon: <Ticket size={16} /> },
@@ -389,6 +401,21 @@ export const useNavItems = (): NavItem[] => {
       label: "Workshops",
       icon: <GraduationCap size={16} />,
       showFor: ["ADMIN"],
+    },
+    {
+      to: "/admin/modulos",
+      label: "Acceso a módulos",
+      icon: <ShieldCheck size={16} />,
+      showFor: ["ADMIN"],
+    },
+    // Modulo externo: la app vive on-premise en el molino. Solo se ve si el
+    // usuario tiene la concesion; el permiso lo valida igual el backend.
+    {
+      to: "/modulos/laboratorio",
+      label: "Laboratorio",
+      icon: <FlaskConical size={16} />,
+      requiresModule: "glutenlab",
+      externalHint: true,
     },
     // ── Gestión IT (solo AGENT/ADMIN) ────────────────────────────────────
     {
@@ -441,10 +468,15 @@ export const useNavItems = (): NavItem[] => {
       section: "it",
     },
   ];
-  return items.filter(
-    (item) =>
-      !item.showFor || (user?.role && item.showFor.includes(user.role)),
-  );
+  return items.filter((item) => {
+    if (item.showFor && !(user?.role && item.showFor.includes(user.role))) {
+      return false;
+    }
+    if (item.requiresModule && !hasModule(item.requiresModule)) {
+      return false;
+    }
+    return true;
+  });
 };
 
 export const UnreadDot: React.FC = () => {
