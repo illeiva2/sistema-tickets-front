@@ -60,6 +60,19 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        // Barra de progreso indeterminada. Se usa en el modulo de laboratorio,
+        // donde algunas consultas agregan decenas de miles de mediciones y
+        // tardan varios segundos: un skeleton estatico no distingue "esta
+        // trabajando" de "se colgo".
+        "lab-sweep": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(400%)" },
+        },
+      },
+      animation: {
+        "lab-sweep": "lab-sweep 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+      },
     },
   },
   plugins: [],

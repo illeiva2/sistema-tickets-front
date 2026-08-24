@@ -31,7 +31,10 @@ const ResourceEditorPage = lazy(() => import("./pages/ResourceEditorPage"));
 const AdminWorkshopsImportPage = lazy(() => import("./pages/AdminWorkshopsImportPage"));
 const AdminWorkshopsRulesPage = lazy(() => import("./pages/AdminWorkshopsRulesPage"));
 const AdminModulesPage = lazy(() => import("./pages/AdminModulesPage"));
-const LabModuleBridgePage = lazy(() => import("./pages/LabModuleBridgePage"));
+const LabLayout = lazy(() => import("./features/lab/components/LabLayout"));
+const LabOperatorPage = lazy(() => import("./pages/lab/LabOperatorPage"));
+const LabSupervisorPage = lazy(() => import("./pages/lab/LabSupervisorPage"));
+const LabNirPage = lazy(() => import("./pages/lab/LabNirPage"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
 const ProjectEditorPage = lazy(() => import("./pages/ProjectEditorPage"));
@@ -142,7 +145,15 @@ function App() {
                     </RoleProtectedRoute>
                   }
                 />
-                <Route path="modulos/laboratorio" element={<LabModuleBridgePage />} />
+                {/* El modulo ya NO es un enlace externo: el panel se
+                    renderiza aca. LabLayout hace la puerta del modulo y las
+                    pestanas; cada vista tiene su propia URL para poder
+                    compartir un link a lo que estas mirando. */}
+                <Route path="modulos/laboratorio" element={<LabLayout />}>
+                  <Route index element={<LabOperatorPage />} />
+                  <Route path="supervisor" element={<LabSupervisorPage />} />
+                  <Route path="nir" element={<LabNirPage />} />
+                </Route>
                 <Route path="resources" element={<ResourcesPage />} />
                 <Route
                   path="resources/new"
