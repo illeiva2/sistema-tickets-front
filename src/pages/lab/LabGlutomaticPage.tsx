@@ -2,30 +2,65 @@ import React from "react";
 import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button } from "@/components/ui";
 import { KpiCard } from "@/components/dashboards/shared";
 import { labApi, labError, labKeys } from "@/features/lab/api";
 import { exportarCsv, type ColumnaCsv } from "@/features/lab/export";
-import { fmtDateTime, fmtInt, fmtNumber, fmtRelative } from "@/features/lab/format";
+import { fmtDate, fmtDateTime, fmtInt, fmtNumber, fmtRelative } from "@/features/lab/format";
 import { ExportButton } from "@/features/lab/components/LabLayout";
 import GlutenFilters, { hayFiltrosActivos } from "@/features/lab/components/GlutenFilters";
 import MeasurementsTable from "@/features/lab/components/MeasurementsTable";
 import MeasurementDetailModal from "@/features/lab/components/MeasurementDetailModal";
 import {
+  LabChartBox,
   LabFetchingHint,
   LabKpiSkeletons,
   LabProgressBar,
   LabTableSkeleton,
   useTicker,
 } from "@/features/lab/components/Loading";
-import type { MeasurementDto, MeasurementsFilters } from "@/features/lab/types";
+import type {
+  MeasurementDto,
+  MeasurementsFilters,
+  MonthlyTrendPointDto,
+  TrendPointDto,
+} from "@/features/lab/types";
+
+/**
+ * Glutomatic: mediciones y tendencias de gluten, en una sola vista.
+ *
+ * Absorbe lo que antes eran dos pestañas (Operador y Supervisor). El motivo no
+ * es solo tener menos pestañas: cada una traía su propio juego de filtros
+ * —fechas de un lado, un selector de período del otro— y eso permitía que la
+ * misma pantalla mostrara promedios de conjuntos distintos según dónde
+ * mirabas. Acá una sola barra gobierna indicadores, tabla y gráficos, así que
+ * por construcción describen lo mismo.
+ */
 
 const PAGE_SIZE = 50;
 
 /** Un equipo que no reporta hace más de dos días es una anomalía, no un filtro vacío. */
 const VIEJO_MS = 2 * 24 * 60 * 60 * 1000;
 
-const COLUMNAS_CSV: ColumnaCsv<MeasurementDto>[] = [
+/** Ventana del gráfico diario cuando no hay rango de fechas puesto. */
+const DIAS_POR_DEFECTO = 30;
+
+/** Un color por parámetro. El ámbar es siempre el primario, igual que en la vista del NIR. */
+const COLOR = { wet: "#f59e0b", dry: "#10b981", wbc: "#8b5cf6", idx: "#0ea5e9" };
+
+const CSV_MEDICIONES: ColumnaCsv<MeasurementDto>[] = [
   { header: "Fecha y hora", value: (m) => fmtDateTime(m.analyzedAt) },
   { header: "Muestra", value: (m) => m.sampleCode },
   { header: "Método", value: (m) => m.methodName?.trim() ?? "" },
@@ -37,7 +72,26 @@ const COLUMNAS_CSV: ColumnaCsv<MeasurementDto>[] = [
   { header: "Serial", value: (m) => m.instrumentSerial },
 ];
 
-export const LabOperatorPage: React.FC = () => {
+const CSV_DIARIO: ColumnaCsv<TrendPointDto>[] = [
+  { header: "Fecha", value: (p) => p.date },
+  { header: "Muestras", value: (p) => p.count, decimals: 0 },
+  { header: "Gluten húmedo (%)", value: (p) => p.avgWetGluten },
+  { header: "Gluten seco (%)", value: (p) => p.avgDryGluten },
+  { header: "Índice de gluten", value: (p) => p.avgGlutenIndex, decimals: 1 },
+  { header: "Retención de agua (%)", value: (p) => p.avgWBC },
+];
+
+const CSV_MENSUAL: ColumnaCsv<MonthlyTrendPointDto>[] = [
+  { header: "Año", value: (p) => p.year, decimals: 0 },
+  { header: "Mes", value: (p) => p.month, decimals: 0 },
+  { header: "Muestras", value: (p) => p.count, decimals: 0 },
+  { header: "Gluten húmedo (%)", value: (p) => p.avgWetGluten },
+  { header: "Gluten seco (%)", value: (p) => p.avgDryGluten },
+  { header: "Índice de gluten", value: (p) => p.avgGlutenIndex, decimals: 1 },
+  { header: "Retención de agua (%)", value: (p) => p.avgWBC },
+];
+
+export const LabGlutomaticPage: React.FC = () => {
   const [filtros, setFiltros] = React.useState<MeasurementsFilters>({
     sortBy: "analyzedAt",
     sortDesc: true,
@@ -48,6 +102,18 @@ export const LabOperatorPage: React.FC = () => {
   useTicker(1000);
 
   const conFiltros = hayFiltrosActivos(filtros);
+
+  /**
+   * Días que cubre el gráfico diario. Sale del rango filtrado, así el gráfico
+   * describe el mismo conjunto que todo lo demás. Sin rango se acota a 30 días:
+   * graficar cuatro años día por día no se puede leer.
+   */
+  const diasGrafico = React.useMemo(() => {
+    if (!filtros.from) return DIAS_POR_DEFECTO;
+    const desde = new Date(filtros.from + "T00:00:00").getTime();
+    const hasta = filtros.to ? new Date(filtros.to + "T00:00:00").getTime() : Date.now();
+    return Math.max(1, Math.min(400, Math.round((hasta - desde) / 86_400_000) + 1));
+  }, [filtros.from, filtros.to]);
 
   const equiposQ = useQuery({
     queryKey: labKeys.equipment,
@@ -86,12 +152,10 @@ export const LabOperatorPage: React.FC = () => {
   });
 
   /**
-   * Promedios por harina, con triple condición:
-   *   1. hay un equipo seleccionado,
-   *   2. el backend devolvió alguna harina conocida,
-   *   3. ese equipo es el del molino.
-   * En acopio los códigos son campos y camiones, así que clasificar por prefijo
-   * de harina daría números sin sentido.
+   * Promedios por harina, con triple condición: hay equipo seleccionado, el
+   * backend devolvió alguna harina conocida, y ese equipo es el del molino. En
+   * acopio los códigos son campos y camiones, así que clasificar por prefijo de
+   * harina daría números sin sentido.
    */
   const esMolino = Boolean(
     seleccionado && /molino/i.test(`${seleccionado.displayName} ${seleccionado.location ?? ""}`),
@@ -100,6 +164,32 @@ export const LabOperatorPage: React.FC = () => {
     queryKey: labKeys.flour(filtros),
     queryFn: () => labApi.flourStats(filtros),
     enabled: esMolino,
+  });
+
+  const [tendenciaQ, mensualQ] = useQueries({
+    queries: [
+      {
+        queryKey: labKeys.trend({ ...filtros, days: diasGrafico }),
+        queryFn: () => labApi.trend({ ...filtros, days: diasGrafico }),
+      },
+      {
+        // Fijo en 12 meses: NO respeta el rango de fechas, pero sí equipo y
+        // método. El subtítulo lo dice para que nadie lo lea mal.
+        queryKey: labKeys.trendMonthly({
+          months: 12,
+          serial: filtros.instrumentSerial,
+          method: filtros.method,
+          includeIncomplete: filtros.includeIncomplete,
+        }),
+        queryFn: () =>
+          labApi.trendMonthly({
+            months: 12,
+            serial: filtros.instrumentSerial,
+            method: filtros.method,
+            includeIncomplete: filtros.includeIncomplete,
+          }),
+      },
+    ],
   });
 
   const medQ = useInfiniteQuery({
@@ -111,15 +201,10 @@ export const LabOperatorPage: React.FC = () => {
       const cargadas = todas.reduce((n, p) => n + p.items.length, 0);
       return cargadas < ultima.total ? todas.length + 1 : undefined;
     },
-    // Auto-refresco solo con una página cargada. Con varias, refrescar
-    // recargaría todas: caro contra este backend, y la lista salta.
-    //
-    // Dos minutos y no los 30 segundos del dashboard original: los datos solo
-    // pueden cambiar cuando corre el agente del molino, que es cada 5 minutos.
-    // Refrescar cada 30 s significaba que 9 de cada 10 consultas volvían con lo
-    // mismo, y cada una agrega ~2 s de trabajo contra la base. El indicador de
-    // frescura ya dice hace cuánto es el último dato, así que la información
-    // que se pierde es nula.
+    // Auto-refresco solo con una página cargada: con varias, refrescar
+    // recargaría todas y la lista salta. Dos minutos y no treinta segundos,
+    // porque los datos solo cambian cuando corre el agente del molino, que es
+    // cada cinco.
     refetchInterval: (q) => (q.state.data?.pages.length === 1 ? 120_000 : false),
   });
 
@@ -128,13 +213,46 @@ export const LabOperatorPage: React.FC = () => {
     [medQ.data],
   );
   const total = medQ.data?.pages[0]?.total ?? 0;
+  const diario = tendenciaQ.data ?? [];
+  const mensual = mensualQ.data ?? [];
+  const stats = statsQ.data;
+  const resumen = resumenQ.data;
 
-  // Los errores se avisan una vez por cambio de error, no en cada render.
-  const errores = [equiposQ.error, metodosQ.error, statsQ.error, medQ.error].filter(Boolean);
+  const errores = [equiposQ.error, statsQ.error, medQ.error, tendenciaQ.error].filter(Boolean);
   React.useEffect(() => {
     if (errores.length > 0) toast.error(`Error cargando datos: ${labError(errores[0])}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errores.length > 0 ? labError(errores[0]) : null]);
+
+  // `?? null` explícito para que recharts CORTE la línea en los huecos en vez
+  // de interpolar un valor que nadie midió.
+  const datosDiarios = React.useMemo(
+    () =>
+      diario.map((p) => ({
+        date: fmtDate(p.date),
+        count: p.count,
+        "Gluten húmedo (%)": p.avgWetGluten ?? null,
+        "Gluten seco (%)": p.avgDryGluten ?? null,
+        "WBC (%)": p.avgWBC ?? null,
+        "Índice de gluten": p.avgGlutenIndex ?? null,
+      })),
+    [diario],
+  );
+
+  const datosMensuales = React.useMemo(
+    () =>
+      mensual.map((p) => ({
+        mes: new Date(p.year, p.month - 1, 1).toLocaleDateString("es-AR", {
+          month: "short",
+          year: "2-digit",
+        }),
+        "Gluten húmedo (%)": p.avgWetGluten ?? null,
+        "Gluten seco (%)": p.avgDryGluten ?? null,
+        "WBC (%)": p.avgWBC ?? null,
+        "Índice de gluten": p.avgGlutenIndex ?? null,
+      })),
+    [mensual],
+  );
 
   const ordenar = (col: string) =>
     setFiltros((f) => ({
@@ -143,21 +261,46 @@ export const LabOperatorPage: React.FC = () => {
       sortDesc: f.sortBy === col ? !f.sortDesc : true,
     }));
 
-  const cargandoKpis = conFiltros ? statsQ.isPending : resumenQ.isPending;
-  const stats = statsQ.data;
-  const resumen = resumenQ.data;
+  const limpiar = () => setFiltros({ sortBy: "analyzedAt", sortDesc: true });
 
   return (
     <div className="space-y-4">
-      {conFiltros && stats && (
-        <p className="text-[11.5px] text-muted-foreground">
-          Los indicadores se calculan sobre las <strong>{fmtInt(stats.count)}</strong>{" "}
-          mediciones que cumplen el filtro, no sobre las cargadas en la tabla.
-        </p>
-      )}
+      {/* ─── Filtros: gobiernan TODA la vista ─────────────────────────── */}
+      <div className="border border-border bg-card rounded-lg overflow-hidden">
+        <LabProgressBar
+          active={statsQ.isFetching || medQ.isFetching || tendenciaQ.isFetching}
+        />
+        <GlutenFilters
+          equipment={equipos}
+          methods={metodosQ.data ?? []}
+          value={filtros}
+          onChange={setFiltros}
+        />
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11.5px] text-muted-foreground">
+          <span>
+            {conFiltros && stats ? (
+              <>
+                Indicadores, tabla y gráficos sobre las{" "}
+                <strong className="text-foreground">{fmtInt(stats.count)}</strong> mediciones
+                que cumplen el filtro
+                {stats.firstMeasurementAt && stats.lastMeasurementAt && (
+                  <>
+                    {" · "}
+                    {fmtDate(stats.firstMeasurementAt)} a {fmtDate(stats.lastMeasurementAt)}
+                  </>
+                )}
+              </>
+            ) : (
+              "Sin filtros: histórico completo"
+            )}
+          </span>
+          <LabFetchingHint active={statsQ.isFetching && !statsQ.isPending} />
+        </div>
+      </div>
 
+      {/* ─── Indicadores ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {cargandoKpis ? (
+        {(conFiltros ? statsQ.isPending : resumenQ.isPending) ? (
           <LabKpiSkeletons count={4} />
         ) : conFiltros && stats ? (
           <>
@@ -165,7 +308,11 @@ export const LabOperatorPage: React.FC = () => {
               label="Muestras en filtro"
               value={fmtInt(stats.count)}
               tone="blue"
-              hint={stats.lastMeasurementAt ? `última: ${fmtRelative(stats.lastMeasurementAt)}` : undefined}
+              hint={
+                stats.lastMeasurementAt
+                  ? `última: ${fmtRelative(stats.lastMeasurementAt)}`
+                  : undefined
+              }
             />
             <KpiCard
               label="Gluten húmedo prom."
@@ -227,8 +374,8 @@ export const LabOperatorPage: React.FC = () => {
         )}
       </div>
 
+      {/* ─── Equipos + tabla ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* ─── Equipos ─────────────────────────────────────────────────── */}
         <div className="border border-border bg-card rounded-lg overflow-hidden self-start">
           <div className="px-3 py-2 border-b border-border">
             <h2 className="text-sm font-semibold">Equipos</h2>
@@ -236,8 +383,7 @@ export const LabOperatorPage: React.FC = () => {
           <div className="p-3 space-y-2">
             {equiposQ.isPending && <LabTableSkeleton rows={2} cols={2} />}
             {equipos.map((e, i) => {
-              const st = frescuraQ[i]?.data;
-              const ultima = st?.lastMeasurementAt ?? null;
+              const ultima = frescuraQ[i]?.data?.lastMeasurementAt ?? null;
               const viejo = ultima ? Date.now() - new Date(ultima).getTime() > VIEJO_MS : false;
               const activo = filtros.instrumentSerial === e.serial;
 
@@ -258,9 +404,6 @@ export const LabOperatorPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[13px] font-medium">{e.displayName}</span>
-                    {/* Se lee del DTO y no se fuerza a "Activo": el dashboard
-                        original lo tenía hardcodeado y ocultaba un equipo dado
-                        de baja. */}
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded ${
                         e.isActive
@@ -277,7 +420,9 @@ export const LabOperatorPage: React.FC = () => {
                   </div>
                   <div
                     className={`text-[11px] mt-0.5 ${
-                      viejo ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+                      viejo
+                        ? "text-amber-600 dark:text-amber-400 font-medium"
+                        : "text-muted-foreground"
                     }`}
                   >
                     {ultima
@@ -343,10 +488,8 @@ export const LabOperatorPage: React.FC = () => {
           )}
         </div>
 
-        {/* ─── Filtros + tabla ─────────────────────────────────────────── */}
         <div className="lg:col-span-2 border border-border bg-card rounded-lg overflow-hidden">
-          <LabProgressBar active={medQ.isFetching || statsQ.isFetching} />
-
+          <LabProgressBar active={medQ.isFetching} />
           <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2 min-w-0">
               <h2 className="text-sm font-semibold shrink-0">Mediciones</h2>
@@ -358,7 +501,7 @@ export const LabOperatorPage: React.FC = () => {
             <div className="flex items-center gap-1.5 shrink-0">
               <ExportButton
                 onClick={() => {
-                  exportarCsv(items, COLUMNAS_CSV, "laboratorio_gluten");
+                  exportarCsv(items, CSV_MEDICIONES, "laboratorio_gluten");
                   toast.success(`${items.length} mediciones exportadas`);
                 }}
                 disabled={items.length === 0}
@@ -381,24 +524,13 @@ export const LabOperatorPage: React.FC = () => {
             </div>
           </div>
 
-          <GlutenFilters
-            equipment={equipos}
-            methods={metodosQ.data ?? []}
-            value={filtros}
-            onChange={setFiltros}
-          />
-
           {medQ.isPending ? (
             <LabTableSkeleton rows={8} cols={7} />
           ) : items.length === 0 ? (
             <div className="px-4 py-12 text-center space-y-3">
               <div className="text-sm font-medium">Sin mediciones para los filtros aplicados</div>
               {conFiltros && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setFiltros({ sortBy: "analyzedAt", sortDesc: true })}
-                >
+                <Button variant="outline" size="sm" onClick={limpiar}>
                   Limpiar filtros
                 </Button>
               )}
@@ -434,9 +566,127 @@ export const LabOperatorPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ─── Evolución diaria ────────────────────────────────────────── */}
+      <div className="border border-border bg-card rounded-lg overflow-hidden">
+        <LabProgressBar active={tendenciaQ.isFetching} />
+        <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-border">
+          <div>
+            <h2 className="text-sm font-semibold">Evolución de parámetros</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {filtros.from
+                ? "Sobre el rango filtrado"
+                : `Últimos ${DIAS_POR_DEFECTO} días. Elegí un rango arriba para cambiar la ventana`}
+            </p>
+          </div>
+          <ExportButton
+            onClick={() => {
+              exportarCsv(diario, CSV_DIARIO, "laboratorio_tendencia_diaria");
+              toast.success(`${diario.length} días exportados`);
+            }}
+            disabled={diario.length === 0}
+          />
+        </div>
+        <div className="p-3">
+          <LabChartBox
+            height={320}
+            loading={tendenciaQ.isPending}
+            empty={datosDiarios.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={datosDiarios} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis yAxisId="l" fontSize={11} domain={["auto", "auto"]} />
+                {/* Eje derecho fijo 0–100: el índice de gluten es una escala
+                    0-100 por definición. Compartiendo eje con los porcentajes,
+                    las cuatro series quedan ilegibles. */}
+                <YAxis yAxisId="r" orientation="right" fontSize={11} domain={[0, 100]} />
+                <Tooltip />
+                <Legend />
+                <Line yAxisId="l" type="monotone" dataKey="Gluten húmedo (%)" stroke={COLOR.wet} strokeWidth={2} dot={false} />
+                <Line yAxisId="l" type="monotone" dataKey="Gluten seco (%)" stroke={COLOR.dry} strokeWidth={2} dot={false} />
+                <Line yAxisId="l" type="monotone" dataKey="WBC (%)" stroke={COLOR.wbc} strokeWidth={2} dot={false} />
+                <Line yAxisId="r" type="monotone" dataKey="Índice de gluten" stroke={COLOR.idx} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </LabChartBox>
+        </div>
+      </div>
+
+      {/* ─── Promedios por mes ───────────────────────────────────────── */}
+      <div className="border border-border bg-card rounded-lg overflow-hidden">
+        <LabProgressBar active={mensualQ.isFetching} />
+        <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-border">
+          <div>
+            <h2 className="text-sm font-semibold">Promedios por mes</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Últimos 12 meses · ponderado por muestra · respeta equipo y método, no el
+              rango de fechas
+            </p>
+          </div>
+          <ExportButton
+            onClick={() => {
+              exportarCsv(mensual, CSV_MENSUAL, "laboratorio_promedios_mensuales");
+              toast.success(`${mensual.length} meses exportados`);
+            }}
+            disabled={mensual.length === 0}
+          />
+        </div>
+        <div className="p-3">
+          <LabChartBox
+            height={280}
+            loading={mensualQ.isPending}
+            empty={datosMensuales.length === 0}
+            emptyLabel="Sin datos"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={datosMensuales} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="mes" fontSize={11} />
+                <YAxis yAxisId="l" fontSize={11} domain={["auto", "auto"]} />
+                <YAxis yAxisId="r" orientation="right" fontSize={11} domain={[0, 100]} />
+                <Tooltip />
+                <Legend />
+                {/* Con puntos, a diferencia del diario: son 12 valores
+                    discretos y no una serie densa. */}
+                <Line yAxisId="l" type="monotone" dataKey="Gluten húmedo (%)" stroke={COLOR.wet} strokeWidth={2} />
+                <Line yAxisId="l" type="monotone" dataKey="Gluten seco (%)" stroke={COLOR.dry} strokeWidth={2} />
+                <Line yAxisId="l" type="monotone" dataKey="WBC (%)" stroke={COLOR.wbc} strokeWidth={2} />
+                <Line yAxisId="r" type="monotone" dataKey="Índice de gluten" stroke={COLOR.idx} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </LabChartBox>
+        </div>
+      </div>
+
+      {/* ─── Volumen diario ──────────────────────────────────────────── */}
+      <div className="border border-border bg-card rounded-lg overflow-hidden">
+        <div className="px-3 py-2 border-b border-border">
+          <h2 className="text-sm font-semibold">Volumen de mediciones por día</h2>
+        </div>
+        <div className="p-3">
+          <LabChartBox
+            height={220}
+            loading={tendenciaQ.isPending}
+            empty={datosDiarios.length === 0}
+            emptyLabel="Sin datos"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={datosDiarios}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis fontSize={11} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" name="Muestras" fill={COLOR.wet} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </LabChartBox>
+        </div>
+      </div>
+
       <MeasurementDetailModal sampleId={detalle} onClose={() => setDetalle(null)} />
     </div>
   );
 };
 
-export default LabOperatorPage;
+export default LabGlutomaticPage;

@@ -1,6 +1,6 @@
 // React 18 with jsx:react-jsx doesn't require explicit import
 import { lazy, Suspense } from "react";
-import { Routes, Route, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 // Componentes que SI van en el bundle inicial: layout, providers,
@@ -32,8 +32,7 @@ const AdminWorkshopsImportPage = lazy(() => import("./pages/AdminWorkshopsImport
 const AdminWorkshopsRulesPage = lazy(() => import("./pages/AdminWorkshopsRulesPage"));
 const AdminModulesPage = lazy(() => import("./pages/AdminModulesPage"));
 const LabLayout = lazy(() => import("./features/lab/components/LabLayout"));
-const LabOperatorPage = lazy(() => import("./pages/lab/LabOperatorPage"));
-const LabSupervisorPage = lazy(() => import("./pages/lab/LabSupervisorPage"));
+const LabGlutomaticPage = lazy(() => import("./pages/lab/LabGlutomaticPage"));
 const LabNirPage = lazy(() => import("./pages/lab/LabNirPage"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
@@ -150,9 +149,19 @@ function App() {
                     pestanas; cada vista tiene su propia URL para poder
                     compartir un link a lo que estas mirando. */}
                 <Route path="modulos/laboratorio" element={<LabLayout />}>
-                  <Route index element={<LabOperatorPage />} />
-                  <Route path="supervisor" element={<LabSupervisorPage />} />
+                  <Route index element={<LabGlutomaticPage />} />
                   <Route path="nir" element={<LabNirPage />} />
+                  {/* Operador y Supervisor se fusionaron en Glutomatic. El
+                      redirect existe porque esas URLs se pudieron compartir por
+                      chat: sin el, un link viejo cae en un 404 sin explicacion. */}
+                  <Route
+                    path="operador"
+                    element={<Navigate to="/modulos/laboratorio" replace />}
+                  />
+                  <Route
+                    path="supervisor"
+                    element={<Navigate to="/modulos/laboratorio" replace />}
+                  />
                 </Route>
                 <Route path="resources" element={<ResourcesPage />} />
                 <Route

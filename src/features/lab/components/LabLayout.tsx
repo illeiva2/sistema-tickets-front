@@ -5,16 +5,23 @@ import { useModules } from "@/contexts/ModulesContext";
 import { Button } from "@/components/ui";
 
 /**
- * Armazón de las tres vistas del laboratorio.
+ * Armazón del panel de laboratorio.
  *
  * Las pestañas son RUTAS y no estado interno: así cada vista tiene URL propia y
  * se puede mandar por chat un link a lo que estás mirando, que es la mitad de
  * para qué existe un panel compartido.
  */
 
+/**
+ * Una pestaña por instrumento, no por rol.
+ *
+ * Antes eran tres (Operador, Supervisor, NIR) y las dos primeras miraban los
+ * MISMOS datos con filtros distintos, lo que permitia que la pantalla mostrara
+ * promedios de conjuntos distintos segun donde miraras. Partir por instrumento
+ * es la division que sigue al dato y no al puesto de quien mira.
+ */
 const PESTANAS = [
-  { to: "/modulos/laboratorio", label: "Operador", end: true },
-  { to: "/modulos/laboratorio/supervisor", label: "Supervisor", end: false },
+  { to: "/modulos/laboratorio", label: "Glutomatic", end: true },
   { to: "/modulos/laboratorio/nir", label: "NIR", end: false },
 ];
 

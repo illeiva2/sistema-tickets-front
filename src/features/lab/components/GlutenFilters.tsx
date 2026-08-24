@@ -1,6 +1,7 @@
 import React from "react";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui";
+import { toDateInput } from "../format";
 import type { EquipmentDto, MeasurementsFilters, MethodDto } from "../types";
 
 /**
@@ -14,6 +15,28 @@ import type { EquipmentDto, MeasurementsFilters, MethodDto } from "../types";
 
 const CLASE_CONTROL =
   "px-2 py-1 text-[12.5px] border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary";
+
+/**
+ * Atajos de período. Reemplazan al selector del Supervisor, que era un control
+ * aparte con su propio estado: ahora escriben en el mismo desde/hasta que usa
+ * todo lo demás, así los indicadores, la tabla y los gráficos no pueden quedar
+ * describiendo conjuntos distintos.
+ */
+const ATAJOS: { label: string; dias: number | null }[] = [
+  { label: "7 d", dias: 7 },
+  { label: "30 d", dias: 30 },
+  { label: "90 d", dias: 90 },
+  { label: "1 año", dias: 365 },
+  { label: "Todo", dias: null },
+];
+
+/** Cuántos días cubre el rango, para saber qué atajo resaltar. */
+const diasDelRango = (f: MeasurementsFilters): number | null => {
+  if (!f.from) return null;
+  const desde = new Date(f.from + "T00:00:00");
+  const hasta = f.to ? new Date(f.to + "T00:00:00") : new Date();
+  return Math.round((hasta.getTime() - desde.getTime()) / 86_400_000);
+};
 
 export const hayFiltrosActivos = (f: MeasurementsFilters): boolean =>
   Boolean(
@@ -53,9 +76,44 @@ export const GlutenFilters: React.FC<{
   }, [value.sampleCodeContains]);
 
   const activos = hayFiltrosActivos(value);
+  const rango = diasDelRango(value);
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-muted/20">
+      <div className="flex items-center gap-0.5 rounded-md border border-border bg-background p-0.5">
+        {ATAJOS.map((a) => {
+          // "Todo" queda marcado solo si no hay rango; los demás toleran un día
+          // de diferencia, porque el rango se calcula contra "hoy".
+          const activo =
+            a.dias === null
+              ? !value.from
+              : rango !== null && Math.abs(rango - a.dias) <= 1;
+          return (
+            <button
+              key={a.label}
+              onClick={() =>
+                onChange(
+                  a.dias === null
+                    ? { ...value, from: undefined, to: undefined }
+                    : {
+                        ...value,
+                        from: toDateInput(new Date(Date.now() - a.dias * 86_400_000)),
+                        to: undefined,
+                      },
+                )
+              }
+              className={`px-2 py-0.5 rounded text-[11.5px] transition-colors ${
+                activo
+                  ? "bg-muted text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+
       <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
         Desde
         <input
