@@ -169,6 +169,10 @@ export const Breadcrumbs: React.FC = () => {
             staff: "Personal y líneas",
             network: "Red y topología",
             live: "Equipos en vivo",
+            modulos: "Módulos",
+            laboratorio: "Laboratorio",
+            supervisor: "Supervisor",
+            nir: "NIR",
           }[name] || name;
 
         if (
@@ -415,7 +419,6 @@ export const useNavItems = (): NavItem[] => {
       label: "Laboratorio",
       icon: <FlaskConical size={16} />,
       requiresModule: "glutenlab",
-      externalHint: true,
     },
     // ── Gestión IT (solo AGENT/ADMIN) ────────────────────────────────────
     {
