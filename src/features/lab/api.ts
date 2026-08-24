@@ -67,11 +67,23 @@ export const labApi = {
   flourStats: (f: MeasurementsFilters = {}) =>
     get<FlourStatsDto[]>("/measurements/flour-stats", soloFiltros(f)),
 
-  trend: (p: { days?: number; instrumentSerial?: string; method?: string; from?: string } = {}) =>
-    get<TrendPointDto[]>("/measurements/trend", p),
+  /**
+   * Tendencia diaria. Acepta el juego COMPLETO de filtros, no solo equipo y
+   * método: con una sola barra de filtros gobernando toda la vista, el gráfico
+   * tiene que describir el mismo conjunto que los indicadores y la tabla.
+   * `days` acota la ventana cuando no hay rango de fechas puesto.
+   */
+  trend: (f: MeasurementsFilters & { days?: number } = {}) =>
+    get<TrendPointDto[]>("/measurements/trend", { ...soloFiltros(f), days: f.days }),
 
-  trendMonthly: (p: { months?: number; serial?: string; method?: string } = {}) =>
-    get<MonthlyTrendPointDto[]>("/measurements/trend/monthly", p),
+  trendMonthly: (
+    p: {
+      months?: number;
+      serial?: string;
+      method?: string;
+      includeIncomplete?: boolean;
+    } = {},
+  ) => get<MonthlyTrendPointDto[]>("/measurements/trend/monthly", p),
 
   details: (sampleId: number) =>
     get<MeasurementDetailDto>(`/measurements/${sampleId}/details`),

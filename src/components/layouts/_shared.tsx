@@ -171,7 +171,6 @@ export const Breadcrumbs: React.FC = () => {
             live: "Equipos en vivo",
             modulos: "Módulos",
             laboratorio: "Laboratorio",
-            supervisor: "Supervisor",
             nir: "NIR",
           }[name] || name;
 
