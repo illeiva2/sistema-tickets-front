@@ -173,3 +173,41 @@ export interface NirFilters {
   page?: number;
   pageSize?: number;
 }
+
+// ─── FN 1000 (Falling Number) ────────────────────────────────────────────────
+
+export interface FnStatsDto {
+  count: number;
+  withFallingNumber: number;
+  avgFallingNumber: number | null;
+  minFallingNumber: number | null;
+  maxFallingNumber: number | null;
+  firstAt: string | null;
+  lastAt: string | null;
+}
+
+export interface FnMeasurementDto {
+  measurementId: string;
+  sampleCode: string | null;
+  analyzedAt: string;
+  /** Canal en que se corrió la muestra: "Izq" / "Der". El equipo corre dos en paralelo. */
+  channel: string;
+  fallingNumber: number | null;
+  liquefactionNumber: number | null;
+  temp: number | null;
+  pressure: number | null;
+}
+
+export interface FnTrendPointDto {
+  date: string;
+  avgFallingNumber: number | null;
+  count: number;
+}
+
+export interface FnFilters {
+  from?: string;
+  to?: string;
+  sampleCodeContains?: string;
+  page?: number;
+  pageSize?: number;
+}

@@ -172,6 +172,7 @@ export const Breadcrumbs: React.FC = () => {
             modulos: "Módulos",
             laboratorio: "Laboratorio",
             nir: "NIR",
+            fn: "Falling Number",
           }[name] || name;
 
         if (
