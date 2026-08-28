@@ -16,6 +16,10 @@ import type {
   NirTrendPointDto,
   PagedResult,
   TrendPointDto,
+  FnStatsDto,
+  FnMeasurementDto,
+  FnTrendPointDto,
+  FnFilters,
 } from "./types";
 
 /**
@@ -107,6 +111,23 @@ export const labApi = {
         sampleCodeContains: f.sampleCodeContains,
       }),
   },
+
+  fn: {
+    stats: (f: FnFilters = {}) =>
+      get<FnStatsDto>("/fn/stats", {
+        from: f.from,
+        to: f.to,
+        sampleCodeContains: f.sampleCodeContains,
+      }),
+    measurements: (f: FnFilters = {}) =>
+      get<PagedResult<FnMeasurementDto>>("/fn/measurements", { ...f }),
+    trend: (f: FnFilters = {}) =>
+      get<FnTrendPointDto[]>("/fn/trend", {
+        from: f.from,
+        to: f.to,
+        sampleCodeContains: f.sampleCodeContains,
+      }),
+  },
 };
 
 /** Claves de React Query. Centralizadas para poder invalidar por prefijo. */
@@ -125,6 +146,9 @@ export const labKeys = {
   nirStats: (f: NirFilters) => ["lab", "nir", "stats", f] as const,
   nirTrend: (f: NirFilters) => ["lab", "nir", "trend", f] as const,
   nirMeasurements: (f: NirFilters) => ["lab", "nir", "measurements", f] as const,
+  fnStats: (f: FnFilters) => ["lab", "fn", "stats", f] as const,
+  fnTrend: (f: FnFilters) => ["lab", "fn", "trend", f] as const,
+  fnMeasurements: (f: FnFilters) => ["lab", "fn", "measurements", f] as const,
 };
 
 /** Mensaje de error legible, con el mismo desanidado que usa el resto del repo. */

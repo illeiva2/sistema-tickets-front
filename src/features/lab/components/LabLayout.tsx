@@ -23,6 +23,7 @@ import { Button } from "@/components/ui";
 const PESTANAS = [
   { to: "/modulos/laboratorio", label: "Glutomatic", end: true },
   { to: "/modulos/laboratorio/nir", label: "NIR", end: false },
+  { to: "/modulos/laboratorio/fn", label: "Falling Number", end: false },
 ];
 
 export const LabLayout: React.FC = () => {
