@@ -20,6 +20,10 @@ import type {
   FnMeasurementDto,
   FnTrendPointDto,
   FnFilters,
+  SdmaticStatsDto,
+  SdmaticMeasurementDto,
+  SdmaticTrendPointDto,
+  SdmaticFilters,
 } from "./types";
 
 /**
@@ -128,6 +132,23 @@ export const labApi = {
         sampleCodeContains: f.sampleCodeContains,
       }),
   },
+
+  sdmatic: {
+    stats: (f: SdmaticFilters = {}) =>
+      get<SdmaticStatsDto>("/sdmatic/stats", {
+        from: f.from,
+        to: f.to,
+        sampleCodeContains: f.sampleCodeContains,
+      }),
+    measurements: (f: SdmaticFilters = {}) =>
+      get<PagedResult<SdmaticMeasurementDto>>("/sdmatic/measurements", { ...f }),
+    trend: (f: SdmaticFilters = {}) =>
+      get<SdmaticTrendPointDto[]>("/sdmatic/trend", {
+        from: f.from,
+        to: f.to,
+        sampleCodeContains: f.sampleCodeContains,
+      }),
+  },
 };
 
 /** Claves de React Query. Centralizadas para poder invalidar por prefijo. */
@@ -149,6 +170,9 @@ export const labKeys = {
   fnStats: (f: FnFilters) => ["lab", "fn", "stats", f] as const,
   fnTrend: (f: FnFilters) => ["lab", "fn", "trend", f] as const,
   fnMeasurements: (f: FnFilters) => ["lab", "fn", "measurements", f] as const,
+  sdmaticStats: (f: SdmaticFilters) => ["lab", "sdmatic", "stats", f] as const,
+  sdmaticTrend: (f: SdmaticFilters) => ["lab", "sdmatic", "trend", f] as const,
+  sdmaticMeasurements: (f: SdmaticFilters) => ["lab", "sdmatic", "measurements", f] as const,
 };
 
 /** Mensaje de error legible, con el mismo desanidado que usa el resto del repo. */
