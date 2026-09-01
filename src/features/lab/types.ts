@@ -211,3 +211,42 @@ export interface FnFilters {
   page?: number;
   pageSize?: number;
 }
+
+// ─── SDmatic 2 (almidón dañado) ──────────────────────────────────────────────
+
+export interface SdmaticStatsDto {
+  count: number;
+  withUcd: number;
+  avgUcd: number | null;
+  minUcd: number | null;
+  maxUcd: number | null;
+  firstAt: string | null;
+  lastAt: string | null;
+}
+
+export interface SdmaticMeasurementDto {
+  measurementId: string;
+  sampleCode: string | null;
+  analyzedAt: string;
+  /** Almidón dañado, unidad UCD (la métrica principal). */
+  ucd: number | null;
+  /** UCD corregido por proteína; null si no se cargó proteína. */
+  ucdc: number | null;
+  iodineAbsorption: number | null;
+  humidity: number | null;
+  protein: number | null;
+}
+
+export interface SdmaticTrendPointDto {
+  date: string;
+  avgUcd: number | null;
+  count: number;
+}
+
+export interface SdmaticFilters {
+  from?: string;
+  to?: string;
+  sampleCodeContains?: string;
+  page?: number;
+  pageSize?: number;
+}

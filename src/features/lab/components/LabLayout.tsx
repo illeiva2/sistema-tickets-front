@@ -24,6 +24,7 @@ const PESTANAS = [
   { to: "/modulos/laboratorio", label: "Glutomatic", end: true },
   { to: "/modulos/laboratorio/nir", label: "NIR", end: false },
   { to: "/modulos/laboratorio/fn", label: "Falling Number", end: false },
+  { to: "/modulos/laboratorio/sdmatic", label: "Almidón dañado", end: false },
 ];
 
 export const LabLayout: React.FC = () => {
