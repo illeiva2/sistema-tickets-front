@@ -36,6 +36,7 @@ const LabGlutomaticPage = lazy(() => import("./pages/lab/LabGlutomaticPage"));
 const LabNirPage = lazy(() => import("./pages/lab/LabNirPage"));
 const LabFnPage = lazy(() => import("./pages/lab/LabFnPage"));
 const LabSdmaticPage = lazy(() => import("./pages/lab/LabSdmaticPage"));
+const LabAlveolabPage = lazy(() => import("./pages/lab/LabAlveolabPage"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
 const ProjectEditorPage = lazy(() => import("./pages/ProjectEditorPage"));
@@ -155,6 +156,7 @@ function App() {
                   <Route path="nir" element={<LabNirPage />} />
                   <Route path="fn" element={<LabFnPage />} />
                   <Route path="sdmatic" element={<LabSdmaticPage />} />
+                  <Route path="alveolab" element={<LabAlveolabPage />} />
                   {/* Operador y Supervisor se fusionaron en Glutomatic. El
                       redirect existe porque esas URLs se pudieron compartir por
                       chat: sin el, un link viejo cae en un 404 sin explicacion. */}
