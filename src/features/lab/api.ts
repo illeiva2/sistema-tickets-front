@@ -24,6 +24,10 @@ import type {
   SdmaticMeasurementDto,
   SdmaticTrendPointDto,
   SdmaticFilters,
+  AlveolabStatsDto,
+  AlveolabMeasurementDto,
+  AlveolabTrendPointDto,
+  AlveolabFilters,
 } from "./types";
 
 /**
@@ -149,6 +153,23 @@ export const labApi = {
         sampleCodeContains: f.sampleCodeContains,
       }),
   },
+
+  alveolab: {
+    stats: (f: AlveolabFilters = {}) =>
+      get<AlveolabStatsDto>("/alveolab/stats", {
+        from: f.from,
+        to: f.to,
+        sampleCodeContains: f.sampleCodeContains,
+      }),
+    measurements: (f: AlveolabFilters = {}) =>
+      get<PagedResult<AlveolabMeasurementDto>>("/alveolab/measurements", { ...f }),
+    trend: (f: AlveolabFilters = {}) =>
+      get<AlveolabTrendPointDto[]>("/alveolab/trend", {
+        from: f.from,
+        to: f.to,
+        sampleCodeContains: f.sampleCodeContains,
+      }),
+  },
 };
 
 /** Claves de React Query. Centralizadas para poder invalidar por prefijo. */
@@ -173,6 +194,9 @@ export const labKeys = {
   sdmaticStats: (f: SdmaticFilters) => ["lab", "sdmatic", "stats", f] as const,
   sdmaticTrend: (f: SdmaticFilters) => ["lab", "sdmatic", "trend", f] as const,
   sdmaticMeasurements: (f: SdmaticFilters) => ["lab", "sdmatic", "measurements", f] as const,
+  alveolabStats: (f: AlveolabFilters) => ["lab", "alveolab", "stats", f] as const,
+  alveolabTrend: (f: AlveolabFilters) => ["lab", "alveolab", "trend", f] as const,
+  alveolabMeasurements: (f: AlveolabFilters) => ["lab", "alveolab", "measurements", f] as const,
 };
 
 /** Mensaje de error legible, con el mismo desanidado que usa el resto del repo. */

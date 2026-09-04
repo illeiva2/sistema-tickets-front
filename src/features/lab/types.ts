@@ -250,3 +250,52 @@ export interface SdmaticFilters {
   page?: number;
   pageSize?: number;
 }
+
+// ─── AlveoLab (alveógrafo Chopin) ────────────────────────────────────────────
+
+export interface AlveolabStatsDto {
+  count: number;
+  withW: number;
+  /** Fuerza panadera (10⁻⁴ J), la métrica principal. */
+  avgW: number | null;
+  minW: number | null;
+  maxW: number | null;
+  /** Tenacidad P (mmH₂O). */
+  avgP: number | null;
+  /** Extensibilidad L (mm). */
+  avgL: number | null;
+  /** Configuración de la curva P/L (cociente). */
+  avgPL: number | null;
+  /** Índice de elasticidad Ie (%). */
+  avgIe: number | null;
+  firstAt: string | null;
+  lastAt: string | null;
+}
+
+export interface AlveolabMeasurementDto {
+  measurementId: string;
+  sampleCode: string | null;
+  analyzedAt: string;
+  /** Tipo de harina, tal como lo clasifica el AlveoLab (ProductType). */
+  flourType: string | null;
+  w: number | null;
+  p: number | null;
+  l: number | null;
+  pl: number | null;
+  ie: number | null;
+  g: number | null;
+}
+
+export interface AlveolabTrendPointDto {
+  date: string;
+  avgW: number | null;
+  count: number;
+}
+
+export interface AlveolabFilters {
+  from?: string;
+  to?: string;
+  sampleCodeContains?: string;
+  page?: number;
+  pageSize?: number;
+}
