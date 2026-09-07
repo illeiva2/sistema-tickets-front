@@ -251,6 +251,101 @@ export interface SdmaticFilters {
   pageSize?: number;
 }
 
+// ─── Registro de muestras ────────────────────────────────────────────────────
+// La muestra se registra una vez y recibe una accesión corta (M-0012-4) que el
+// operario tipea en cada instrumento. El esquema de la ficha es configurable:
+// los campos vienen del backend (SampleKindDto.fields), no están hardcodeados.
+
+export type LabSite = "MOLINO" | "ACOPIO";
+export type LabFieldType = "TEXT" | "NUMBER" | "SELECT" | "DATETIME";
+
+export interface SampleFieldDefDto {
+  id: string;
+  kindId: string;
+  /** Clave estable del valor dentro de `SampleDto.fields`. */
+  key: string;
+  label: string;
+  type: LabFieldType;
+  required: boolean;
+  /** Opciones de un SELECT. Viene como JSON; puede ser null en los demás tipos. */
+  options: string[] | null;
+  /** Participa del nombre descriptivo auto-generado. */
+  inName: boolean;
+  namePrefix: string | null;
+  placeholder: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface SampleKindDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  /** Laboratorio propuesto al elegir este tipo; el operario puede cambiarlo. */
+  defaultSite: LabSite | null;
+  sortOrder: number;
+  isActive: boolean;
+  fields: SampleFieldDefDto[];
+}
+
+export type SampleFieldValues = Record<string, string | number>;
+
+export interface SampleDto {
+  id: string;
+  accession: string;
+  site: LabSite;
+  seq: number;
+  kindId: string;
+  /** Momento de la TOMA (no del registro). */
+  sampledAt: string;
+  displayName: string;
+  fields: SampleFieldValues;
+  notes: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  kind: { id: string; code: string; name: string };
+  createdBy: { id: string; name: string };
+}
+
+export interface SamplesSummaryDto {
+  total: number;
+  today: number;
+  last7d: number;
+  bySite: Partial<Record<LabSite, number>>;
+}
+
+export interface SampleFilters {
+  site?: LabSite;
+  kindId?: string;
+  /** Accesión (tolera tipeo) o texto libre contra el nombre. */
+  q?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface SamplesPage extends PagedResult<SampleDto> {
+  /** Aviso no bloqueante, p. ej. "ese número no es una accesión válida". */
+  warning?: string;
+}
+
+export interface CreateSampleInput {
+  kindId: string;
+  site: LabSite;
+  sampledAt?: string;
+  fields: Record<string, unknown>;
+  notes?: string | null;
+}
+
+export interface UpdateSampleInput {
+  sampledAt?: string;
+  fields?: Record<string, unknown>;
+  notes?: string | null;
+}
+
 // ─── AlveoLab (alveógrafo Chopin) ────────────────────────────────────────────
 
 export interface AlveolabStatsDto {

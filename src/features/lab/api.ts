@@ -28,6 +28,13 @@ import type {
   AlveolabMeasurementDto,
   AlveolabTrendPointDto,
   AlveolabFilters,
+  SampleKindDto,
+  SampleDto,
+  SamplesSummaryDto,
+  SampleFilters,
+  SamplesPage,
+  CreateSampleInput,
+  UpdateSampleInput,
 } from "./types";
 
 /**
@@ -51,6 +58,16 @@ async function get<T>(path: string, params?: Record<string, unknown>): Promise<T
   const res = await api.get<{ success: boolean; data: T }>(`${BASE}${path}`, {
     params: limpios,
   });
+  return res.data.data;
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await api.post<{ success: boolean; data: T }>(`${BASE}${path}`, body);
+  return res.data.data;
+}
+
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const res = await api.patch<{ success: boolean; data: T }>(`${BASE}${path}`, body);
   return res.data.data;
 }
 
@@ -170,6 +187,18 @@ export const labApi = {
         sampleCodeContains: f.sampleCodeContains,
       }),
   },
+
+  /** Registro de muestras: el catálogo de campos viene del backend, no se hardcodea. */
+  samples: {
+    kinds: (includeInactive = false) =>
+      get<SampleKindDto[]>("/samples/kinds", includeInactive ? { includeInactive: true } : undefined),
+    summary: () => get<SamplesSummaryDto>("/samples/summary"),
+    list: (f: SampleFilters = {}) => get<SamplesPage>("/samples", { ...f }),
+    get: (accession: string) => get<SampleDto>(`/samples/${encodeURIComponent(accession)}`),
+    create: (input: CreateSampleInput) => post<SampleDto>("/samples", input),
+    update: (id: string, input: UpdateSampleInput) =>
+      patch<SampleDto>(`/samples/${encodeURIComponent(id)}`, input),
+  },
 };
 
 /** Claves de React Query. Centralizadas para poder invalidar por prefijo. */
@@ -197,6 +226,12 @@ export const labKeys = {
   alveolabStats: (f: AlveolabFilters) => ["lab", "alveolab", "stats", f] as const,
   alveolabTrend: (f: AlveolabFilters) => ["lab", "alveolab", "trend", f] as const,
   alveolabMeasurements: (f: AlveolabFilters) => ["lab", "alveolab", "measurements", f] as const,
+  /** Prefijo para invalidar todo lo de muestras tras registrar o editar. */
+  samplesAll: ["lab", "samples"] as const,
+  samplesKinds: ["lab", "samples", "kinds"] as const,
+  samplesSummary: ["lab", "samples", "summary"] as const,
+  samples: (f: SampleFilters) => ["lab", "samples", "list", f] as const,
+  sample: (accession: string) => ["lab", "samples", "one", accession] as const,
 };
 
 /** Mensaje de error legible, con el mismo desanidado que usa el resto del repo. */
