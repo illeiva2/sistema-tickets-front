@@ -347,6 +347,38 @@ export interface RelinkResultDto {
   linked: number;
 }
 
+// ─── Reporte de análisis diario (turno × producto) ───────────────────────────
+
+export interface DailyReportColumnDto {
+  /** Código del parámetro tal como lo guarda el equipo. */
+  code: string;
+  source: LabSource;
+  label: string;
+  unit?: string;
+  decimals: number;
+}
+
+export interface DailyReportRowDto {
+  turno: string;
+  producto: string;
+  measurements: number;
+  /** Accesiones de las muestras registradas que aportaron a la fila. */
+  samples: string[];
+  /** Promedio por columna, indexado por `code`. Ausente = sin dato. */
+  values: Record<string, number>;
+}
+
+export interface DailyReportDto {
+  /** YYYY-MM-DD de planta. El día arranca a las 22:00 del anterior, como la planilla. */
+  date: string;
+  from: string;
+  to: string;
+  turnos: string[];
+  columns: DailyReportColumnDto[];
+  rows: DailyReportRowDto[];
+  totalMeasurements: number;
+}
+
 /** Alta de un campo del catálogo. `key` y `type` quedan fijos después. */
 export interface FieldDefInput {
   key: string;

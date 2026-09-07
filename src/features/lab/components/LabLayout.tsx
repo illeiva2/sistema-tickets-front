@@ -30,6 +30,7 @@ const PESTANAS = [
   // Va al final para no mover las pestañas que la gente ya tiene en la mano;
   // cuando el flujo "registrar → medir" se asiente, puede pasar al frente.
   { to: "/modulos/laboratorio/muestras", label: "Muestras", end: false },
+  { to: "/modulos/laboratorio/reporte", label: "Reporte diario", end: false },
 ];
 
 export const LabLayout: React.FC = () => {
