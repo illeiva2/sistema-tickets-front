@@ -30,11 +30,16 @@ import type {
   AlveolabFilters,
   SampleKindDto,
   SampleDto,
+  SampleDetailDto,
   SamplesSummaryDto,
   SampleFilters,
   SamplesPage,
   CreateSampleInput,
   UpdateSampleInput,
+  RelinkResultDto,
+  SampleFieldDefDto,
+  FieldDefInput,
+  FieldDefUpdateInput,
 } from "./types";
 
 /**
@@ -194,10 +199,17 @@ export const labApi = {
       get<SampleKindDto[]>("/samples/kinds", includeInactive ? { includeInactive: true } : undefined),
     summary: () => get<SamplesSummaryDto>("/samples/summary"),
     list: (f: SampleFilters = {}) => get<SamplesPage>("/samples", { ...f }),
-    get: (accession: string) => get<SampleDto>(`/samples/${encodeURIComponent(accession)}`),
+    /** La ficha: la muestra más sus análisis enlazados, crudos. */
+    get: (accession: string) => get<SampleDetailDto>(`/samples/${encodeURIComponent(accession)}`),
     create: (input: CreateSampleInput) => post<SampleDto>("/samples", input),
     update: (id: string, input: UpdateSampleInput) =>
       patch<SampleDto>(`/samples/${encodeURIComponent(id)}`, input),
+    /** Re-enlaza mediciones sueltas cuya accesión ahora existe (MANAGEMENT). */
+    relink: (days = 30) => post<RelinkResultDto>(`/samples/relink?days=${days}`, {}),
+    createField: (kindId: string, input: FieldDefInput) =>
+      post<SampleFieldDefDto>(`/samples/kinds/${encodeURIComponent(kindId)}/fields`, input),
+    updateField: (id: string, input: FieldDefUpdateInput) =>
+      patch<SampleFieldDefDto>(`/samples/fields/${encodeURIComponent(id)}`, input),
   },
 };
 
@@ -229,6 +241,8 @@ export const labKeys = {
   /** Prefijo para invalidar todo lo de muestras tras registrar o editar. */
   samplesAll: ["lab", "samples"] as const,
   samplesKinds: ["lab", "samples", "kinds"] as const,
+  /** Catálogo completo, con campos desactivados: solo para administrarlo. */
+  samplesKindsAll: ["lab", "samples", "kinds", "all"] as const,
   samplesSummary: ["lab", "samples", "summary"] as const,
   samples: (f: SampleFilters) => ["lab", "samples", "list", f] as const,
   sample: (accession: string) => ["lab", "samples", "one", accession] as const,

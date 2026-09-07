@@ -1,4 +1,4 @@
-import type { LabSite, SampleFieldDefDto } from "./types";
+import type { LabSite, LabSource, SampleFieldDefDto, SampleMeasurementParamDto } from "./types";
 
 /**
  * Helpers del registro de muestras compartidos por la página y los modales.
@@ -64,4 +64,91 @@ export const copiarAlPortapapeles = async (texto: string): Promise<boolean> => {
   } catch {
     return false;
   }
+};
+
+// ─── Análisis enlazados ──────────────────────────────────────────────────────
+
+export const SOURCE_LABEL: Record<LabSource, string> = {
+  GLUTOMATIC: "Gluten",
+  NIR: "NIR",
+  FN: "Falling Number",
+  SDMATIC: "Almidón dañado",
+  ALVEOLAB: "Alveógrafo",
+};
+
+/** Abreviatura para los chips de la lista. */
+export const SOURCE_SHORT: Record<LabSource, string> = {
+  GLUTOMATIC: "GL",
+  NIR: "NIR",
+  FN: "FN",
+  SDMATIC: "AD",
+  ALVEOLAB: "ALV",
+};
+
+/** Orden del flujo del laboratorio: el NIR es el primer análisis, el más general. */
+export const SOURCE_ORDER: LabSource[] = ["NIR", "GLUTOMATIC", "FN", "SDMATIC", "ALVEOLAB"];
+
+/** Orden en que el laboratorio lee cada parámetro; lo que no figura va después, alfabético. */
+const PARAM_ORDER: Partial<Record<LabSource, string[]>> = {
+  GLUTOMATIC: ["Gluten húmedo", "Gluten seco", "Índice de gluten", "Capacidad de retención de agua"],
+  FN: ["Falling Number", "Índice de licuefacción", "Temperatura", "Presión"],
+  SDMATIC: [
+    "Almidón dañado (UCD)",
+    "Almidón dañado corregido (UCDc)",
+    "Absorción de yodo",
+    "Humedad",
+    "Proteína",
+  ],
+  ALVEOLAB: ["W", "P", "L", "P/L", "Ie", "G"],
+};
+
+export const ordenarParams = (
+  source: LabSource,
+  params: SampleMeasurementParamDto[],
+): SampleMeasurementParamDto[] => {
+  const orden = PARAM_ORDER[source] ?? [];
+  const rango = (code: string) => {
+    const i = orden.indexOf(code);
+    return i === -1 ? orden.length : i;
+  };
+  return [...params].sort((a, b) => rango(a.code) - rango(b.code) || a.code.localeCompare(b.code));
+};
+
+/** Los códigos del NIR llevan la base de humedad como sufijo; se traduce. */
+export const etiquetaParam = (code: string): string => {
+  const sufijos: [string, string][] = [
+    ["DryBasis", " (base seca)"],
+    ["AsIs", " (tal cual)"],
+    ["Fixed", " (base fija)"],
+  ];
+  for (const [sufijo, texto] of sufijos) {
+    if (code.endsWith(sufijo)) return code.slice(0, -sufijo.length).trim() + texto;
+  }
+  return code;
+};
+
+/** Decimales con los que el laboratorio lee cada magnitud (mismos que las pestañas por equipo). */
+export const decimalesParam = (code: string): number => {
+  if (["W", "P", "L", "Falling Number", "Índice de gluten", "Temperatura"].includes(code)) return 0;
+  if (code === "P/L") return 2;
+  if (["Ie", "G", "Almidón dañado (UCD)", "Almidón dañado corregido (UCDc)"].includes(code)) return 1;
+  return 2;
+};
+
+/**
+ * Clave de campo a partir de la etiqueta: minúsculas, sin acentos, snake_case,
+ * empieza con letra. Es una propuesta; quien administra puede corregirla antes
+ * de guardar, y después queda fija.
+ */
+export const claveDesdeEtiqueta = (label: string): string => {
+  let k = label
+    .normalize("NFD")
+    // Quita los diacríticos que NFD separó: "Número" → "Numero".
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  if (!/^[a-z]/.test(k)) k = `c_${k}`.slice(0, 40);
+  return k;
 };
