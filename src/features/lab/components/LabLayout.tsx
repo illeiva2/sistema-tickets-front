@@ -26,6 +26,10 @@ const PESTANAS = [
   { to: "/modulos/laboratorio/fn", label: "Falling Number", end: false },
   { to: "/modulos/laboratorio/sdmatic", label: "Almidón dañado", end: false },
   { to: "/modulos/laboratorio/alveolab", label: "Alveógrafo", end: false },
+  // El registro de muestras es la unidad que enlaza a todos los instrumentos.
+  // Va al final para no mover las pestañas que la gente ya tiene en la mano;
+  // cuando el flujo "registrar → medir" se asiente, puede pasar al frente.
+  { to: "/modulos/laboratorio/muestras", label: "Muestras", end: false },
 ];
 
 export const LabLayout: React.FC = () => {
