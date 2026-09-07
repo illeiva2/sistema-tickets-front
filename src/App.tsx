@@ -1,5 +1,6 @@
 // React 18 with jsx:react-jsx doesn't require explicit import
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyConReintento } from "./lib/lazyConReintento";
 import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
@@ -15,49 +16,49 @@ import { TicketsProvider } from "./contexts/TicketsContext";
 
 // Paginas: lazy-load. Cada una se descarga solo cuando se navega ahi.
 // Esto reduce drasticamente el tiempo de primera carga.
-const LoginPage = lazy(() => import("./pages/LoginPage"));
-const RegisterPage = lazy(() => import("./pages/RegisterPage"));
-const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const TicketsPage = lazy(() => import("./pages/TicketsPage"));
-const TicketDetailPage = lazy(() => import("./pages/TicketDetailPage"));
-const NewTicketPage = lazy(() => import("./pages/NewTicketPage"));
-const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
-const FileManagementPage = lazy(() => import("./pages/FileManagementPage"));
-const UsersPage = lazy(() => import("./pages/UsersPage"));
-const DepartmentsPage = lazy(() => import("./pages/DepartmentsPage"));
-const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
-const ResourceDetailPage = lazy(() => import("./pages/ResourceDetailPage"));
-const ResourceEditorPage = lazy(() => import("./pages/ResourceEditorPage"));
-const AdminWorkshopsImportPage = lazy(() => import("./pages/AdminWorkshopsImportPage"));
-const AdminWorkshopsRulesPage = lazy(() => import("./pages/AdminWorkshopsRulesPage"));
-const AdminModulesPage = lazy(() => import("./pages/AdminModulesPage"));
-const LabLayout = lazy(() => import("./features/lab/components/LabLayout"));
-const LabGlutomaticPage = lazy(() => import("./pages/lab/LabGlutomaticPage"));
-const LabNirPage = lazy(() => import("./pages/lab/LabNirPage"));
-const LabFnPage = lazy(() => import("./pages/lab/LabFnPage"));
-const LabSdmaticPage = lazy(() => import("./pages/lab/LabSdmaticPage"));
-const LabAlveolabPage = lazy(() => import("./pages/lab/LabAlveolabPage"));
-const LabSamplesPage = lazy(() => import("./pages/lab/LabSamplesPage"));
-const LabDailyReportPage = lazy(() => import("./pages/lab/LabDailyReportPage"));
-const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
-const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
-const ProjectEditorPage = lazy(() => import("./pages/ProjectEditorPage"));
-const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
-const SetupPasswordPage = lazy(() => import("./pages/SetupPasswordPage"));
-const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
+const LoginPage = lazyConReintento(() => import("./pages/LoginPage"));
+const RegisterPage = lazyConReintento(() => import("./pages/RegisterPage"));
+const DashboardPage = lazyConReintento(() => import("./pages/DashboardPage"));
+const TicketsPage = lazyConReintento(() => import("./pages/TicketsPage"));
+const TicketDetailPage = lazyConReintento(() => import("./pages/TicketDetailPage"));
+const NewTicketPage = lazyConReintento(() => import("./pages/NewTicketPage"));
+const NotificationsPage = lazyConReintento(() => import("./pages/NotificationsPage"));
+const FileManagementPage = lazyConReintento(() => import("./pages/FileManagementPage"));
+const UsersPage = lazyConReintento(() => import("./pages/UsersPage"));
+const DepartmentsPage = lazyConReintento(() => import("./pages/DepartmentsPage"));
+const ResourcesPage = lazyConReintento(() => import("./pages/ResourcesPage"));
+const ResourceDetailPage = lazyConReintento(() => import("./pages/ResourceDetailPage"));
+const ResourceEditorPage = lazyConReintento(() => import("./pages/ResourceEditorPage"));
+const AdminWorkshopsImportPage = lazyConReintento(() => import("./pages/AdminWorkshopsImportPage"));
+const AdminWorkshopsRulesPage = lazyConReintento(() => import("./pages/AdminWorkshopsRulesPage"));
+const AdminModulesPage = lazyConReintento(() => import("./pages/AdminModulesPage"));
+const LabLayout = lazyConReintento(() => import("./features/lab/components/LabLayout"));
+const LabGlutomaticPage = lazyConReintento(() => import("./pages/lab/LabGlutomaticPage"));
+const LabNirPage = lazyConReintento(() => import("./pages/lab/LabNirPage"));
+const LabFnPage = lazyConReintento(() => import("./pages/lab/LabFnPage"));
+const LabSdmaticPage = lazyConReintento(() => import("./pages/lab/LabSdmaticPage"));
+const LabAlveolabPage = lazyConReintento(() => import("./pages/lab/LabAlveolabPage"));
+const LabSamplesPage = lazyConReintento(() => import("./pages/lab/LabSamplesPage"));
+const LabDailyReportPage = lazyConReintento(() => import("./pages/lab/LabDailyReportPage"));
+const ProjectsPage = lazyConReintento(() => import("./pages/ProjectsPage"));
+const ProjectDetailPage = lazyConReintento(() => import("./pages/ProjectDetailPage"));
+const ProjectEditorPage = lazyConReintento(() => import("./pages/ProjectEditorPage"));
+const OAuthCallbackPage = lazyConReintento(() => import("./pages/OAuthCallbackPage"));
+const SetupPasswordPage = lazyConReintento(() => import("./pages/SetupPasswordPage"));
+const ChangePasswordPage = lazyConReintento(() => import("./pages/ChangePasswordPage"));
 
 // Gestión IT (solo AGENT/ADMIN): todas lazy, viven bajo /it/*.
-const ItDashboardPage = lazy(() =>
+const ItDashboardPage = lazyConReintento(() =>
   import("./features/it/ItOpsDashboardPage").then(({ ItOpsDashboardPage }) => ({
     default: ItOpsDashboardPage,
   })),
 );
-const ItInventoryPage = lazy(() => import("./pages/it/ItInventoryPage"));
-const ItMaintenancePage = lazy(() => import("./pages/it/ItMaintenancePage"));
-const ItPurchasesPage = lazy(() => import("./pages/it/ItPurchasesPage"));
-const ItStaffPage = lazy(() => import("./pages/it/ItStaffPage"));
-const ItNetworkPage = lazy(() => import("./pages/it/ItNetworkPage"));
-const ItLiveDevicesPage = lazy(() => import("./pages/it/ItLiveDevicesPage"));
+const ItInventoryPage = lazyConReintento(() => import("./pages/it/ItInventoryPage"));
+const ItMaintenancePage = lazyConReintento(() => import("./pages/it/ItMaintenancePage"));
+const ItPurchasesPage = lazyConReintento(() => import("./pages/it/ItPurchasesPage"));
+const ItStaffPage = lazyConReintento(() => import("./pages/it/ItStaffPage"));
+const ItNetworkPage = lazyConReintento(() => import("./pages/it/ItNetworkPage"));
+const ItLiveDevicesPage = lazyConReintento(() => import("./pages/it/ItLiveDevicesPage"));
 
 // Fallback mientras carga el chunk de la pagina. Mantiene el layout estable
 // (sin flash blanco) usando un mini skeleton.
