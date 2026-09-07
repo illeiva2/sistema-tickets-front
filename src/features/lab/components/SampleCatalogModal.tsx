@@ -25,6 +25,7 @@ const CLASE_CONTROL =
 const TIPOS: { value: LabFieldType; label: string }[] = [
   { value: "TEXT", label: "Texto" },
   { value: "SELECT", label: "Lista de opciones" },
+  { value: "BOOLEAN", label: "Casilla (sí / no)" },
   { value: "NUMBER", label: "Número" },
   { value: "DATETIME", label: "Fecha y hora" },
 ];
@@ -41,6 +42,9 @@ interface Borrador {
   placeholder: string;
   sortOrder: string;
   isActive: boolean;
+  isCondition: boolean;
+  /** Opciones que cuentan como alteración, separadas por coma. Vacío = cualquiera. */
+  conditionValuesTexto: string;
 }
 
 const borradorVacio = (siguienteOrden: number): Borrador => ({
@@ -54,6 +58,8 @@ const borradorVacio = (siguienteOrden: number): Borrador => ({
   placeholder: "",
   sortOrder: String(siguienteOrden),
   isActive: true,
+  isCondition: false,
+  conditionValuesTexto: "",
 });
 
 const borradorDe = (d: SampleFieldDefDto): Borrador => ({
@@ -67,6 +73,8 @@ const borradorDe = (d: SampleFieldDefDto): Borrador => ({
   placeholder: d.placeholder ?? "",
   sortOrder: String(d.sortOrder),
   isActive: d.isActive,
+  isCondition: d.isCondition,
+  conditionValuesTexto: (d.conditionValues ?? []).join(", "),
 });
 
 export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -155,6 +163,7 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
                       <th className="font-medium px-3 py-1.5">Tipo</th>
                       <th className="font-medium px-3 py-1.5 text-center">Oblig.</th>
                       <th className="font-medium px-3 py-1.5 text-center">En nombre</th>
+                      <th className="font-medium px-3 py-1.5 text-center" title="Cuenta como alteración de la muestra">Alerta</th>
                       <th className="font-medium px-3 py-1.5 text-center">Activo</th>
                       <th className="px-2 py-1.5" />
                     </tr>
@@ -162,7 +171,7 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
                   <tbody className="divide-y divide-border">
                     {kind.fields.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">
+                        <td colSpan={9} className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">
                           Este tipo no tiene campos todavía.
                         </td>
                       </tr>
@@ -183,6 +192,18 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
                         <td className="px-3 py-1.5 text-center text-[12px]">{d.required ? "sí" : "—"}</td>
                         <td className="px-3 py-1.5 text-center text-[12px]">
                           {d.inName ? (d.namePrefix ? `"${d.namePrefix}…"` : "sí") : "—"}
+                        </td>
+                        <td
+                          className="px-3 py-1.5 text-center text-[12px]"
+                          title={
+                            d.isCondition
+                              ? d.conditionValues?.length
+                                ? `Cuenta: ${d.conditionValues.join(", ")}`
+                                : "Cuenta cualquier valor"
+                              : undefined
+                          }
+                        >
+                          {d.isCondition ? "⚠" : "—"}
                         </td>
                         <td className="px-3 py-1.5 text-center text-[12px]">{d.isActive ? "sí" : "no"}</td>
                         <td className="px-2 py-1.5 text-right">
@@ -274,6 +295,15 @@ const FormularioCampo: React.FC<{
               .map((o) => o.trim())
               .filter(Boolean)
           : undefined;
+      // Para una lista marcada como alteración: qué opciones cuentan. Vacío
+      // viaja como null = cualquier valor cuenta. En otros tipos no aplica.
+      const conditionValues =
+        b.type === "SELECT" && b.isCondition
+          ? b.conditionValuesTexto
+              .split(",")
+              .map((o) => o.trim())
+              .filter(Boolean)
+          : undefined;
       const comun = {
         label: b.label.trim(),
         required: b.required,
@@ -282,6 +312,9 @@ const FormularioCampo: React.FC<{
         namePrefix: b.namePrefix.trim() || null,
         placeholder: b.placeholder.trim() || null,
         sortOrder: Number(b.sortOrder) || 0,
+        isCondition: b.isCondition,
+        conditionValues:
+          conditionValues === undefined ? undefined : conditionValues.length > 0 ? conditionValues : null,
       };
       if (esEdicion) {
         const input: FieldDefUpdateInput = { ...comun, isActive: b.isActive };
@@ -409,6 +442,12 @@ const FormularioCampo: React.FC<{
           onChange={(v) => set("inName", v)}
           hint="El nombre descriptivo se arma con estos campos, en orden."
         />
+        <Check
+          label="Marca una alteración de la muestra"
+          checked={b.isCondition}
+          onChange={(v) => set("isCondition", v)}
+          hint="Si está presente, la muestra lleva una advertencia en la lista y la ficha."
+        />
         {esEdicion && (
           <Check
             label="Activo"
@@ -418,6 +457,21 @@ const FormularioCampo: React.FC<{
           />
         )}
       </div>
+
+      {b.type === "SELECT" && b.isCondition && (
+        <Campo
+          label="Opciones que cuentan como alteración"
+          error={errores.conditionValues}
+          hint='Separadas por coma, tal como están en la lista ("Vivos, Muertos"). Vacío = cualquier valor distinto de vacío.'
+        >
+          <input
+            className={CLASE_CONTROL}
+            value={b.conditionValuesTexto}
+            onChange={(e) => set("conditionValuesTexto", e.target.value)}
+            placeholder="Vivos, Muertos"
+          />
+        </Campo>
+      )}
 
       <div className="flex flex-wrap justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={mutation.isPending}>

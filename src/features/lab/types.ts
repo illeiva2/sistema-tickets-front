@@ -257,7 +257,7 @@ export interface SdmaticFilters {
 // los campos vienen del backend (SampleKindDto.fields), no están hardcodeados.
 
 export type LabSite = "MOLINO" | "ACOPIO";
-export type LabFieldType = "TEXT" | "NUMBER" | "SELECT" | "DATETIME";
+export type LabFieldType = "TEXT" | "NUMBER" | "SELECT" | "DATETIME" | "BOOLEAN";
 
 export interface SampleFieldDefDto {
   id: string;
@@ -273,6 +273,10 @@ export interface SampleFieldDefDto {
   inName: boolean;
   namePrefix: string | null;
   placeholder: string | null;
+  /** El campo describe una alteración de la muestra: presente = advertencia. */
+  isCondition: boolean;
+  /** Para listas: qué opciones cuentan como alteración. null = cualquier valor. */
+  conditionValues: string[] | null;
   sortOrder: number;
   isActive: boolean;
 }
@@ -289,7 +293,8 @@ export interface SampleKindDto {
   fields: SampleFieldDefDto[];
 }
 
-export type SampleFieldValues = Record<string, string | number>;
+/** Una casilla (BOOLEAN) solo viene cuando está marcada: `true`. */
+export type SampleFieldValues = Record<string, string | number | boolean>;
 
 /** Los cinco instrumentos que alimentan el espejo. */
 export type LabSource = "GLUTOMATIC" | "NIR" | "FN" | "SDMATIC" | "ALVEOLAB";
@@ -312,6 +317,8 @@ export interface SampleDto {
   createdBy: { id: string; name: string };
   /** Cuántos análisis enlazados tiene, por equipo. Viene en la lista. */
   analyses?: Partial<Record<LabSource, number>>;
+  /** Alteraciones presentes ("Brotado", "Insectos: Vivos"): la muestra lleva advertencia. */
+  conditions?: string[];
 }
 
 export interface SampleMeasurementParamDto {
@@ -390,6 +397,8 @@ export interface FieldDefInput {
   namePrefix?: string | null;
   placeholder?: string | null;
   sortOrder?: number;
+  isCondition?: boolean;
+  conditionValues?: string[] | null;
 }
 
 export interface FieldDefUpdateInput {
@@ -401,6 +410,8 @@ export interface FieldDefUpdateInput {
   placeholder?: string | null;
   sortOrder?: number;
   isActive?: boolean;
+  isCondition?: boolean;
+  conditionValues?: string[] | null;
 }
 
 export interface SamplesSummaryDto {

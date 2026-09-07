@@ -41,6 +41,7 @@ const CSV: ColumnaCsv<SampleDto>[] = [
   { header: "Tipo", value: (s) => s.kind.name },
   { header: "Laboratorio", value: (s) => SITE_LABEL[s.site] },
   { header: "Fecha y hora de toma", value: (s) => fmtDateTime(s.sampledAt) },
+  { header: "Alteraciones", value: (s) => (s.conditions ?? []).join(" · ") },
   { header: "Registró", value: (s) => s.createdBy.name },
 ];
 
@@ -311,6 +312,15 @@ export const LabSamplesPage: React.FC = () => {
                     >
                       <td className="py-2.5 pl-4 pr-2 whitespace-nowrap font-mono text-[12.5px] font-semibold tracking-wide">
                         {s.accession}
+                        {s.conditions && s.conditions.length > 0 && (
+                          <span
+                            className="inline-flex align-middle ml-1.5 text-amber-600"
+                            title={`Muestra con alteración: ${s.conditions.join(" · ")}`}
+                            aria-label={`Muestra con alteración: ${s.conditions.join(", ")}`}
+                          >
+                            <AlertTriangle size={13} />
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-2.5 text-[12.5px] min-w-[200px]">{s.displayName}</td>
                       <td className="px-2 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">

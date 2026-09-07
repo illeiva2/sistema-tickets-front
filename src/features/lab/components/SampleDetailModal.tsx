@@ -55,6 +55,13 @@ export const SampleDetailModal: React.FC<{
       title={
         <span className="flex items-center gap-2 flex-wrap">
           <span className="font-mono tracking-wider">{accession}</span>
+          {data?.conditions && data.conditions.length > 0 && (
+            <AlertTriangle
+              size={15}
+              className="text-amber-600 shrink-0"
+              aria-label="Muestra con alteración"
+            />
+          )}
           <button
             type="button"
             onClick={() => void copiar()}
@@ -108,16 +115,17 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
   for (const def of defs) {
     const v = sample.fields[def.key];
     usados.add(def.key);
-    if (v === undefined || v === null || v === "") continue;
+    if (v === undefined || v === null || v === "" || v === false) continue;
     filas.push({
       label: def.label,
-      valor: def.type === "DATETIME" ? fmtDateTime(String(v)) : String(v),
+      valor: v === true ? "Sí" : def.type === "DATETIME" ? fmtDateTime(String(v)) : String(v),
     });
   }
   for (const [k, v] of Object.entries(sample.fields)) {
-    if (usados.has(k) || v === undefined || v === null || v === "") continue;
-    filas.push({ label: k, valor: String(v) });
+    if (usados.has(k) || v === undefined || v === null || v === "" || v === false) continue;
+    filas.push({ label: k, valor: v === true ? "Sí" : String(v) });
   }
+  const alteraciones = sample.conditions ?? [];
 
   const porEquipo = new Map<LabSource, SampleMeasurementDto[]>();
   for (const m of sample.measurements) {
@@ -135,6 +143,15 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
           {SITE_LABEL[sample.site]} · {sample.kind.name} · toma {fmtDateTime(sample.sampledAt)}
         </p>
       </div>
+
+      {alteraciones.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[13px] text-amber-900 dark:text-amber-200">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+          <span>
+            <strong>Muestra con alteración:</strong> {alteraciones.join(" · ")}
+          </span>
+        </div>
+      )}
 
       {filas.length === 0 ? (
         <p className="text-[12.5px] text-muted-foreground">Sin datos de ficha cargados.</p>

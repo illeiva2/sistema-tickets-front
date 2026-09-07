@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Plus } from "lucide-react";
+import { AlertTriangle, Copy, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { labApi, labError, labKeys } from "../api";
@@ -55,12 +55,16 @@ const Campo: React.FC<{
 
 /** Valores guardados (string | number) a strings para los inputs. Las fechas ISO pasan a datetime-local. */
 const aStrings = (
-  fields: Record<string, string | number> | undefined,
+  fields: Record<string, string | number | boolean> | undefined,
   defs: SampleFieldDefDto[],
 ): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(fields ?? {})) {
     if (v === null || v === undefined) continue;
+    if (typeof v === "boolean") {
+      out[k] = v ? "true" : "";
+      continue;
+    }
     const def = defs.find((d) => d.key === k);
     if (def?.type === "DATETIME") {
       const d = new Date(String(v));
@@ -135,6 +139,11 @@ export const SampleFormModal: React.FC<{
       for (const def of kind?.fields ?? []) {
         const v = values[def.key];
         if (v === undefined || v === "") continue;
+        // Una casilla viaja como true solo si está marcada; sin marcar no viaja.
+        if (def.type === "BOOLEAN") {
+          if (v === "true") fields[def.key] = true;
+          continue;
+        }
         fields[def.key] = def.type === "DATETIME" ? localToIso(v) ?? v : v;
       }
 
@@ -186,6 +195,14 @@ export const SampleFormModal: React.FC<{
             {creada.accession}
           </div>
           <p className="text-sm font-medium">{creada.displayName}</p>
+          {creada.conditions && creada.conditions.length > 0 && (
+            <div className="mx-auto max-w-md flex items-start gap-2 rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-left text-[13px] text-amber-900 dark:text-amber-200">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+              <span>
+                <strong>Muestra con alteración:</strong> {creada.conditions.join(" · ")}
+              </span>
+            </div>
+          )}
           <div className="flex flex-wrap justify-center gap-2 pt-1">
             <Button size="sm" onClick={() => void copiar(creada.accession)}>
               <Copy size={13} className="mr-1.5" />
@@ -205,6 +222,8 @@ export const SampleFormModal: React.FC<{
   }
 
   // ─── Formulario ────────────────────────────────────────────────────────────
+  const casillas = (kind?.fields ?? []).filter((def) => def.type === "BOOLEAN");
+
   const renderInput = (def: SampleFieldDefDto) => {
     const v = values[def.key] ?? "";
     switch (def.type) {
@@ -333,11 +352,48 @@ export const SampleFormModal: React.FC<{
             />
           </Campo>
 
-          {kind?.fields.map((def) => (
-            <Campo key={def.id} label={def.label} required={def.required} error={errores[def.key]}>
-              {renderInput(def)}
-            </Campo>
-          ))}
+          {kind?.fields
+            .filter((def) => def.type !== "BOOLEAN")
+            .map((def) => (
+              <Campo key={def.id} label={def.label} required={def.required} error={errores[def.key]}>
+                {renderInput(def)}
+              </Campo>
+            ))}
+
+          {/* Las casillas van juntas: son la revisión visual de la muestra y se
+              marcan de corrido. Un triángulo señala las que cuentan como alteración. */}
+          {casillas.length > 0 && (
+            <fieldset className="sm:col-span-2 rounded-md border border-border px-3 pt-2 pb-3">
+              <legend className="px-1 text-[11.5px] text-muted-foreground">
+                Marcá lo que se observa en la muestra
+              </legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
+                {casillas.map((def) => (
+                  <label
+                    key={def.id}
+                    className="flex items-center gap-2 text-[13px] cursor-pointer select-none min-h-[28px]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={values[def.key] === "true"}
+                      onChange={(e) => setValor(def, e.target.checked ? "true" : "")}
+                    />
+                    <span>{def.label}</span>
+                    {def.isCondition && (
+                      <AlertTriangle
+                        size={12}
+                        className="text-amber-600/80 shrink-0"
+                        aria-label="Cuenta como alteración de la muestra"
+                      />
+                    )}
+                    {errores[def.key] && (
+                      <span className="text-[11.5px] text-red-600 dark:text-red-400">{errores[def.key]}</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
 
           <Campo label="Notas" className="sm:col-span-2" error={errores.notes}>
             <textarea
