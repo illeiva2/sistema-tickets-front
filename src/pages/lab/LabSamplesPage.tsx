@@ -1,6 +1,6 @@
 import React from "react";
 import { useQueries } from "@tanstack/react-query";
-import { AlertTriangle, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, Plus, Search, Settings2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { KpiCard } from "@/components/dashboards/shared";
@@ -8,7 +8,7 @@ import { useModules } from "@/contexts/ModulesContext";
 import { labApi, labError, labKeys } from "@/features/lab/api";
 import { exportarCsv, type ColumnaCsv } from "@/features/lab/export";
 import { fmtDateTime, fmtInt } from "@/features/lab/format";
-import { SITES, SITE_LABEL } from "@/features/lab/samples";
+import { SITES, SITE_LABEL, SOURCE_LABEL, SOURCE_ORDER, SOURCE_SHORT } from "@/features/lab/samples";
 import { ExportButton } from "@/features/lab/components/LabLayout";
 import {
   LabFetchingHint,
@@ -18,6 +18,7 @@ import {
 } from "@/features/lab/components/Loading";
 import { SampleFormModal } from "@/features/lab/components/SampleFormModal";
 import { SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
+import { SampleCatalogModal } from "@/features/lab/components/SampleCatalogModal";
 import type { LabSite, SampleDto, SampleFilters } from "@/features/lab/types";
 
 /**
@@ -47,12 +48,15 @@ export const LabSamplesPage: React.FC = () => {
   const { levelOf } = useModules();
   const nivel = levelOf("glutenlab");
   const puedeEscribir = nivel === "QC" || nivel === "MANAGEMENT";
+  const puedeConfigurar = nivel === "MANAGEMENT";
 
   const [filtros, setFiltros] = React.useState<SampleFilters>({ pageSize: PAGE_SIZE });
   const [texto, setTexto] = React.useState("");
   const [formAbierto, setFormAbierto] = React.useState(false);
   const [editando, setEditando] = React.useState<SampleDto | null>(null);
-  const [detalle, setDetalle] = React.useState<SampleDto | null>(null);
+  /** Accesión de la ficha abierta; la ficha se consulta aparte (trae los análisis). */
+  const [detalle, setDetalle] = React.useState<string | null>(null);
+  const [catalogoAbierto, setCatalogoAbierto] = React.useState(false);
 
   React.useEffect(() => {
     const t = window.setTimeout(() => {
@@ -107,18 +111,32 @@ export const LabSamplesPage: React.FC = () => {
             Todos los análisis quedan enlazados a esta ficha.
           </p>
         </div>
-        {puedeEscribir && (
-          <Button
-            size="sm"
-            className="h-8"
-            onClick={() => setFormAbierto(true)}
-            disabled={kindsQ.isPending || kinds.length === 0}
-            title={kinds.length === 0 && !kindsQ.isPending ? "No hay tipos de muestra configurados" : undefined}
-          >
-            <Plus size={14} className="mr-1.5" />
-            Nueva muestra
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {puedeConfigurar && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={() => setCatalogoAbierto(true)}
+              title="Definir qué campos pide la ficha por tipo de muestra"
+            >
+              <Settings2 size={14} className="mr-1.5" />
+              Campos
+            </Button>
+          )}
+          {puedeEscribir && (
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={() => setFormAbierto(true)}
+              disabled={kindsQ.isPending || kinds.length === 0}
+              title={kinds.length === 0 && !kindsQ.isPending ? "No hay tipos de muestra configurados" : undefined}
+            >
+              <Plus size={14} className="mr-1.5" />
+              Nueva muestra
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ─── Indicadores ──────────────────────────────────────────────── */}
@@ -279,6 +297,7 @@ export const LabSamplesPage: React.FC = () => {
                     <th className="font-medium px-2 py-2 whitespace-nowrap">Tipo</th>
                     <th className="font-medium px-2 py-2 whitespace-nowrap">Laboratorio</th>
                     <th className="font-medium px-2 py-2 whitespace-nowrap">Toma</th>
+                    <th className="font-medium px-2 py-2 whitespace-nowrap">Análisis</th>
                     <th className="font-medium px-2 pr-4 py-2 whitespace-nowrap">Registró</th>
                   </tr>
                 </thead>
@@ -287,7 +306,7 @@ export const LabSamplesPage: React.FC = () => {
                     <tr
                       key={s.id}
                       className="border-b border-border/60 hover:bg-muted/40 transition-colors cursor-pointer"
-                      onClick={() => setDetalle(s)}
+                      onClick={() => setDetalle(s.accession)}
                       title="Ver ficha"
                     >
                       <td className="py-2.5 pl-4 pr-2 whitespace-nowrap font-mono text-[12.5px] font-semibold tracking-wide">
@@ -300,6 +319,9 @@ export const LabSamplesPage: React.FC = () => {
                       <td className="px-2 py-2.5 text-[12px] whitespace-nowrap">{SITE_LABEL[s.site]}</td>
                       <td className="px-2 py-2.5 text-[12.5px] tabular-nums whitespace-nowrap">
                         {fmtDateTime(s.sampledAt)}
+                      </td>
+                      <td className="px-2 py-2.5 whitespace-nowrap">
+                        <ChipsAnalisis analyses={s.analyses} />
                       </td>
                       <td className="px-2 pr-4 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">
                         {s.createdBy.name}
@@ -335,7 +357,7 @@ export const LabSamplesPage: React.FC = () => {
       )}
       {detalle && !editando && (
         <SampleDetailModal
-          sample={detalle}
+          accession={detalle}
           kinds={kinds}
           canEdit={puedeEscribir}
           onEdit={(s) => {
@@ -345,7 +367,35 @@ export const LabSamplesPage: React.FC = () => {
           onClose={cerrarDetalle}
         />
       )}
+      {catalogoAbierto && <SampleCatalogModal onClose={() => setCatalogoAbierto(false)} />}
     </div>
+  );
+};
+
+/**
+ * Qué análisis tiene la muestra, de un vistazo. Un chip por equipo con
+ * mediciones, en el orden del flujo; "×n" si hay más de una (el FN corre dos
+ * canales). Sin nada, un guion: la ausencia también informa.
+ */
+const ChipsAnalisis: React.FC<{ analyses: SampleDto["analyses"] }> = ({ analyses }) => {
+  const presentes = SOURCE_ORDER.filter((s) => (analyses?.[s] ?? 0) > 0);
+  if (presentes.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {presentes.map((s) => {
+        const n = analyses?.[s] ?? 0;
+        return (
+          <span
+            key={s}
+            className="inline-flex items-center rounded border border-border bg-muted/30 px-1.5 py-0.5 text-[10.5px] font-medium tabular-nums"
+            title={`${SOURCE_LABEL[s]}: ${n} medición${n === 1 ? "" : "es"}`}
+          >
+            {SOURCE_SHORT[s]}
+            {n > 1 && <span className="text-muted-foreground ml-0.5">×{n}</span>}
+          </span>
+        );
+      })}
+    </span>
   );
 };
 

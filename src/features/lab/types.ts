@@ -291,6 +291,9 @@ export interface SampleKindDto {
 
 export type SampleFieldValues = Record<string, string | number>;
 
+/** Los cinco instrumentos que alimentan el espejo. */
+export type LabSource = "GLUTOMATIC" | "NIR" | "FN" | "SDMATIC" | "ALVEOLAB";
+
 export interface SampleDto {
   id: string;
   accession: string;
@@ -307,6 +310,65 @@ export interface SampleDto {
   updatedAt: string;
   kind: { id: string; code: string; name: string };
   createdBy: { id: string; name: string };
+  /** Cuántos análisis enlazados tiene, por equipo. Viene en la lista. */
+  analyses?: Partial<Record<LabSource, number>>;
+}
+
+export interface SampleMeasurementParamDto {
+  /** Código tal como lo manda el instrumento ("Gluten húmedo", "W", "Falling Number"). */
+  code: string;
+  value: number;
+  unit: string | null;
+  /** Fuera del rango de calibración: se marca, no se esconde. */
+  isImplausible: boolean;
+}
+
+/** Una medición enlazada a la muestra, cruda: la ficha es la vista integral. */
+export interface SampleMeasurementDto {
+  id: string;
+  source: LabSource;
+  sourceId: string;
+  instrumentSerial: string | null;
+  instrumentName: string | null;
+  productCode: string | null;
+  /** Lo que el operario tipeó en el equipo; de ahí salió el enlace. */
+  sampleRef: string | null;
+  analyzedAt: string;
+  params: SampleMeasurementParamDto[];
+}
+
+export interface SampleDetailDto extends SampleDto {
+  measurements: SampleMeasurementDto[];
+}
+
+export interface RelinkResultDto {
+  scanned: number;
+  candidates: number;
+  linked: number;
+}
+
+/** Alta de un campo del catálogo. `key` y `type` quedan fijos después. */
+export interface FieldDefInput {
+  key: string;
+  type: LabFieldType;
+  label: string;
+  required?: boolean;
+  options?: string[];
+  inName?: boolean;
+  namePrefix?: string | null;
+  placeholder?: string | null;
+  sortOrder?: number;
+}
+
+export interface FieldDefUpdateInput {
+  label?: string;
+  required?: boolean;
+  options?: string[];
+  inName?: boolean;
+  namePrefix?: string | null;
+  placeholder?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
 }
 
 export interface SamplesSummaryDto {
