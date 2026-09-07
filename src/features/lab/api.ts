@@ -40,6 +40,7 @@ import type {
   SampleFieldDefDto,
   FieldDefInput,
   FieldDefUpdateInput,
+  DailyReportDto,
 } from "./types";
 
 /**
@@ -206,6 +207,8 @@ export const labApi = {
       patch<SampleDto>(`/samples/${encodeURIComponent(id)}`, input),
     /** Re-enlaza mediciones sueltas cuya accesión ahora existe (MANAGEMENT). */
     relink: (days = 30) => post<RelinkResultDto>(`/samples/relink?days=${days}`, {}),
+    /** Reporte de análisis diario del molino. Sin fecha = hoy (fecha de planta). */
+    dailyReport: (date?: string) => get<DailyReportDto>("/samples/daily-report", { date }),
     createField: (kindId: string, input: FieldDefInput) =>
       post<SampleFieldDefDto>(`/samples/kinds/${encodeURIComponent(kindId)}/fields`, input),
     updateField: (id: string, input: FieldDefUpdateInput) =>
@@ -246,6 +249,7 @@ export const labKeys = {
   samplesSummary: ["lab", "samples", "summary"] as const,
   samples: (f: SampleFilters) => ["lab", "samples", "list", f] as const,
   sample: (accession: string) => ["lab", "samples", "one", accession] as const,
+  dailyReport: (date: string) => ["lab", "samples", "daily-report", date] as const,
 };
 
 /** Mensaje de error legible, con el mismo desanidado que usa el resto del repo. */
