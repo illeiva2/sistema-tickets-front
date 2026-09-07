@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { esErrorDeChunk, recargarPorVersionNueva } from "@/lib/lazyConReintento";
 
 interface Props {
   children: ReactNode;
@@ -24,6 +25,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Error caught by boundary:", error, errorInfo);
+    // Un chunk que ya no existe no es un error de la app: hay una versión
+    // nueva. Se recarga una vez en silencio; si vuelve a fallar, se muestra.
+    if (esErrorDeChunk(error) && recargarPorVersionNueva()) return;
     this.setState({
       error,
       errorInfo,
@@ -36,17 +40,19 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const versionNueva = esErrorDeChunk(this.state.error);
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <div className="text-center">
               <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
               <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Algo salió mal
+                {versionNueva ? "Hay una versión nueva" : "Algo salió mal"}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Ha ocurrido un error inesperado. Por favor, intenta recargar la
-                página.
+                {versionNueva
+                  ? "La aplicación se actualizó mientras la tenías abierta. Recargá la página para seguir."
+                  : "Ha ocurrido un error inesperado. Por favor, intenta recargar la página."}
               </p>
 
               <div className="space-y-3">
