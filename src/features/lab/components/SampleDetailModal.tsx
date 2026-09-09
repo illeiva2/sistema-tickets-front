@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Pencil } from "lucide-react";
+import { AlertTriangle, Copy, Pencil, Printer } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { labApi, labError, labKeys } from "../api";
@@ -17,6 +17,7 @@ import {
 import type { LabSource, SampleDetailDto, SampleDto, SampleKindDto, SampleMeasurementDto } from "../types";
 import { LabModal } from "./LabModal";
 import { LabTableSkeleton } from "./Loading";
+import { imprimirEtiqueta } from "../etiqueta";
 
 /**
  * Ficha de una muestra: metadata + TODOS sus análisis enlazados, por equipo.
@@ -78,6 +79,20 @@ export const SampleDetailModal: React.FC<{
       }
       footer={
         <>
+          {data && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!imprimirEtiqueta(data)) {
+                  toast.error("El navegador bloqueó la ventana de impresión. Permití ventanas emergentes para este sitio.");
+                }
+              }}
+            >
+              <Printer size={13} className="mr-1.5" />
+              Imprimir etiqueta
+            </Button>
+          )}
           {canEdit && data && (
             <Button size="sm" variant="outline" onClick={() => onEdit(data)}>
               <Pencil size={13} className="mr-1.5" />
