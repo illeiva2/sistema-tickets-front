@@ -23,14 +23,21 @@ export interface TamanoEtiqueta {
   alto: number;
   /** Imprime en una hoja común, con la etiqueta arriba a la izquierda. */
   hoja?: boolean;
+  /**
+   * Ancho del código de barras en mm. Deliberadamente MENOR que la etiqueta:
+   * la etiqueta va envuelta en frascos chicos y el lector necesita ver todas
+   * las barras a la vez; un código ancho se curva y pierde los extremos. Con
+   * ~42 mm para 8 caracteres el módulo queda en ~0,34 mm (4 puntos a 300 dpi).
+   */
+  codigoAncho: number;
 }
 
 export const TAMANOS: TamanoEtiqueta[] = [
-  { id: "dymo-89x28", nombre: "DYMO LabelWriter 89 × 28 mm (99010)", ancho: 89, alto: 28 },
-  { id: "62x29", nombre: "Brother 62 × 29 mm", ancho: 62, alto: 29 },
-  { id: "50x30", nombre: "Etiqueta 50 × 30 mm", ancho: 50, alto: 30 },
-  { id: "100x50", nombre: "Etiqueta 100 × 50 mm", ancho: 100, alto: 50 },
-  { id: "a4", nombre: "Hoja A4 (etiqueta arriba a la izquierda)", ancho: 89, alto: 28, hoja: true },
+  { id: "dymo-89x28", nombre: "DYMO LabelWriter 89 × 28 mm (99010)", ancho: 89, alto: 28, codigoAncho: 42 },
+  { id: "62x29", nombre: "Brother 62 × 29 mm", ancho: 62, alto: 29, codigoAncho: 42 },
+  { id: "50x30", nombre: "Etiqueta 50 × 30 mm", ancho: 50, alto: 30, codigoAncho: 40 },
+  { id: "100x50", nombre: "Etiqueta 100 × 50 mm", ancho: 100, alto: 50, codigoAncho: 50 },
+  { id: "a4", nombre: "Hoja A4 (etiqueta arriba a la izquierda)", ancho: 89, alto: 28, hoja: true, codigoAncho: 42 },
 ];
 
 const CLAVE_TAMANO = "lab-etiqueta-tamano";
@@ -95,21 +102,23 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
 <title>Etiqueta ${acc}</title>
 <style id="pagina">${reglaPagina(t)}</style>
 <style>
-  :root { --w: ${t.ancho}mm; --h: ${t.alto}mm; }
+  :root { --w: ${t.ancho}mm; --h: ${t.alto}mm; --bc: ${t.codigoAncho}mm; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; }
   .barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; background: #f3f4f6; border-bottom: 1px solid #d1d5db; font: 13px system-ui, sans-serif; }
   .barra select, .barra button { font: 13px system-ui, sans-serif; padding: 4px 8px; }
   .barra .ayuda { color: #6b7280; }
   .lienzo { padding: 12px; }
-  .etiqueta { width: var(--w); height: var(--h); box-sizing: border-box; padding: 1.5mm 2mm; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 0.6mm; overflow: hidden; background: #fff; outline: 1px dashed #9ca3af; }
-  .fila1 { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
-  .acc { font-family: Consolas, "Courier New", monospace; font-weight: 700; font-size: 7.2mm; letter-spacing: 0.4mm; line-height: 1; white-space: nowrap; }
-  .meta { font-size: 2.6mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .etiqueta { width: var(--w); height: var(--h); box-sizing: border-box; padding: 1.5mm 2mm; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 0.6mm; overflow: hidden; background: #fff; outline: 1px dashed #9ca3af; }
+  .fila1 { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; min-width: 0; }
+  .acc { flex: 0 0 auto; font-family: Consolas, "Courier New", monospace; font-weight: 700; font-size: 7.2mm; letter-spacing: 0.4mm; line-height: 1; white-space: nowrap; }
+  /* Los textos largos se ACORTAN (min-width 0 + ellipsis): sin eso, un flex item con nowrap
+     crece más que la etiqueta y empuja al vecino fuera del borde, donde no se imprime. */
+  .meta { flex: 1 1 auto; min-width: 0; font-size: 2.6mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
   .codigo { display: flex; align-items: center; justify-content: center; min-height: 0; }
-  .codigo svg { width: 100%; height: 100%; max-height: 9mm; display: block; }
-  .pie { display: flex; justify-content: space-between; align-items: flex-end; gap: 2mm; font-size: 2.7mm; line-height: 1.2; }
-  .nombre { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .fecha { white-space: nowrap; }
+  .codigo svg { width: var(--bc); max-width: 100%; height: 100%; max-height: 14mm; display: block; }
+  .pie { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; min-width: 0; font-size: 2.7mm; line-height: 1.2; }
+  .nombre { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .fecha { flex: 0 0 auto; white-space: nowrap; }
   @media print { .barra { display: none; } .lienzo { padding: 0; } .etiqueta { outline: none; } }
 </style>
 </head>
@@ -136,6 +145,7 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
       "@page{size:" + (t.hoja ? "A4" : t.ancho + "mm " + t.alto + "mm") + ";margin:" + (t.hoja ? "10mm" : "0") + "}";
     document.documentElement.style.setProperty("--w", t.ancho + "mm");
     document.documentElement.style.setProperty("--h", t.alto + "mm");
+    document.documentElement.style.setProperty("--bc", t.codigoAncho + "mm");
     try { localStorage.setItem(${JSON.stringify(CLAVE_TAMANO)}, id); } catch (e) {}
   }
   sel.addEventListener("change", function () { aplicar(sel.value); });
