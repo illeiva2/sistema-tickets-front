@@ -1,6 +1,6 @@
 import React from "react";
 import { useQueries } from "@tanstack/react-query";
-import { AlertTriangle, Plus, Search, Settings2, X } from "lucide-react";
+import { AlertTriangle, Plus, Printer, Search, Settings2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { KpiCard } from "@/components/dashboards/shared";
@@ -19,6 +19,7 @@ import {
 import { SampleFormModal } from "@/features/lab/components/SampleFormModal";
 import { SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
 import { SampleCatalogModal } from "@/features/lab/components/SampleCatalogModal";
+import { imprimirEtiqueta } from "@/features/lab/etiqueta";
 import type { LabSite, SampleDto, SampleFilters } from "@/features/lab/types";
 
 /**
@@ -299,7 +300,8 @@ export const LabSamplesPage: React.FC = () => {
                     <th className="font-medium px-2 py-2 whitespace-nowrap">Laboratorio</th>
                     <th className="font-medium px-2 py-2 whitespace-nowrap">Toma</th>
                     <th className="font-medium px-2 py-2 whitespace-nowrap">Análisis</th>
-                    <th className="font-medium px-2 pr-4 py-2 whitespace-nowrap">Registró</th>
+                    <th className="font-medium px-2 py-2 whitespace-nowrap">Registró</th>
+                    <th className="px-2 pr-4 py-2" aria-label="Acciones" />
                   </tr>
                 </thead>
                 <tbody>
@@ -333,8 +335,24 @@ export const LabSamplesPage: React.FC = () => {
                       <td className="px-2 py-2.5 whitespace-nowrap">
                         <ChipsAnalisis analyses={s.analyses} />
                       </td>
-                      <td className="px-2 pr-4 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">
                         {s.createdBy.name}
+                      </td>
+                      <td className="px-2 pr-4 py-2.5 text-right">
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                          title="Imprimir etiqueta"
+                          aria-label={`Imprimir etiqueta de ${s.accession}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!imprimirEtiqueta(s)) {
+                              toast.error("El navegador bloqueó la ventana de impresión. Permití ventanas emergentes para este sitio.");
+                            }
+                          }}
+                        >
+                          <Printer size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}

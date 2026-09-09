@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Plus } from "lucide-react";
+import { AlertTriangle, Copy, Plus, Printer } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { labApi, labError, labKeys } from "../api";
@@ -15,6 +15,7 @@ import {
   toDateTimeLocal,
 } from "../samples";
 import type { LabSite, SampleDto, SampleFieldDefDto, SampleKindDto } from "../types";
+import { imprimirEtiqueta } from "../etiqueta";
 import { LabModal } from "./LabModal";
 
 /**
@@ -183,13 +184,20 @@ export const SampleFormModal: React.FC<{
       : toast.error("No se pudo copiar; anotala a mano");
   };
 
+  const imprimir = (m: SampleDto) => {
+    if (!imprimirEtiqueta(m)) {
+      toast.error("El navegador bloqueó la ventana de impresión. Permití ventanas emergentes para este sitio.");
+    }
+  };
+
   // ─── Confirmación del alta: la accesión, grande, para tipearla en el equipo ──
   if (creada) {
     return (
       <LabModal onClose={onClose} title="Muestra registrada">
         <div className="text-center space-y-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Tipeá esta accesión como código de muestra en el equipo:
+            Imprimí la etiqueta y pegala en la muestra: en cada equipo se escanea (o se tipea) esta
+            accesión como código de muestra.
           </p>
           <div className="font-mono text-4xl sm:text-5xl font-bold tracking-wider tabular-nums select-all">
             {creada.accession}
@@ -204,7 +212,11 @@ export const SampleFormModal: React.FC<{
             </div>
           )}
           <div className="flex flex-wrap justify-center gap-2 pt-1">
-            <Button size="sm" onClick={() => void copiar(creada.accession)}>
+            <Button size="sm" onClick={() => imprimir(creada)}>
+              <Printer size={13} className="mr-1.5" />
+              Imprimir etiqueta
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void copiar(creada.accession)}>
               <Copy size={13} className="mr-1.5" />
               Copiar accesión
             </Button>
