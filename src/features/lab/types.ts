@@ -437,6 +437,48 @@ export interface SamplesPage extends PagedResult<SampleDto> {
   warning?: string;
 }
 
+// ─── Grilla de análisis (consulta para comercio) ─────────────────────────────
+// Una fila por muestra con la ficha y un valor por análisis, identificado por
+// `source|code`. El catálogo de columnas viene del backend, que agrega lo que
+// no conoce con su código como etiqueta.
+
+export interface AnalysisColumnDto {
+  /** `source|code`: clave de `GridSampleDto.values`. */
+  key: string;
+  source: LabSource;
+  code: string;
+  label: string;
+  unit?: string;
+  decimals: number;
+}
+
+export interface GridSampleDto extends SampleDto {
+  /** Promedio de las lecturas plausibles por `source|code`. Ausente = sin ese análisis. */
+  values: Record<string, number>;
+  /** Claves cuyo valor sale solo de lecturas fuera de calibración: se muestra, marcado. */
+  implausible: string[];
+}
+
+export interface SamplesGridDto {
+  items: GridSampleDto[];
+  /** Muestras que cumplen el filtro, hayan entrado o no en `items`. */
+  total: number;
+  limit: number;
+  /** Quedaron muestras afuera del tope: acotar el filtro. */
+  truncated: boolean;
+  warning?: string;
+  columns: AnalysisColumnDto[];
+}
+
+export interface GridFilters {
+  site?: LabSite;
+  kindId?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
 export interface CreateSampleInput {
   kindId: string;
   site: LabSite;

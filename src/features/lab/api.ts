@@ -41,6 +41,8 @@ import type {
   FieldDefInput,
   FieldDefUpdateInput,
   DailyReportDto,
+  GridFilters,
+  SamplesGridDto,
 } from "./types";
 
 /**
@@ -200,6 +202,8 @@ export const labApi = {
       get<SampleKindDto[]>("/samples/kinds", includeInactive ? { includeInactive: true } : undefined),
     summary: () => get<SamplesSummaryDto>("/samples/summary"),
     list: (f: SampleFilters = {}) => get<SamplesPage>("/samples", { ...f }),
+    /** Grilla de consulta: el filtro entero (hasta un tope) con los análisis pivoteados. */
+    grid: (f: GridFilters = {}) => get<SamplesGridDto>("/samples/grid", { ...f }),
     /** La ficha: la muestra más sus análisis enlazados, crudos. */
     get: (accession: string) => get<SampleDetailDto>(`/samples/${encodeURIComponent(accession)}`),
     create: (input: CreateSampleInput) => post<SampleDto>("/samples", input),
@@ -248,6 +252,7 @@ export const labKeys = {
   samplesKindsAll: ["lab", "samples", "kinds", "all"] as const,
   samplesSummary: ["lab", "samples", "summary"] as const,
   samples: (f: SampleFilters) => ["lab", "samples", "list", f] as const,
+  samplesGrid: (f: GridFilters) => ["lab", "samples", "grid", f] as const,
   sample: (accession: string) => ["lab", "samples", "one", accession] as const,
   dailyReport: (date: string) => ["lab", "samples", "daily-report", date] as const,
 };

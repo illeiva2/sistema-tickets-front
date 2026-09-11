@@ -142,14 +142,6 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
   }
   const alteraciones = sample.conditions ?? [];
 
-  const porEquipo = new Map<LabSource, SampleMeasurementDto[]>();
-  for (const m of sample.measurements) {
-    const lista = porEquipo.get(m.source) ?? [];
-    lista.push(m);
-    porEquipo.set(m.source, lista);
-  }
-  const equipos = SOURCE_ORDER.filter((s) => porEquipo.has(s));
-
   return (
     <div className="space-y-5">
       <div>
@@ -190,38 +182,56 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
         </div>
       )}
 
-      {/* ─── Análisis ─────────────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-baseline justify-between gap-2 mb-2">
-          <h4 className="text-sm font-semibold">
-            Análisis
-            <span className="text-[11.5px] text-muted-foreground font-normal ml-2 tabular-nums">
-              {sample.measurements.length === 0
-                ? "ninguno todavía"
-                : `${sample.measurements.length} en ${equipos.length} equipo${equipos.length === 1 ? "" : "s"}`}
-            </span>
-          </h4>
-        </div>
-
-        {equipos.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border px-4 py-5 text-center text-[12.5px] text-muted-foreground">
-            Todavía no hay análisis enlazados. Tipeá{" "}
-            <span className="font-mono font-medium text-foreground">{sample.accession}</span> como
-            código de muestra en el equipo: apenas llegue la medición, aparece acá.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {equipos.map((source) => (
-              <TarjetaEquipo key={source} source={source} mediciones={porEquipo.get(source) ?? []} />
-            ))}
-          </div>
-        )}
-      </div>
+      <AnalisisPorEquipo sample={sample} />
 
       <p className="text-[11.5px] text-muted-foreground border-t border-border pt-3">
         Registró {sample.createdBy.name} el {fmtDateTime(sample.createdAt)}
         {sample.updatedAt !== sample.createdAt && ` · editada ${fmtDateTime(sample.updatedAt)}`}
       </p>
+    </div>
+  );
+};
+
+/**
+ * Todos los análisis enlazados a la muestra, una tarjeta por equipo. Se exporta
+ * porque la grilla de consulta lo muestra al expandir una fila: es la misma
+ * información que la ficha, sin duplicar el render.
+ */
+export const AnalisisPorEquipo: React.FC<{ sample: SampleDetailDto }> = ({ sample }) => {
+  const porEquipo = new Map<LabSource, SampleMeasurementDto[]>();
+  for (const m of sample.measurements) {
+    const lista = porEquipo.get(m.source) ?? [];
+    lista.push(m);
+    porEquipo.set(m.source, lista);
+  }
+  const equipos = SOURCE_ORDER.filter((s) => porEquipo.has(s));
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-2">
+        <h4 className="text-sm font-semibold">
+          Análisis
+          <span className="text-[11.5px] text-muted-foreground font-normal ml-2 tabular-nums">
+            {sample.measurements.length === 0
+              ? "ninguno todavía"
+              : `${sample.measurements.length} en ${equipos.length} equipo${equipos.length === 1 ? "" : "s"}`}
+          </span>
+        </h4>
+      </div>
+
+      {equipos.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border px-4 py-5 text-center text-[12.5px] text-muted-foreground">
+          Todavía no hay análisis enlazados. Tipeá{" "}
+          <span className="font-mono font-medium text-foreground">{sample.accession}</span> como
+          código de muestra en el equipo: apenas llegue la medición, aparece acá.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {equipos.map((source) => (
+            <TarjetaEquipo key={source} source={source} mediciones={porEquipo.get(source) ?? []} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
