@@ -479,6 +479,49 @@ export interface GridFilters {
   limit?: number;
 }
 
+// ─── Asistente de laboratorio (modelo local en el molino) ────────────────────
+// La pregunta se encola; el relé del molino la lleva al modelo; el navegador
+// consulta el estado hasta que hay respuesta.
+
+export interface AssistantStatusDto {
+  /** El relé del molino latió hace poco: se puede preguntar. */
+  available: boolean;
+  model: string | null;
+  /** El modelo corre en la GPU (null = todavía no cargó ninguno). */
+  gpu: boolean | null;
+  relayVersion: string | null;
+  relayLastSeenAt: string | null;
+  /** Consultas de todos los usuarios esperando o en curso. */
+  queued: number;
+}
+
+export interface AssistantTraceDto {
+  tool: string;
+  summary: string;
+  ok: boolean;
+  ms: number;
+}
+
+export type AssistantRequestStatus = "QUEUED" | "RUNNING" | "DONE" | "FAILED";
+
+export interface AssistantRequestDto {
+  id: string;
+  status: AssistantRequestStatus;
+  question: string;
+  answer: string | null;
+  /** Qué herramientas consultó para responder, en orden. */
+  toolTrace: AssistantTraceDto[];
+  error: string | null;
+  model: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface AssistantHistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface CreateSampleInput {
   kindId: string;
   site: LabSite;

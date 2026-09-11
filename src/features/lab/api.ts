@@ -43,6 +43,9 @@ import type {
   DailyReportDto,
   GridFilters,
   SamplesGridDto,
+  AssistantStatusDto,
+  AssistantRequestDto,
+  AssistantHistoryTurn,
 } from "./types";
 
 /**
@@ -218,6 +221,14 @@ export const labApi = {
     updateField: (id: string, input: FieldDefUpdateInput) =>
       patch<SampleFieldDefDto>(`/samples/fields/${encodeURIComponent(id)}`, input),
   },
+
+  /** Asistente: la pregunta se encola y se consulta su estado hasta que el modelo del molino responde. */
+  assistant: {
+    status: () => get<AssistantStatusDto>("/assistant/status"),
+    ask: (question: string, history: AssistantHistoryTurn[]) =>
+      post<AssistantRequestDto>("/assistant/ask", { question, history }),
+    get: (id: string) => get<AssistantRequestDto>(`/assistant/requests/${encodeURIComponent(id)}`),
+  },
 };
 
 /** Claves de React Query. Centralizadas para poder invalidar por prefijo. */
@@ -255,6 +266,8 @@ export const labKeys = {
   samplesGrid: (f: GridFilters) => ["lab", "samples", "grid", f] as const,
   sample: (accession: string) => ["lab", "samples", "one", accession] as const,
   dailyReport: (date: string) => ["lab", "samples", "daily-report", date] as const,
+  assistantStatus: ["lab", "assistant", "status"] as const,
+  assistantRequest: (id: string) => ["lab", "assistant", "request", id] as const,
 };
 
 /** Mensaje de error legible, con el mismo desanidado que usa el resto del repo. */

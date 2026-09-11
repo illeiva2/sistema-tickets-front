@@ -3,6 +3,7 @@ import { ChevronRight, Download, FlaskConical } from "lucide-react";
 import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useModules } from "@/contexts/ModulesContext";
 import { Button } from "@/components/ui";
+import { LabAssistant } from "./LabAssistant";
 
 /**
  * Armazón del panel de laboratorio.
@@ -98,6 +99,9 @@ export const LabLayout: React.FC = () => {
       <div key={pathname}>
         <Outlet />
       </div>
+
+      {/* Fuera del key por ruta: la conversación sobrevive al cambio de pestaña. */}
+      <LabAssistant />
     </div>
   );
 };
