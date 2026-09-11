@@ -32,11 +32,21 @@ export interface TamanoEtiqueta {
   codigoAncho: number;
 }
 
+// El primero es el DEFAULT del selector (localStorage recuerda la última
+// elección por navegador). Hoy el laboratorio imprime en la DYMO 550, así que
+// arranca en 89 × 28 mm; cuando llegue la Xprinter XP-410B (en ~2 semanas) se
+// elige "50 × 30 mm" una sola vez y queda recordado.
+//
+// codigoAncho por tamaño: en la Xprinter (térmica directa, 203 dpi) 46 mm hace
+// que la accesión típica ("A-0002-3" = 123 módulos de Code 128) tenga módulos
+// de ~3 puntos del cabezal (0,125 mm/punto). Es lo que da barras parejas y
+// lectura confiable sobre el frasco curvo; un ancho con módulos de 2,x puntos
+// redondea desparejo y el lector empieza a fallar.
 export const TAMANOS: TamanoEtiqueta[] = [
   { id: "dymo-89x28", nombre: "DYMO LabelWriter 89 × 28 mm (99010)", ancho: 89, alto: 28, codigoAncho: 42 },
+  { id: "50x30", nombre: "Xprinter / genérica 50 × 30 mm", ancho: 50, alto: 30, codigoAncho: 46 },
+  { id: "100x50", nombre: "Xprinter / genérica 100 × 50 mm", ancho: 100, alto: 50, codigoAncho: 46 },
   { id: "62x29", nombre: "Brother 62 × 29 mm", ancho: 62, alto: 29, codigoAncho: 42 },
-  { id: "50x30", nombre: "Etiqueta 50 × 30 mm", ancho: 50, alto: 30, codigoAncho: 40 },
-  { id: "100x50", nombre: "Etiqueta 100 × 50 mm", ancho: 100, alto: 50, codigoAncho: 50 },
   { id: "a4", nombre: "Hoja A4 (etiqueta arriba a la izquierda)", ancho: 89, alto: 28, hoja: true, codigoAncho: 42 },
 ];
 
