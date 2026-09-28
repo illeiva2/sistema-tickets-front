@@ -1,5 +1,5 @@
 import React from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Copy, Plus, Printer } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
@@ -9,14 +9,18 @@ import {
   SITE_LABEL,
   copiarAlPortapapeles,
   erroresDeCampos,
+  errorDeFormato,
+  esVisible,
   indiceTurno,
   localToIso,
   opcionesDe,
+  pctKey,
   toDateTimeLocal,
 } from "../samples";
 import type { LabSite, SampleDto, SampleFieldDefDto, SampleKindDto } from "../types";
 import { imprimirEtiqueta } from "../etiqueta";
 import { LabModal } from "./LabModal";
+import { NoLigaBadge } from "./NoLigaBadge";
 
 /**
  * Alta y edición de una muestra.
@@ -24,6 +28,15 @@ import { LabModal } from "./LabModal";
  * El formulario es DINÁMICO: los campos salen de `kind.fields`, que define el
  * laboratorio desde el catálogo. Acá no hay ningún campo hardcodeado más que
  * los intrínsecos de toda muestra (laboratorio, fecha/hora de la toma, notas).
+ *
+ * Las reglas del catálogo también se aplican acá, espejando al backend:
+ * - `visibleWhen`: un campo aparece solo si otro vale cierta opción (Lote solo
+ *   en los embolses, Silo solo en trigo sucio). Lo que queda oculto se descarta.
+ * - `pattern`: se avisa el formato al salir del campo, antes de enviar.
+ * - `withPercent`: una casilla marcada pide su porcentaje al lado.
+ * - `suggest`: el texto propone los valores ya cargados (empresas, localidades).
+ * - `uppercase`: se escribe en mayúsculas (patentes, lotes).
+ * - `lockSite` del tipo: el laboratorio no se elige.
  *
  * Se monta recién al abrirse y se desmonta al cerrar, así el estado nace
  * limpio en cada alta sin efectos de "reset".
@@ -77,6 +90,48 @@ const aStrings = (
   return out;
 };
 
+/** Lista de valores ya cargados para un campo con sugerencias; el navegador la muestra al tipear. */
+const Sugerencias: React.FC<{ id: string; fieldKey: string; kindId: string }> = ({ id, fieldKey, kindId }) => {
+  const q = useQuery({
+    queryKey: labKeys.samplesSuggest(fieldKey, kindId),
+    queryFn: () => labApi.samples.suggest(fieldKey, kindId),
+    staleTime: 5 * 60_000,
+  });
+  return (
+    <datalist id={id}>
+      {(q.data?.values ?? []).map((v) => (
+        <option key={v} value={v} />
+      ))}
+    </datalist>
+  );
+};
+
+/** Una lista de dos opciones se muestra como dos botones: se ve todo de una y se elige con un clic. */
+const Segmentos: React.FC<{ opciones: string[]; valor: string; onChange: (v: string) => void }> = ({
+  opciones,
+  valor,
+  onChange,
+}) => (
+  <div className="flex flex-wrap gap-1.5" role="radiogroup">
+    {opciones.map((o) => (
+      <button
+        key={o}
+        type="button"
+        role="radio"
+        aria-checked={valor === o}
+        onClick={() => onChange(valor === o ? "" : o)}
+        className={`h-9 px-3.5 rounded-md border text-[13px] transition-colors ${
+          valor === o
+            ? "border-primary bg-primary/10 font-medium"
+            : "border-border hover:bg-muted/50 text-muted-foreground"
+        }`}
+      >
+        {o}
+      </button>
+    ))}
+  </div>
+);
+
 export const SampleFormModal: React.FC<{
   kinds: SampleKindDto[];
   /** Muestra a editar. Ausente = alta. */
@@ -101,6 +156,10 @@ export const SampleFormModal: React.FC<{
   const [turnoTocado, setTurnoTocado] = React.useState(esEdicion);
   const [creada, setCreada] = React.useState<SampleDto | null>(null);
 
+  // Laboratorio fijo por tipo (las internas siempre son del molino): no se elige.
+  const sitioFijo: LabSite | null = kind?.lockSite ? (kind.defaultSite ?? "MOLINO") : null;
+  const sitioEfectivo: LabSite = esEdicion ? site : (sitioFijo ?? site);
+
   const cambiarKind = (id: string) => {
     setKindId(id);
     const k = kinds.find((x) => x.id === id);
@@ -123,10 +182,36 @@ export const SampleFormModal: React.FC<{
     setValues((v) => (v.turno === propuesto ? v : { ...v, turno: propuesto }));
   }, [sampledAt, turnoDef, turnoTocado]);
 
+  const defs = React.useMemo(() => kind?.fields ?? [], [kind]);
+  const visibles = React.useMemo(() => defs.filter((d) => esVisible(d, values, defs)), [defs, values]);
+
+  // Lo que quedó oculto al cambiar un controlador (el lote de un producto
+  // anterior, el silo de una mezcla) se descarta: el backend lo ignoraría
+  // igual, pero así no reaparece cargado si vuelven a la opción anterior.
+  React.useEffect(() => {
+    const claves = defs
+      .filter((d) => !esVisible(d, values, defs))
+      .flatMap((d) => [d.key, pctKey(d.key)])
+      .filter((k) => values[k] !== undefined && values[k] !== "");
+    if (claves.length === 0) return;
+    setValues((v) => {
+      const n = { ...v };
+      for (const k of claves) delete n[k];
+      return n;
+    });
+  }, [values, defs]);
+
   const setValor = (def: SampleFieldDefDto, valor: string) => {
     if (def.key === "turno") setTurnoTocado(true);
-    setValues((v) => ({ ...v, [def.key]: valor }));
+    const v = def.type === "TEXT" && def.uppercase ? valor.toUpperCase() : valor;
+    setValues((prev) => ({ ...prev, [def.key]: v }));
     if (errores[def.key]) setErrores((e) => ({ ...e, [def.key]: "" }));
+  };
+
+  const setPct = (def: SampleFieldDefDto, valor: string) => {
+    const k = pctKey(def.key);
+    setValues((prev) => ({ ...prev, [k]: valor }));
+    if (errores[k]) setErrores((e) => ({ ...e, [k]: "" }));
   };
 
   const mutation = useMutation({
@@ -134,15 +219,31 @@ export const SampleFormModal: React.FC<{
       const iso = localToIso(sampledAt);
       if (!iso) throw new Error("La fecha de toma no es válida");
 
+      // Formato de los textos con patrón, antes de viajar: el backend lo valida
+      // igual, pero acá el aviso aparece pegado al campo y sin esperar.
+      const locales: Record<string, string> = {};
+      for (const def of visibles) {
+        if (def.type !== "TEXT") continue;
+        const err = errorDeFormato(def, (values[def.key] ?? "").trim());
+        if (err) locales[def.key] = err;
+      }
+      if (Object.keys(locales).length > 0) {
+        setErrores(locales);
+        throw new Error("Revisá los campos marcados");
+      }
+
       // Las fechas de los campos DATETIME también van con zona: el backend corre
       // en UTC y un "2026-09-07T10:30" pelado lo leería tres horas corrido.
       const fields: Record<string, unknown> = {};
-      for (const def of kind?.fields ?? []) {
+      for (const def of visibles) {
         const v = values[def.key];
         if (v === undefined || v === "") continue;
         // Una casilla viaja como true solo si está marcada; sin marcar no viaja.
         if (def.type === "BOOLEAN") {
-          if (v === "true") fields[def.key] = true;
+          if (v !== "true") continue;
+          fields[def.key] = true;
+          const p = values[pctKey(def.key)];
+          if (def.withPercent && p !== undefined && p.trim() !== "") fields[pctKey(def.key)] = p.trim();
           continue;
         }
         fields[def.key] = def.type === "DATETIME" ? localToIso(v) ?? v : v;
@@ -151,7 +252,7 @@ export const SampleFormModal: React.FC<{
       const comun = { sampledAt: iso, fields, notes: notes.trim() || null };
       return esEdicion
         ? labApi.samples.update(editing!.id, comun)
-        : labApi.samples.create({ kindId, site, ...comun });
+        : labApi.samples.create({ kindId, site: sitioEfectivo, ...comun });
     },
     onSuccess: (s) => {
       void qc.invalidateQueries({ queryKey: labKeys.samplesAll });
@@ -164,7 +265,7 @@ export const SampleFormModal: React.FC<{
     },
     onError: (e) => {
       const porCampo = erroresDeCampos(e);
-      setErrores(porCampo);
+      if (Object.keys(porCampo).length > 0) setErrores(porCampo);
       toast.error(Object.keys(porCampo).length > 0 ? "Revisá los campos marcados" : labError(e));
     },
   });
@@ -202,7 +303,10 @@ export const SampleFormModal: React.FC<{
           <div className="font-mono text-4xl sm:text-5xl font-bold tracking-wider tabular-nums select-all">
             {creada.accession}
           </div>
-          <p className="text-sm font-medium">{creada.displayName}</p>
+          <p className="text-sm font-medium">
+            {creada.displayName}
+            {creada.noLiga && <NoLigaBadge className="ml-2" />}
+          </p>
           {creada.conditions && creada.conditions.length > 0 && (
             <div className="mx-auto max-w-md flex items-start gap-2 rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-left text-[13px] text-amber-900 dark:text-amber-200">
               <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
@@ -234,22 +338,28 @@ export const SampleFormModal: React.FC<{
   }
 
   // ─── Formulario ────────────────────────────────────────────────────────────
-  const casillas = (kind?.fields ?? []).filter((def) => def.type === "BOOLEAN");
+  const casillas = visibles.filter((def) => def.type === "BOOLEAN");
+  const generales = visibles.filter((def) => def.type !== "BOOLEAN");
 
   const renderInput = (def: SampleFieldDefDto) => {
     const v = values[def.key] ?? "";
     switch (def.type) {
-      case "SELECT":
+      case "SELECT": {
+        const ops = opcionesDe(def);
+        if (ops.length > 0 && ops.length <= 2) {
+          return <Segmentos opciones={ops} valor={v} onChange={(o) => setValor(def, o)} />;
+        }
         return (
           <select className={CLASE_CONTROL} value={v} onChange={(e) => setValor(def, e.target.value)}>
             <option value="">{def.placeholder ?? "Elegí…"}</option>
-            {opcionesDe(def).map((o) => (
+            {ops.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
             ))}
           </select>
         );
+      }
       case "NUMBER":
         return (
           <input
@@ -270,17 +380,28 @@ export const SampleFormModal: React.FC<{
             onChange={(e) => setValor(def, e.target.value)}
           />
         );
-      default:
+      default: {
+        const listaId = def.suggest ? `sug-${kindId}-${def.key}` : undefined;
         return (
-          <input
-            type="text"
-            className={CLASE_CONTROL}
-            placeholder={def.placeholder ?? ""}
-            value={v}
-            maxLength={200}
-            onChange={(e) => setValor(def, e.target.value)}
-          />
+          <>
+            <input
+              type="text"
+              className={`${CLASE_CONTROL} ${def.uppercase ? "uppercase" : ""}`}
+              placeholder={def.placeholder ?? ""}
+              value={v}
+              maxLength={200}
+              list={listaId}
+              autoComplete="off"
+              onChange={(e) => setValor(def, e.target.value)}
+              onBlur={() => {
+                const err = errorDeFormato(def, v.trim());
+                if (err) setErrores((e) => ({ ...e, [def.key]: err }));
+              }}
+            />
+            {listaId && <Sugerencias id={listaId} fieldKey={def.key} kindId={kindId} />}
+          </>
         );
+      }
     }
   };
 
@@ -335,25 +456,34 @@ export const SampleFormModal: React.FC<{
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo
-            label="Laboratorio"
-            required
-            error={errores.site}
-            hint={esEdicion ? "Define el prefijo de la accesión; no se cambia." : undefined}
-          >
-            <select
-              className={CLASE_CONTROL}
-              value={site}
-              disabled={esEdicion}
-              onChange={(e) => setSite(e.target.value as LabSite)}
+          {sitioFijo && !esEdicion ? (
+            <Campo
+              label="Laboratorio"
+              hint={`Fijo para este tipo de muestra: la accesión será ${sitioFijo === "MOLINO" ? "M" : "A"}-…`}
             >
-              {SITES.map((s) => (
-                <option key={s} value={s}>
-                  {SITE_LABEL[s]}
-                </option>
-              ))}
-            </select>
-          </Campo>
+              <input className={CLASE_CONTROL} value={SITE_LABEL[sitioFijo]} disabled readOnly />
+            </Campo>
+          ) : (
+            <Campo
+              label="Laboratorio"
+              required
+              error={errores.site}
+              hint={esEdicion ? "Define el prefijo de la accesión; no se cambia." : undefined}
+            >
+              <select
+                className={CLASE_CONTROL}
+                value={site}
+                disabled={esEdicion}
+                onChange={(e) => setSite(e.target.value as LabSite)}
+              >
+                {SITES.map((s) => (
+                  <option key={s} value={s}>
+                    {SITE_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          )}
 
           <Campo label="Fecha y hora de la toma" required error={errores.sampledAt}>
             <input
@@ -364,45 +494,72 @@ export const SampleFormModal: React.FC<{
             />
           </Campo>
 
-          {kind?.fields
-            .filter((def) => def.type !== "BOOLEAN")
-            .map((def) => (
-              <Campo key={def.id} label={def.label} required={def.required} error={errores[def.key]}>
-                {renderInput(def)}
-              </Campo>
-            ))}
+          {generales.map((def) => (
+            <Campo
+              key={def.id}
+              label={def.label}
+              required={def.required}
+              error={errores[def.key]}
+              hint={!errores[def.key] && def.pattern && def.patternHint ? def.patternHint : undefined}
+            >
+              {renderInput(def)}
+            </Campo>
+          ))}
 
           {/* Las casillas van juntas: son la revisión visual de la muestra y se
-              marcan de corrido. Un triángulo señala las que cuentan como alteración. */}
+              marcan de corrido. Un triángulo señala las que cuentan como
+              alteración; las que llevan porcentaje lo piden al marcarse. */}
           {casillas.length > 0 && (
             <fieldset className="sm:col-span-2 rounded-md border border-border px-3 pt-2 pb-3">
               <legend className="px-1 text-[11.5px] text-muted-foreground">
                 Marcá lo que se observa en la muestra
               </legend>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
-                {casillas.map((def) => (
-                  <label
-                    key={def.id}
-                    className="flex items-center gap-2 text-[13px] cursor-pointer select-none min-h-[28px]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={values[def.key] === "true"}
-                      onChange={(e) => setValor(def, e.target.checked ? "true" : "")}
-                    />
-                    <span>{def.label}</span>
-                    {def.isCondition && (
-                      <AlertTriangle
-                        size={12}
-                        className="text-amber-600/80 shrink-0"
-                        aria-label="Cuenta como alteración de la muestra"
-                      />
-                    )}
-                    {errores[def.key] && (
-                      <span className="text-[11.5px] text-red-600 dark:text-red-400">{errores[def.key]}</span>
-                    )}
-                  </label>
-                ))}
+                {casillas.map((def) => {
+                  const marcada = values[def.key] === "true";
+                  const pk = pctKey(def.key);
+                  return (
+                    <div key={def.id} className="flex items-center gap-2 min-h-[28px] flex-wrap">
+                      <label className="flex items-center gap-2 text-[13px] cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={marcada}
+                          onChange={(e) => {
+                            setValor(def, e.target.checked ? "true" : "");
+                            if (!e.target.checked) setPct(def, "");
+                          }}
+                        />
+                        <span>{def.label}</span>
+                        {def.isCondition && (
+                          <AlertTriangle
+                            size={12}
+                            className="text-amber-600/80 shrink-0"
+                            aria-label="Cuenta como alteración de la muestra"
+                          />
+                        )}
+                      </label>
+                      {def.withPercent && marcada && (
+                        <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="h-7 w-16 px-2 text-[12.5px] border border-border rounded-md bg-background text-right focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="%"
+                            value={values[pk] ?? ""}
+                            onChange={(e) => setPct(def, e.target.value)}
+                            aria-label={`Porcentaje de ${def.label}`}
+                          />
+                          %
+                        </span>
+                      )}
+                      {(errores[def.key] || errores[pk]) && (
+                        <span className="text-[11.5px] text-red-600 dark:text-red-400 basis-full">
+                          {errores[def.key] || errores[pk]}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </fieldset>
           )}

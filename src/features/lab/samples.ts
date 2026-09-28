@@ -40,6 +40,39 @@ export const opcionesDe = (def: Pick<SampleFieldDefDto, "options">): string[] =>
     ? def.options.filter((o): o is string => typeof o === "string")
     : [];
 
+/** Clave bajo la que viaja el porcentaje de una casilla con porcentaje (misma convención que el backend). */
+export const pctKey = (key: string): string => `${key}_pct`;
+
+/**
+ * ¿Se pide este campo con lo cargado hasta ahora? Espejo de la regla del
+ * backend: sigue la cadena (Silo depende de Origen, que depende de Producto) y
+ * compara el valor del controlador —en el formulario, strings; una casilla
+ * marcada vale "true"— contra las opciones de la regla.
+ */
+export const esVisible = (
+  def: SampleFieldDefDto,
+  values: Record<string, string>,
+  defs: SampleFieldDefDto[],
+  profundidad = 0,
+): boolean => {
+  const regla = def.visibleWhen;
+  if (!regla || !regla.field || regla.values.length === 0) return true;
+  if (profundidad > 8) return false;
+  const controlador = defs.find((d) => d.key === regla.field);
+  if (controlador && !esVisible(controlador, values, defs, profundidad + 1)) return false;
+  return regla.values.includes((values[regla.field] ?? "").trim());
+};
+
+/** Formato de un valor TEXT contra el patrón del catálogo; null = cumple (o no hay patrón válido). */
+export const errorDeFormato = (def: SampleFieldDefDto, valor: string): string | null => {
+  if (!def.pattern || !valor) return null;
+  try {
+    return new RegExp(def.pattern, "u").test(valor) ? null : (def.patternHint ?? "Formato inválido");
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Errores por campo de una respuesta 400 del backend: `details` trae
  * `{ field: "fields.turno" | "body.site", message }`. Se devuelven indexados

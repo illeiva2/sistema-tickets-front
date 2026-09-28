@@ -207,6 +207,8 @@ export const labApi = {
     list: (f: SampleFilters = {}) => get<SamplesPage>("/samples", { ...f }),
     /** Grilla de consulta: el filtro entero (hasta un tope) con los análisis pivoteados. */
     grid: (f: GridFilters = {}) => get<SamplesGridDto>("/samples/grid", { ...f }),
+    /** Valores ya cargados de un campo con sugerencias (empresa, procedencia…), los más usados primero. */
+    suggest: (key: string, kindId?: string) => get<{ values: string[] }>("/samples/suggest", { key, kindId }),
     /** La ficha: la muestra más sus análisis enlazados, crudos. */
     get: (accession: string) => get<SampleDetailDto>(`/samples/${encodeURIComponent(accession)}`),
     create: (input: CreateSampleInput) => post<SampleDto>("/samples", input),
@@ -264,6 +266,7 @@ export const labKeys = {
   samplesSummary: ["lab", "samples", "summary"] as const,
   samples: (f: SampleFilters) => ["lab", "samples", "list", f] as const,
   samplesGrid: (f: GridFilters) => ["lab", "samples", "grid", f] as const,
+  samplesSuggest: (key: string, kindId?: string) => ["lab", "samples", "suggest", key, kindId ?? ""] as const,
   sample: (accession: string) => ["lab", "samples", "one", accession] as const,
   dailyReport: (date: string) => ["lab", "samples", "daily-report", date] as const,
   assistantStatus: ["lab", "assistant", "status"] as const,
