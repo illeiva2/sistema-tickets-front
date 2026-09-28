@@ -1,4 +1,4 @@
-import type { ProductoresStatusDto } from "./types";
+import type { ManualMeasurementInput, ProductoresStatusDto, SampleMeasurementDto } from "./types";
 import api from "@/lib/api";
 import type {
   DashboardSummaryDto,
@@ -80,6 +80,11 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
   const res = await api.patch<{ success: boolean; data: T }>(`${BASE}${path}`, body);
+  return res.data.data;
+}
+
+async function del<T>(path: string): Promise<T> {
+  const res = await api.delete<{ success: boolean; data: T }>(`${BASE}${path}`);
   return res.data.data;
 }
 
@@ -228,6 +233,14 @@ export const labApi = {
     relink: (days = 30) => post<RelinkResultDto>(`/samples/relink?days=${days}`, {}),
     /** Reporte de análisis diario del molino. Sin fecha = hoy (fecha de planta). */
     dailyReport: (date?: string) => get<DailyReportDto>("/samples/daily-report", { date }),
+    /** Análisis de equipos sin conexión, cargados a mano desde la ficha. Solo esos se corrigen o borran. */
+    manual: {
+      create: (sampleId: string, input: ManualMeasurementInput) =>
+        post<SampleMeasurementDto>(`/samples/${encodeURIComponent(sampleId)}/manual`, input),
+      update: (id: string, input: ManualMeasurementInput) =>
+        patch<SampleMeasurementDto>(`/measurements/manual/${encodeURIComponent(id)}`, input),
+      remove: (id: string) => del<{ id: string }>(`/measurements/manual/${encodeURIComponent(id)}`),
+    },
     createField: (kindId: string, input: FieldDefInput) =>
       post<SampleFieldDefDto>(`/samples/kinds/${encodeURIComponent(kindId)}/fields`, input),
     updateField: (id: string, input: FieldDefUpdateInput) =>

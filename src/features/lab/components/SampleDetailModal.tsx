@@ -1,6 +1,6 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Pencil, Printer } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Copy, FlaskConical, Pencil, Printer, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { labApi, labError, labKeys } from "../api";
@@ -17,6 +17,7 @@ import {
 import type { LabSource, SampleDetailDto, SampleDto, SampleKindDto, SampleMeasurementDto } from "../types";
 import { LabModal } from "./LabModal";
 import { LabTableSkeleton } from "./Loading";
+import { ManualMeasurementModal } from "./ManualMeasurementModal";
 import { NoLigaBadge } from "./NoLigaBadge";
 import { imprimirEtiqueta } from "../etiqueta";
 
@@ -27,6 +28,10 @@ import { imprimirEtiqueta } from "../etiqueta";
  * trae las mediciones, y se refresca sola mientras está abierta: el operario
  * registra, tipea la accesión en el equipo y ve aparecer el resultado acá sin
  * cerrar y volver a abrir.
+ *
+ * Los análisis de equipos sin conexión (termobalanza, estufa, colorímetro,
+ * PMG) se cargan desde acá con "Análisis manual": quedan como una medición
+ * más, con quién la cargó, y solo esas se corrigen o borran.
  */
 
 const REFRESCO_MS = 30_000;
@@ -44,6 +49,16 @@ export const SampleDetailModal: React.FC<{
     refetchInterval: REFRESCO_MS,
   });
 
+  // null = cerrado; editing null = alta; editing con medición = corrección.
+  const [manual, setManual] = React.useState<{ editing: SampleMeasurementDto | null } | null>(null);
+
+  // Con el formulario manual abierto, Escape y el clic afuera cierran ese
+  // formulario, no la ficha entera.
+  const cerrar = React.useCallback(() => {
+    if (manual) return;
+    onClose();
+  }, [manual, onClose]);
+
   const copiar = async () => {
     (await copiarAlPortapapeles(accession))
       ? toast.success("Accesión copiada")
@@ -53,7 +68,7 @@ export const SampleDetailModal: React.FC<{
   return (
     <LabModal
       wide
-      onClose={onClose}
+      onClose={cerrar}
       title={
         <span className="flex items-center gap-2 flex-wrap">
           <span className="font-mono tracking-wider">{accession}</span>
@@ -96,6 +111,12 @@ export const SampleDetailModal: React.FC<{
             </Button>
           )}
           {canEdit && data && (
+            <Button size="sm" variant="outline" onClick={() => setManual({ editing: null })}>
+              <FlaskConical size={13} className="mr-1.5" />
+              Análisis manual
+            </Button>
+          )}
+          {canEdit && data && (
             <Button size="sm" variant="outline" onClick={() => onEdit(data)}>
               <Pencil size={13} className="mr-1.5" />
               Editar ficha
@@ -116,12 +137,36 @@ export const SampleDetailModal: React.FC<{
         </div>
       )}
 
-      {data && <Ficha sample={data} kinds={kinds} />}
+      {data && (
+        <Ficha
+          sample={data}
+          kinds={kinds}
+          acciones={canEdit ? { onEditarManual: (m) => setManual({ editing: m }) } : undefined}
+        />
+      )}
+
+      {manual && data && (
+        <ManualMeasurementModal
+          sampleId={data.id}
+          accession={data.accession}
+          editing={manual.editing}
+          onClose={() => setManual(null)}
+        />
+      )}
     </LabModal>
   );
 };
 
-const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ sample, kinds }) => {
+/** Lo que puede hacer quien tiene QC sobre los análisis manuales de la muestra. */
+export interface AccionesManual {
+  onEditarManual: (m: SampleMeasurementDto) => void;
+}
+
+const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[]; acciones?: AccionesManual }> = ({
+  sample,
+  kinds,
+  acciones,
+}) => {
   const kind = kinds.find((k) => k.id === sample.kindId);
   const defs = kind?.fields ?? [];
 
@@ -193,7 +238,7 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
         </div>
       )}
 
-      <AnalisisPorEquipo sample={sample} />
+      <AnalisisPorEquipo sample={sample} acciones={acciones} />
 
       <p className="text-[11.5px] text-muted-foreground border-t border-border pt-3">
         Registró {sample.createdBy.name} el {fmtDateTime(sample.createdAt)}
@@ -206,9 +251,13 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
 /**
  * Todos los análisis enlazados a la muestra, una tarjeta por equipo. Se exporta
  * porque la grilla de consulta lo muestra al expandir una fila: es la misma
- * información que la ficha, sin duplicar el render.
+ * información que la ficha, sin duplicar el render. `acciones` solo viene de
+ * la ficha, con QC: corregir o borrar un análisis manual.
  */
-export const AnalisisPorEquipo: React.FC<{ sample: SampleDetailDto }> = ({ sample }) => {
+export const AnalisisPorEquipo: React.FC<{ sample: SampleDetailDto; acciones?: AccionesManual }> = ({
+  sample,
+  acciones,
+}) => {
   const porEquipo = new Map<LabSource, SampleMeasurementDto[]>();
   for (const m of sample.measurements) {
     const lista = porEquipo.get(m.source) ?? [];
@@ -235,11 +284,18 @@ export const AnalisisPorEquipo: React.FC<{ sample: SampleDetailDto }> = ({ sampl
           Todavía no hay análisis enlazados. Tipeá{" "}
           <span className="font-mono font-medium text-foreground">{sample.accession}</span> como
           código de muestra en el equipo: apenas llegue la medición, aparece acá.
+          {acciones && " Lo de termobalanza, estufa o colorímetro se carga con “Análisis manual”."}
         </div>
       ) : (
         <div className="space-y-3">
           {equipos.map((source) => (
-            <TarjetaEquipo key={source} source={source} mediciones={porEquipo.get(source) ?? []} />
+            <TarjetaEquipo
+              key={source}
+              source={source}
+              mediciones={porEquipo.get(source) ?? []}
+              accession={sample.accession}
+              acciones={acciones}
+            />
           ))}
         </div>
       )}
@@ -251,26 +307,71 @@ export const AnalisisPorEquipo: React.FC<{ sample: SampleDetailDto }> = ({ sampl
  * Un equipo puede tener varias mediciones de la misma muestra (el FN corre dos
  * canales, una prueba se repite). Se muestran todas, cada una con su hora.
  */
-const TarjetaEquipo: React.FC<{ source: LabSource; mediciones: SampleMeasurementDto[] }> = ({
-  source,
-  mediciones,
-}) => {
+const TarjetaEquipo: React.FC<{
+  source: LabSource;
+  mediciones: SampleMeasurementDto[];
+  accession: string;
+  acciones?: AccionesManual;
+}> = ({ source, mediciones, accession, acciones }) => {
+  const qc = useQueryClient();
+  const esManual = source === "MANUAL";
   const instrumento = mediciones.find((m) => m.instrumentName)?.instrumentName;
+
+  const borrar = useMutation({
+    mutationFn: (id: string) => labApi.samples.manual.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: labKeys.sample(accession) });
+      void qc.invalidateQueries({ queryKey: labKeys.samplesAll });
+      toast.success("Análisis manual borrado");
+    },
+    onError: (e) => toast.error(labError(e)),
+  });
+
   return (
     <div className="rounded-md border border-border overflow-hidden">
       <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
         <span className="text-[12.5px] font-semibold">{SOURCE_LABEL[source]}</span>
         <span className="text-[11px] text-muted-foreground truncate">
-          {instrumento ?? ""}
+          {esManual ? "Termobalanza, estufa, colorímetro, PMG" : (instrumento ?? "")}
           {mediciones.length > 1 && ` · ${mediciones.length} mediciones`}
         </span>
       </div>
       <div className="divide-y divide-border/60">
         {mediciones.map((m) => (
           <div key={m.id} className="px-3 py-2">
-            <div className="text-[11px] text-muted-foreground tabular-nums mb-1.5">
-              {fmtDateTime(m.analyzedAt)}
-              {m.productCode && ` · ${m.productCode}`}
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="text-[11px] text-muted-foreground tabular-nums">
+                {fmtDateTime(m.analyzedAt)}
+                {m.productCode && ` · ${m.productCode}`}
+                {esManual && m.createdBy && ` · cargó ${m.createdBy.name}`}
+              </div>
+              {esManual && acciones && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground p-1"
+                    title="Corregir"
+                    aria-label="Corregir análisis manual"
+                    onClick={() => acciones.onEditarManual(m)}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-red-600 p-1 disabled:opacity-50"
+                    title="Borrar"
+                    aria-label="Borrar análisis manual"
+                    disabled={borrar.isPending}
+                    onClick={() => {
+                      if (window.confirm("¿Borrar este análisis manual? Se puede volver a cargar.")) {
+                        borrar.mutate(m.id);
+                      }
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {ordenarParams(source, m.params).map((p) => (

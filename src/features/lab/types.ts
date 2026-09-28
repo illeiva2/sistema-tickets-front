@@ -310,7 +310,7 @@ export interface SampleKindDto {
 export type SampleFieldValues = Record<string, string | number | boolean>;
 
 /** Los cinco instrumentos que alimentan el espejo. */
-export type LabSource = "GLUTOMATIC" | "NIR" | "FN" | "SDMATIC" | "ALVEOLAB";
+export type LabSource = "GLUTOMATIC" | "NIR" | "FN" | "SDMATIC" | "ALVEOLAB" | "MANUAL";
 
 export interface SampleDto {
   id: string;
@@ -356,7 +356,15 @@ export interface SampleMeasurementDto {
   /** Lo que el operario tipeó en el equipo; de ahí salió el enlace. */
   sampleRef: string | null;
   analyzedAt: string;
+  /** Solo en las cargadas a mano (origen MANUAL): quién las cargó. */
+  createdBy?: { id: string; name: string } | null;
   params: SampleMeasurementParamDto[];
+}
+
+/** Un análisis manual (termobalanza, estufa, colorímetro, PMG): valores por código; null = no se midió. */
+export interface ManualMeasurementInput {
+  analyzedAt?: string;
+  values: Record<string, number | null>;
 }
 
 export interface SampleDetailDto extends SampleDto {
@@ -369,25 +377,40 @@ export interface RelinkResultDto {
   linked: number;
 }
 
-// ─── Reporte de análisis diario (turno × producto) ───────────────────────────
+// ─── Reporte de análisis diario (la planilla M.M.LC.P.02) ─────────────────────
 
 export interface DailyReportColumnDto {
+  /** `source|code`, la misma clave de la grilla de análisis. */
+  key: string;
   /** Código del parámetro tal como lo guarda el equipo. */
   code: string;
   source: LabSource;
+  /** Encabezado dentro del grupo ("Termobalanza", "NIR", "L"). */
   label: string;
+  /** Encabezado del grupo, como en el papel ("% Humedad", "Gluten"). */
+  group: string;
+  section: "fq" | "reo";
   unit?: string;
   decimals: number;
+  /** Se carga a mano desde la ficha. */
+  manual: boolean;
 }
 
 export interface DailyReportRowDto {
   turno: string;
   producto: string;
+  orden: number;
+  /** Muestra registrada; null en un hueco de la planilla o en mediciones sueltas. */
+  sample: { id: string; accession: string; sampledAt: string; displayName: string } | null;
+  hora: string | null;
+  lote: string | null;
+  /** Mediciones del día sin muestra registrada: el producto es el que dice el equipo. */
+  sinMuestra: boolean;
   measurements: number;
-  /** Accesiones de las muestras registradas que aportaron a la fila. */
-  samples: string[];
-  /** Promedio por columna, indexado por `code`. Ausente = sin dato. */
+  /** Un valor por columna, indexado por `key`. Ausente = sin dato. */
   values: Record<string, number>;
+  implausible: string[];
+  noLiga: boolean;
 }
 
 export interface DailyReportDto {
@@ -399,6 +422,7 @@ export interface DailyReportDto {
   columns: DailyReportColumnDto[];
   rows: DailyReportRowDto[];
   totalMeasurements: number;
+  totalSamples: number;
 }
 
 /** Alta de un campo del catálogo. `key` y `type` quedan fijos después. */
