@@ -611,3 +611,13 @@ export interface AlveolabFilters {
   page?: number;
   pageSize?: number;
 }
+
+/** Estado de la lista de empresas de granos que trae el job nocturno desde el ERP. */
+export interface ProductoresStatusDto {
+  total: number;
+  activos: number;
+  dataset: string | null;
+  ultimaCorrida: { at: string; status: string; total: number | null; error: string | null } | null;
+  ultimaOk: string | null;
+  desactualizado: boolean;
+}
