@@ -277,6 +277,17 @@ export interface SampleFieldDefDto {
   isCondition: boolean;
   /** Para listas: qué opciones cuentan como alteración. null = cualquier valor. */
   conditionValues: string[] | null;
+  /** Se pide solo cuando `field` vale alguna de `values` (una casilla marcada vale "true"). null = siempre. */
+  visibleWhen: { field: string; values: string[] } | null;
+  /** TEXT: regex (anclada) que debe cumplir el valor; `patternHint` explica el formato. */
+  pattern: string | null;
+  patternHint: string | null;
+  /** BOOLEAN: al marcarse pide un porcentaje, guardado en `<key>_pct`. */
+  withPercent: boolean;
+  /** TEXT: el formulario sugiere valores ya cargados. */
+  suggest: boolean;
+  /** TEXT: se guarda en mayúsculas. */
+  uppercase: boolean;
   sortOrder: number;
   isActive: boolean;
 }
@@ -288,6 +299,8 @@ export interface SampleKindDto {
   description: string | null;
   /** Laboratorio propuesto al elegir este tipo; el operario puede cambiarlo. */
   defaultSite: LabSite | null;
+  /** El laboratorio queda fijo en defaultSite (las internas siempre son M-). */
+  lockSite: boolean;
   sortOrder: number;
   isActive: boolean;
   fields: SampleFieldDefDto[];
@@ -319,6 +332,8 @@ export interface SampleDto {
   analyses?: Partial<Record<LabSource, number>>;
   /** Alteraciones presentes ("Brotado", "Insectos: Vivos"): la muestra lleva advertencia. */
   conditions?: string[];
+  /** El Glutomatic no formó gluten (prueba guardada con 0). Distinto de "sin Glutomatic". */
+  noLiga?: boolean;
 }
 
 export interface SampleMeasurementParamDto {
@@ -399,6 +414,12 @@ export interface FieldDefInput {
   sortOrder?: number;
   isCondition?: boolean;
   conditionValues?: string[] | null;
+  visibleWhen?: { field: string; values: string[] } | null;
+  pattern?: string | null;
+  patternHint?: string | null;
+  withPercent?: boolean;
+  suggest?: boolean;
+  uppercase?: boolean;
 }
 
 export interface FieldDefUpdateInput {
@@ -412,6 +433,12 @@ export interface FieldDefUpdateInput {
   isActive?: boolean;
   isCondition?: boolean;
   conditionValues?: string[] | null;
+  visibleWhen?: { field: string; values: string[] } | null;
+  pattern?: string | null;
+  patternHint?: string | null;
+  withPercent?: boolean;
+  suggest?: boolean;
+  uppercase?: boolean;
 }
 
 export interface SamplesSummaryDto {

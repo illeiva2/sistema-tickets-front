@@ -60,6 +60,11 @@ export const COLUMNAS_FIJAS: ColumnaGrid[] = [
   fijo("kind", "Tipo de muestra", "texto", (r) => r.kind.name),
   fijo("displayName", "Nombre", "texto", (r) => r.displayName),
   fijo("conditions", "Alteraciones", "texto", (r) => (r.conditions ?? []).join(" · ") || undefined),
+  // "No liga" es un resultado del Glutomatic (gluten 0), no una ausencia: por eso
+  // se distingue de "sin Glutomatic todavía" (vacío).
+  fijo("gluten", "Gluten (liga)", "texto", (r) =>
+    r.noLiga ? "No liga" : (r.analyses?.GLUTOMATIC ?? 0) > 0 ? "Liga" : undefined,
+  ),
   fijo(
     "analyses",
     "Equipos",
@@ -146,6 +151,7 @@ export const VISTA_SUGERIDA: SavedViewConfig = {
     "a:NIR|Peso específico",
     "a:FN|Falling Number",
     "a:ALVEOLAB|W",
+    "gluten",
     "conditions",
   ],
   sort: [{ id: "sampledAt", desc: true }],

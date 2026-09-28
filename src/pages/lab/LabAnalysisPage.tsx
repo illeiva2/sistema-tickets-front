@@ -30,6 +30,7 @@ import { ExportButton } from "@/features/lab/components/LabLayout";
 import { LabFetchingHint, LabProgressBar, LabTableSkeleton } from "@/features/lab/components/Loading";
 import { AnalisisPorEquipo, SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
 import { GridColumnsPanel } from "@/features/lab/components/GridColumnsPanel";
+import { NoLigaBadge } from "@/features/lab/components/NoLigaBadge";
 import {
   VIEW_KEY,
   VISTA_SUGERIDA,
@@ -465,8 +466,14 @@ const Celda: React.FC<{ c: ColumnaGrid; r: GridSampleDto; expandida: boolean }> 
             <AlertTriangle size={13} />
           </span>
         )}
+        {r.noLiga && <NoLigaBadge compact />}
       </span>
     );
+  }
+  if (c.id === "gluten") {
+    const t = c.texto(r);
+    if (!t) return <span className="text-muted-foreground">—</span>;
+    return t === "No liga" ? <NoLigaBadge /> : <span className="text-muted-foreground">{t}</span>;
   }
   if (c.tipo === "numero") {
     const clave = claveAnalisis(c.id);
@@ -530,6 +537,7 @@ const Tarjeta: React.FC<{
             {abierta ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
             {r.accession}
             {r.conditions && r.conditions.length > 0 && <AlertTriangle size={13} className="text-amber-600" />}
+            {r.noLiga && <NoLigaBadge compact />}
           </span>
           <span className="text-[11px] text-muted-foreground">{SITE_LABEL[r.site]}</span>
         </div>

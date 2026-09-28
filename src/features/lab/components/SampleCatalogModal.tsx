@@ -45,6 +45,15 @@ interface Borrador {
   isCondition: boolean;
   /** Opciones que cuentan como alteración, separadas por coma. Vacío = cualquiera. */
   conditionValuesTexto: string;
+  /** Clave del campo del que depende; vacío = siempre se pide. */
+  visibleWhenField: string;
+  /** Opciones del controlador que muestran este campo, separadas por coma. */
+  visibleWhenValuesTexto: string;
+  pattern: string;
+  patternHint: string;
+  withPercent: boolean;
+  suggest: boolean;
+  uppercase: boolean;
 }
 
 const borradorVacio = (siguienteOrden: number): Borrador => ({
@@ -60,6 +69,13 @@ const borradorVacio = (siguienteOrden: number): Borrador => ({
   isActive: true,
   isCondition: false,
   conditionValuesTexto: "",
+  visibleWhenField: "",
+  visibleWhenValuesTexto: "",
+  pattern: "",
+  patternHint: "",
+  withPercent: false,
+  suggest: false,
+  uppercase: false,
 });
 
 const borradorDe = (d: SampleFieldDefDto): Borrador => ({
@@ -75,6 +91,13 @@ const borradorDe = (d: SampleFieldDefDto): Borrador => ({
   isActive: d.isActive,
   isCondition: d.isCondition,
   conditionValuesTexto: (d.conditionValues ?? []).join(", "),
+  visibleWhenField: d.visibleWhen?.field ?? "",
+  visibleWhenValuesTexto: (d.visibleWhen?.values ?? []).join(", "),
+  pattern: d.pattern ?? "",
+  patternHint: d.patternHint ?? "",
+  withPercent: d.withPercent,
+  suggest: d.suggest,
+  uppercase: d.uppercase,
 });
 
 export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -184,6 +207,23 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
                           {d.type === "SELECT" && (
                             <span className="block text-[10.5px] text-muted-foreground font-normal truncate max-w-[280px]">
                               {opcionesDe(d).join(" · ")}
+                            </span>
+                          )}
+                          {d.visibleWhen && (
+                            <span className="block text-[10.5px] text-muted-foreground font-normal truncate max-w-[280px]">
+                              solo si {d.visibleWhen.field} = {d.visibleWhen.values.join(" / ")}
+                            </span>
+                          )}
+                          {(d.pattern || d.withPercent || d.suggest || d.uppercase) && (
+                            <span className="block text-[10.5px] text-muted-foreground font-normal">
+                              {[
+                                d.pattern ? "formato" : null,
+                                d.withPercent ? "con %" : null,
+                                d.suggest ? "sugerencias" : null,
+                                d.uppercase ? "mayúsculas" : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </span>
                           )}
                         </td>
@@ -304,6 +344,10 @@ const FormularioCampo: React.FC<{
               .map((o) => o.trim())
               .filter(Boolean)
           : undefined;
+      const visibleWhenValues = b.visibleWhenValuesTexto
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean);
       const comun = {
         label: b.label.trim(),
         required: b.required,
@@ -315,6 +359,16 @@ const FormularioCampo: React.FC<{
         isCondition: b.isCondition,
         conditionValues:
           conditionValues === undefined ? undefined : conditionValues.length > 0 ? conditionValues : null,
+        // Sin controlador o sin opciones, la regla se limpia (null): el campo vuelve a pedirse siempre.
+        visibleWhen:
+          b.visibleWhenField.trim() && visibleWhenValues.length > 0
+            ? { field: b.visibleWhenField.trim(), values: visibleWhenValues }
+            : null,
+        pattern: b.type === "TEXT" ? b.pattern.trim() || null : null,
+        patternHint: b.type === "TEXT" ? b.patternHint.trim() || null : null,
+        withPercent: b.type === "BOOLEAN" && b.withPercent,
+        suggest: b.type === "TEXT" && b.suggest,
+        uppercase: b.type === "TEXT" && b.uppercase,
       };
       if (esEdicion) {
         const input: FieldDefUpdateInput = { ...comun, isActive: b.isActive };
@@ -472,6 +526,89 @@ const FormularioCampo: React.FC<{
           />
         </Campo>
       )}
+
+      {/* Reglas: cuándo se pide, qué formato y cómo se carga. Es lo que hace que
+          "Lote" aparezca solo en los embolses sin tocar código. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3">
+        <Campo
+          label="Se pide solo cuando"
+          error={errores.visibleWhen}
+          hint="Otro campo de este tipo de muestra. Vacío = se pide siempre."
+        >
+          <select
+            className={CLASE_CONTROL}
+            value={b.visibleWhenField}
+            onChange={(e) => set("visibleWhenField", e.target.value)}
+          >
+            <option value="">— siempre —</option>
+            {kind.fields
+              .filter((f) => f.key !== b.key && f.isActive)
+              .map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label} ({f.key})
+                </option>
+              ))}
+          </select>
+        </Campo>
+        <Campo
+          label="…vale alguna de estas opciones"
+          hint='Separadas por coma, tal como están en la lista ("3/0 Embolse, 4/0 Embolse"). Para una casilla, "true".'
+        >
+          <input
+            className={CLASE_CONTROL}
+            value={b.visibleWhenValuesTexto}
+            onChange={(e) => set("visibleWhenValuesTexto", e.target.value)}
+            disabled={!b.visibleWhenField}
+            placeholder="Trigo Sucio"
+          />
+        </Campo>
+        {b.type === "TEXT" && (
+          <>
+            <Campo
+              label="Formato (expresión regular)"
+              error={errores.pattern}
+              hint="Anclada al valor completo. Ej.: ^\d{3}[A-Z]$ para 123A. Vacío = cualquier texto."
+            >
+              <input
+                className={`${CLASE_CONTROL} font-mono`}
+                value={b.pattern}
+                maxLength={200}
+                onChange={(e) => set("pattern", e.target.value)}
+                placeholder="^\d{3}[A-Z]$"
+              />
+            </Campo>
+            <Campo label="Cómo explicar el formato" error={errores.patternHint} hint="Se muestra debajo del campo y en el error.">
+              <input
+                className={CLASE_CONTROL}
+                value={b.patternHint}
+                maxLength={120}
+                onChange={(e) => set("patternHint", e.target.value)}
+                placeholder="3 números y una letra, por ejemplo 123A"
+              />
+            </Campo>
+            <Check
+              label="Sugerir valores ya cargados"
+              checked={b.suggest}
+              onChange={(v) => set("suggest", v)}
+              hint="Desplegable con lo que ya se cargó en este campo (empresas, localidades)."
+            />
+            <Check
+              label="Guardar en mayúsculas"
+              checked={b.uppercase}
+              onChange={(v) => set("uppercase", v)}
+              hint="Patentes, lotes."
+            />
+          </>
+        )}
+        {b.type === "BOOLEAN" && (
+          <Check
+            label="Al marcarse pide un porcentaje"
+            checked={b.withPercent}
+            onChange={(v) => set("withPercent", v)}
+            hint="Lo que informa el escáner de granos (picado 1,5 %). Se guarda junto a la casilla."
+          />
+        )}
+      </div>
 
       <div className="flex flex-wrap justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={mutation.isPending}>

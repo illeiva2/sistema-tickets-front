@@ -20,6 +20,7 @@ import { SampleFormModal } from "@/features/lab/components/SampleFormModal";
 import { SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
 import { SampleCatalogModal } from "@/features/lab/components/SampleCatalogModal";
 import { imprimirEtiqueta } from "@/features/lab/etiqueta";
+import { NoLigaBadge } from "@/features/lab/components/NoLigaBadge";
 import type { LabSite, SampleDto, SampleFilters } from "@/features/lab/types";
 
 /**
@@ -43,6 +44,7 @@ const CSV: ColumnaCsv<SampleDto>[] = [
   { header: "Laboratorio", value: (s) => SITE_LABEL[s.site] },
   { header: "Fecha y hora de toma", value: (s) => fmtDateTime(s.sampledAt) },
   { header: "Alteraciones", value: (s) => (s.conditions ?? []).join(" · ") },
+  { header: "Gluten", value: (s) => (s.noLiga ? "No liga" : (s.analyses?.GLUTOMATIC ?? 0) > 0 ? "Liga" : "") },
   { header: "Registró", value: (s) => s.createdBy.name },
 ];
 
@@ -323,6 +325,7 @@ export const LabSamplesPage: React.FC = () => {
                             <AlertTriangle size={13} />
                           </span>
                         )}
+                        {s.noLiga && <NoLigaBadge className="ml-1.5" />}
                       </td>
                       <td className="px-2 py-2.5 text-[12.5px] min-w-[200px]">{s.displayName}</td>
                       <td className="px-2 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">

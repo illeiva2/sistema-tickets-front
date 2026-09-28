@@ -17,6 +17,7 @@ import {
 import type { LabSource, SampleDetailDto, SampleDto, SampleKindDto, SampleMeasurementDto } from "../types";
 import { LabModal } from "./LabModal";
 import { LabTableSkeleton } from "./Loading";
+import { NoLigaBadge } from "./NoLigaBadge";
 import { imprimirEtiqueta } from "../etiqueta";
 
 /**
@@ -63,6 +64,7 @@ export const SampleDetailModal: React.FC<{
               aria-label="Muestra con alteración"
             />
           )}
+          {data?.noLiga && <NoLigaBadge />}
           <button
             type="button"
             onClick={() => void copiar()}
@@ -156,6 +158,15 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[] }> = ({ 
           <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
           <span>
             <strong>Muestra con alteración:</strong> {alteraciones.join(" · ")}
+          </span>
+        </div>
+      )}
+
+      {sample.noLiga && (
+        <div className="flex items-start gap-2 rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-3 py-2 text-[13px] text-red-900 dark:text-red-200">
+          <span className="mt-0.5 shrink-0 font-bold">✕</span>
+          <span>
+            <strong>No liga:</strong> el Glutomatic no formó gluten (la prueba quedó registrada en 0).
           </span>
         </div>
       )}
