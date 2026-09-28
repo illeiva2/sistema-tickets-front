@@ -107,6 +107,7 @@ export const SOURCE_LABEL: Record<LabSource, string> = {
   FN: "Falling Number",
   SDMATIC: "Almidón dañado",
   ALVEOLAB: "Alveógrafo",
+  MANUAL: "Manual",
 };
 
 /** Abreviatura para los chips de la lista. */
@@ -116,10 +117,37 @@ export const SOURCE_SHORT: Record<LabSource, string> = {
   FN: "FN",
   SDMATIC: "AD",
   ALVEOLAB: "ALV",
+  MANUAL: "MAN",
 };
 
-/** Orden del flujo del laboratorio: el NIR es el primer análisis, el más general. */
-export const SOURCE_ORDER: LabSource[] = ["NIR", "GLUTOMATIC", "FN", "SDMATIC", "ALVEOLAB"];
+/** Orden del flujo del laboratorio: el NIR es el primer análisis, el más general; lo manual al final. */
+export const SOURCE_ORDER: LabSource[] = ["NIR", "GLUTOMATIC", "FN", "SDMATIC", "ALVEOLAB", "MANUAL"];
+
+/**
+ * Análisis con equipos sin conexión (termobalanza, estufa, colorímetro, balanza)
+ * que se cargan a mano desde la ficha. Espejo del catálogo del backend: los
+ * códigos son fijos, son las columnas del reporte diario en papel.
+ */
+export interface ManualParamDef {
+  code: string;
+  label: string;
+  unit?: string;
+  decimals: number;
+  min: number;
+  max: number;
+  hint?: string;
+}
+
+export const MANUAL_PARAMS: ManualParamDef[] = [
+  { code: "Humedad termobalanza", label: "Humedad (termobalanza)", unit: "%", decimals: 1, min: 0, max: 100 },
+  { code: "Cenizas cápsula", label: "Cenizas: cápsula", decimals: 2, min: 0, max: 1000, hint: "Como en la planilla" },
+  { code: "Cenizas estufa", label: "Cenizas (estufa)", unit: "%", decimals: 2, min: 0, max: 100 },
+  { code: "Cenizas cápsula ensayo", label: "Cenizas: cápsula ensayo", decimals: 2, min: 0, max: 1000, hint: "Como en la planilla" },
+  { code: "Color L", label: "Color L", decimals: 1, min: 0, max: 100 },
+  { code: "Color a", label: "Color a", decimals: 1, min: -100, max: 100 },
+  { code: "Color b", label: "Color b", decimals: 1, min: -100, max: 100 },
+  { code: "Peso de mil granos", label: "Peso de mil granos", unit: "g", decimals: 1, min: 0, max: 100, hint: "Solo trigo" },
+];
 
 /** Orden en que el laboratorio lee cada parámetro; lo que no figura va después, alfabético. */
 const PARAM_ORDER: Partial<Record<LabSource, string[]>> = {
@@ -133,6 +161,7 @@ const PARAM_ORDER: Partial<Record<LabSource, string[]>> = {
     "Proteína",
   ],
   ALVEOLAB: ["W", "P", "L", "P/L", "Ie", "G"],
+  MANUAL: MANUAL_PARAMS.map((p) => p.code),
 };
 
 export const ordenarParams = (
@@ -164,6 +193,8 @@ export const etiquetaParam = (code: string): string => {
 export const decimalesParam = (code: string): number => {
   if (["W", "P", "L", "Falling Number", "Índice de gluten", "Temperatura"].includes(code)) return 0;
   if (code === "P/L") return 2;
+  const manual = MANUAL_PARAMS.find((p) => p.code === code);
+  if (manual) return manual.decimals;
   if (["Ie", "G", "Almidón dañado (UCD)", "Almidón dañado corregido (UCDc)"].includes(code)) return 1;
   return 2;
 };
