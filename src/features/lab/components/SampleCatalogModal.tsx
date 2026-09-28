@@ -8,6 +8,7 @@ import { claveDesdeEtiqueta, erroresDeCampos, opcionesDe } from "../samples";
 import type { FieldDefInput, FieldDefUpdateInput, LabFieldType, SampleFieldDefDto, SampleKindDto } from "../types";
 import { LabModal } from "./LabModal";
 import { LabTableSkeleton } from "./Loading";
+import { fmtRelative } from "../format";
 
 /**
  * Administración del catálogo de campos (MANAGEMENT).
@@ -158,6 +159,8 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
             </div>
           )}
 
+          {kind.fields.some((f) => f.key === "empresa") && <EstadoProductores />}
+
           <p className="text-[11.5px] text-muted-foreground">
             Fecha y hora de la toma, laboratorio y notas son fijos de toda muestra; acá se definen los
             demás campos. La clave y el tipo no se cambian después: para cambiar un tipo, desactivá el
@@ -271,6 +274,35 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
         </div>
       )}
     </LabModal>
+  );
+};
+
+/**
+ * Estado de la lista de empresas del ERP que alimenta las sugerencias de
+ * "Empresa". El job nocturno puede dejar de correr sin que nadie lo note (ya
+ * pasó con otro sync): acá se ve cuándo fue la última carga buena.
+ */
+const EstadoProductores: React.FC = () => {
+  const q = useQuery({
+    queryKey: labKeys.productoresStatus,
+    queryFn: labApi.productores.status,
+    staleTime: 60_000,
+  });
+  if (!q.data) return null;
+  const d = q.data;
+  const carga = d.ultimaOk ? `actualizada ${fmtRelative(d.ultimaOk)}` : "todavía sin cargar";
+  return (
+    <p
+      className={`text-[11.5px] rounded-md border px-3 py-2 ${
+        d.desactualizado
+          ? "border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+          : "border-border bg-muted/20 text-muted-foreground"
+      }`}
+    >
+      <strong>Empresas del ERP para "Empresa":</strong> {d.activos} activas de {d.total}, {carga}.
+      {d.desactualizado && " La lista está desactualizada: revisá el job nocturno."}
+      {d.ultimaCorrida?.status === "ERROR" && d.ultimaCorrida.error && ` Último error: ${d.ultimaCorrida.error}`}
+    </p>
   );
 };
 

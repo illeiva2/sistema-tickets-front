@@ -97,10 +97,14 @@ const Sugerencias: React.FC<{ id: string; fieldKey: string; kindId: string }> = 
     queryFn: () => labApi.samples.suggest(fieldKey, kindId),
     staleTime: 5 * 60_000,
   });
+  // "Empresa" trae además la lista del ERP: la etiqueta (CUIT · localidad)
+  // distingue homónimas; el valor sigue siendo el nombre, que es lo que se guarda.
+  const items: { value: string; label?: string }[] =
+    q.data?.items ?? (q.data?.values ?? []).map((value) => ({ value }));
   return (
     <datalist id={id}>
-      {(q.data?.values ?? []).map((v) => (
-        <option key={v} value={v} />
+      {items.map((i) => (
+        <option key={i.value} value={i.value} label={i.label} />
       ))}
     </datalist>
   );

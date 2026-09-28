@@ -1,3 +1,4 @@
+import type { ProductoresStatusDto } from "./types";
 import api from "@/lib/api";
 import type {
   DashboardSummaryDto,
@@ -199,6 +200,11 @@ export const labApi = {
       }),
   },
 
+  /** Empresas de granos del ERP (las trae el job nocturno); alimentan las sugerencias de "Empresa". */
+  productores: {
+    status: () => get<ProductoresStatusDto>("/productores/status"),
+  },
+
   /** Registro de muestras: el catálogo de campos viene del backend, no se hardcodea. */
   samples: {
     kinds: (includeInactive = false) =>
@@ -208,7 +214,11 @@ export const labApi = {
     /** Grilla de consulta: el filtro entero (hasta un tope) con los análisis pivoteados. */
     grid: (f: GridFilters = {}) => get<SamplesGridDto>("/samples/grid", { ...f }),
     /** Valores ya cargados de un campo con sugerencias (empresa, procedencia…), los más usados primero. */
-    suggest: (key: string, kindId?: string) => get<{ values: string[] }>("/samples/suggest", { key, kindId }),
+    suggest: (key: string, kindId?: string) =>
+      get<{ values: string[]; items?: { value: string; label?: string }[] }>("/samples/suggest", {
+        key,
+        kindId,
+      }),
     /** La ficha: la muestra más sus análisis enlazados, crudos. */
     get: (accession: string) => get<SampleDetailDto>(`/samples/${encodeURIComponent(accession)}`),
     create: (input: CreateSampleInput) => post<SampleDto>("/samples", input),
@@ -269,6 +279,7 @@ export const labKeys = {
   samplesSuggest: (key: string, kindId?: string) => ["lab", "samples", "suggest", key, kindId ?? ""] as const,
   sample: (accession: string) => ["lab", "samples", "one", accession] as const,
   dailyReport: (date: string) => ["lab", "samples", "daily-report", date] as const,
+  productoresStatus: ["lab", "productores", "status"] as const,
   assistantStatus: ["lab", "assistant", "status"] as const,
   assistantRequest: (id: string) => ["lab", "assistant", "request", id] as const,
 };
