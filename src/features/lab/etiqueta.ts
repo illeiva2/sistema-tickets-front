@@ -24,6 +24,16 @@ export interface TamanoEtiqueta {
   /** Imprime en una hoja común, con la etiqueta arriba a la izquierda. */
   hoja?: boolean;
   /**
+   * No fija el tamaño de página: toma el papel que tenga elegido el driver, en
+   * vertical. Es para rollos donde la etiqueta sale "derecha" (el ancho del
+   * rollo es el ancho de la etiqueta: Xprinter 50 mm, Brother 62 mm). Si la
+   * página declarara 50 × 30, Chrome la mandaría en horizontal por ser más
+   * ancha que alta, y el driver la giraría 90° sobre la etiqueta. La DYMO es
+   * al revés: el rollo mide 28 mm y la etiqueta sale acostada, así que ahí la
+   * página 89 × 28 en horizontal es justo lo que hace falta.
+   */
+  paginaAuto?: boolean;
+  /**
    * Ancho del código de barras en mm. Deliberadamente MENOR que la etiqueta:
    * la etiqueta va envuelta en frascos chicos y el lector necesita ver todas
    * las barras a la vez; un código ancho se curva y pierde los extremos. Con
@@ -44,10 +54,10 @@ export interface TamanoEtiqueta {
 // lectura confiable sobre el frasco curvo; un ancho con módulos de 2,x puntos
 // redondea desparejo y el lector empieza a fallar.
 export const TAMANOS: TamanoEtiqueta[] = [
-  { id: "50x30", nombre: "Xprinter / genérica 50 × 30 mm", ancho: 50, alto: 30, codigoAncho: 46 },
+  { id: "50x30", nombre: "Xprinter / genérica 50 × 30 mm", ancho: 50, alto: 30, codigoAncho: 46, paginaAuto: true },
   { id: "dymo-89x28", nombre: "DYMO LabelWriter 89 × 28 mm (99010)", ancho: 89, alto: 28, codigoAncho: 42 },
-  { id: "100x50", nombre: "Xprinter / genérica 100 × 50 mm", ancho: 100, alto: 50, codigoAncho: 46 },
-  { id: "62x29", nombre: "Brother 62 × 29 mm", ancho: 62, alto: 29, codigoAncho: 42 },
+  { id: "100x50", nombre: "Xprinter / genérica 100 × 50 mm", ancho: 100, alto: 50, codigoAncho: 46, paginaAuto: true },
+  { id: "62x29", nombre: "Brother 62 × 29 mm", ancho: 62, alto: 29, codigoAncho: 42, paginaAuto: true },
   { id: "a4", nombre: "Hoja A4 (etiqueta arriba a la izquierda)", ancho: 89, alto: 28, hoja: true, codigoAncho: 42 },
 ];
 
@@ -98,8 +108,11 @@ export const svgCodigoBarras = (texto: string): string => {
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 
-const reglaPagina = (t: TamanoEtiqueta) =>
-  `@page{size:${t.hoja ? "A4" : `${t.ancho}mm ${t.alto}mm`};margin:${t.hoja ? "10mm" : "0"}}`;
+/** Tamaño de página CSS: A4 en hoja, el del driver en rollos "derechos", el de la etiqueta en la DYMO. */
+export const tamanoPagina = (t: TamanoEtiqueta): string =>
+  t.hoja ? "A4" : t.paginaAuto ? "auto" : `${t.ancho}mm ${t.alto}mm`;
+
+const reglaPagina = (t: TamanoEtiqueta) => `@page{size:${tamanoPagina(t)};margin:${t.hoja ? "10mm" : "0"}}`;
 
 /** Documento completo de la etiqueta. Puro: recibe el SVG ya generado. */
 export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoImprimir = true): string => {
@@ -151,7 +164,7 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
   <label>Tamaño <select id="tamano">${opciones}</select></label>
   <button id="imprimir" type="button">Imprimir</button>
   <button id="cerrar" type="button">Cerrar</button>
-  <span class="ayuda">La línea punteada marca el borde de la etiqueta y no se imprime. En el diálogo, elegí la impresora de etiquetas y su tamaño de papel.</span>
+  <span class="ayuda">La línea punteada marca el borde de la etiqueta y no se imprime. En el diálogo, elegí la impresora de etiquetas y su papel; en la Xprinter, orientación vertical.</span>
 </div>
 <div class="lienzo">
   <div class="etiqueta${esEstrecha(t) ? " estrecha" : ""}" id="etiqueta">
@@ -168,7 +181,7 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
   function aplicar(id) {
     var t = TAMANOS.find(function (x) { return x.id === id; }) || TAMANOS[0];
     document.getElementById("pagina").textContent =
-      "@page{size:" + (t.hoja ? "A4" : t.ancho + "mm " + t.alto + "mm") + ";margin:" + (t.hoja ? "10mm" : "0") + "}";
+      "@page{size:" + (t.hoja ? "A4" : t.paginaAuto ? "auto" : t.ancho + "mm " + t.alto + "mm") + ";margin:" + (t.hoja ? "10mm" : "0") + "}";
     document.documentElement.style.setProperty("--w", t.ancho + "mm");
     document.documentElement.style.setProperty("--h", t.alto + "mm");
     document.documentElement.style.setProperty("--bc", t.codigoAncho + "mm");

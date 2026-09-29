@@ -41,19 +41,22 @@ describe("tamaño por defecto", () => {
 });
 
 describe("htmlEtiqueta", () => {
-  it("en 50 × 30 apila el contenido y fija la página al tamaño de la etiqueta", () => {
+  it("en 50 × 30 apila el contenido y deja la página al papel del driver (en vertical, sin girar)", () => {
     const html = htmlEtiqueta(muestra, "<svg data-test></svg>", "50x30", false);
     expect(html).toContain('class="etiqueta estrecha"');
-    expect(html).toContain("@page{size:50mm 30mm;margin:0}");
+    // Con size:50mm 30mm Chrome manda la página en horizontal y la Xprinter la gira 90°.
+    expect(html).toContain("@page{size:auto;margin:0}");
+    expect(html).not.toContain("size:50mm 30mm");
     expect(html).toContain("--w: 50mm; --h: 30mm; --bc: 46mm;");
     expect(html).toContain("<svg data-test></svg>");
     expect(html).toContain('<option value="50x30" selected>');
   });
 
-  it("en la DYMO va en columnas y en A4 imprime en hoja con margen", () => {
+  it("en la DYMO va en columnas con la página fija (el rollo es angosto y la etiqueta sale acostada); en A4, hoja con margen", () => {
     expect(htmlEtiqueta(muestra, "<svg></svg>", "dymo-89x28", false)).toContain('class="etiqueta"');
     expect(htmlEtiqueta(muestra, "<svg></svg>", "dymo-89x28", false)).toContain("@page{size:89mm 28mm;margin:0}");
     expect(htmlEtiqueta(muestra, "<svg></svg>", "a4", false)).toContain("@page{size:A4;margin:10mm}");
+    expect(TAMANOS.filter((t) => t.paginaAuto).map((t) => t.id)).toEqual(["50x30", "100x50", "62x29"]);
   });
 
   it("escapa el texto de la muestra y solo dispara la impresión automática si se pide", () => {
