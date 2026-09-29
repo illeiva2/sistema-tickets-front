@@ -33,9 +33,10 @@ export interface TamanoEtiqueta {
 }
 
 // El primero es el DEFAULT del selector (localStorage recuerda la última
-// elección por navegador). Hoy el laboratorio imprime en la DYMO 550, así que
-// arranca en 89 × 28 mm; cuando llegue la Xprinter XP-410B (en ~2 semanas) se
-// elige "50 × 30 mm" una sola vez y queda recordado.
+// elección por navegador). Desde el 29-sep-2026 los laboratorios imprimen en
+// las Xprinter XP-410B con rollos de 50 × 30 mm, así que arranca ahí; la DYMO
+// queda en la lista por si alguna PC la sigue usando (se elige una vez y queda
+// recordado).
 //
 // codigoAncho por tamaño: en la Xprinter (térmica directa, 203 dpi) 46 mm hace
 // que la accesión típica ("A-0002-3" = 123 módulos de Code 128) tenga módulos
@@ -43,14 +44,20 @@ export interface TamanoEtiqueta {
 // lectura confiable sobre el frasco curvo; un ancho con módulos de 2,x puntos
 // redondea desparejo y el lector empieza a fallar.
 export const TAMANOS: TamanoEtiqueta[] = [
-  { id: "dymo-89x28", nombre: "DYMO LabelWriter 89 × 28 mm (99010)", ancho: 89, alto: 28, codigoAncho: 42 },
   { id: "50x30", nombre: "Xprinter / genérica 50 × 30 mm", ancho: 50, alto: 30, codigoAncho: 46 },
+  { id: "dymo-89x28", nombre: "DYMO LabelWriter 89 × 28 mm (99010)", ancho: 89, alto: 28, codigoAncho: 42 },
   { id: "100x50", nombre: "Xprinter / genérica 100 × 50 mm", ancho: 100, alto: 50, codigoAncho: 46 },
   { id: "62x29", nombre: "Brother 62 × 29 mm", ancho: 62, alto: 29, codigoAncho: 42 },
   { id: "a4", nombre: "Hoja A4 (etiqueta arriba a la izquierda)", ancho: 89, alto: 28, hoja: true, codigoAncho: 42 },
 ];
 
-const CLAVE_TAMANO = "lab-etiqueta-tamano";
+// La clave cambió de nombre al llegar las Xprinter: así todas las PC arrancan
+// en 50 × 30 aunque antes hubieran elegido la DYMO, en vez de seguir mandando
+// páginas de 89 mm a una impresora de 50.
+const CLAVE_TAMANO = "lab-etiqueta-tamano-v2";
+
+/** Por debajo de 60 mm de ancho el contenido se apila (accesión sola arriba, datos abajo). */
+export const esEstrecha = (t: TamanoEtiqueta): boolean => !t.hoja && t.ancho < 60;
 
 export const tamanoGuardado = (): string => {
   try {
@@ -102,7 +109,9 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
   ).join("");
   const acc = esc(m.accession);
   const nombre = esc(m.displayName);
-  const meta = esc(`${SITE_LABEL[m.site]} · ${m.kind.name}`);
+  // En la etiqueta angosta el laboratorio sobra (la letra de la accesión ya lo dice) y
+  // el lugar se necesita para el tipo de muestra: se oculta por CSS.
+  const meta = `<span class="sitio">${esc(SITE_LABEL[m.site])} · </span>${esc(m.kind.name)}`;
   const fecha = esc(fmtDateTime(m.sampledAt));
 
   return `<!doctype html>
@@ -118,17 +127,22 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
   .barra select, .barra button { font: 13px system-ui, sans-serif; padding: 4px 8px; }
   .barra .ayuda { color: #6b7280; }
   .lienzo { padding: 12px; }
-  .etiqueta { width: var(--w); height: var(--h); box-sizing: border-box; padding: 1.5mm 2mm; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 0.6mm; overflow: hidden; background: #fff; outline: 1px dashed #9ca3af; }
-  .fila1 { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; min-width: 0; }
-  .acc { flex: 0 0 auto; font-family: Consolas, "Courier New", monospace; font-weight: 700; font-size: 7.2mm; letter-spacing: 0.4mm; line-height: 1; white-space: nowrap; }
-  /* Los textos largos se ACORTAN (min-width 0 + ellipsis): sin eso, un flex item con nowrap
+  /* Grilla con áreas: en una etiqueta ancha (DYMO 89 mm) la accesión y el
+     laboratorio comparten la primera fila y el nombre y la fecha la última; en
+     una estrecha (Xprinter 50 mm) se apilan, porque no entran al lado. */
+  .etiqueta { width: var(--w); height: var(--h); box-sizing: border-box; padding: 1.5mm 2mm; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "acc meta" "codigo codigo" "nombre fecha"; column-gap: 2mm; row-gap: 0.6mm; align-items: baseline; overflow: hidden; background: #fff; outline: 1px dashed #9ca3af; }
+  .etiqueta.estrecha { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "acc acc" "codigo codigo" "nombre nombre" "meta fecha"; row-gap: 0.4mm; }
+  .acc { grid-area: acc; font-family: Consolas, "Courier New", monospace; font-weight: 700; font-size: 7.2mm; letter-spacing: 0.4mm; line-height: 1; white-space: nowrap; }
+  /* Los textos largos se ACORTAN (min-width 0 + ellipsis): sin eso, un item con nowrap
      crece más que la etiqueta y empuja al vecino fuera del borde, donde no se imprime. */
-  .meta { flex: 1 1 auto; min-width: 0; font-size: 2.6mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
-  .codigo { display: flex; align-items: center; justify-content: center; min-height: 0; }
+  .meta { grid-area: meta; min-width: 0; font-size: 2.6mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .etiqueta.estrecha .meta { text-align: left; font-size: 2.4mm; }
+  .etiqueta.estrecha .meta .sitio { display: none; }
+  .codigo { grid-area: codigo; align-self: stretch; display: flex; align-items: center; justify-content: center; min-height: 0; }
   .codigo svg { width: var(--bc); max-width: 100%; height: 100%; max-height: 14mm; display: block; }
-  .pie { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; min-width: 0; font-size: 2.7mm; line-height: 1.2; }
-  .nombre { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .fecha { flex: 0 0 auto; white-space: nowrap; }
+  .nombre { grid-area: nombre; min-width: 0; font-size: 2.7mm; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .fecha { grid-area: fecha; font-size: 2.7mm; line-height: 1.2; white-space: nowrap; text-align: right; }
+  .etiqueta.estrecha .fecha { font-size: 2.4mm; }
   @media print { .barra { display: none; } .lienzo { padding: 0; } .etiqueta { outline: none; } }
 </style>
 </head>
@@ -140,10 +154,12 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
   <span class="ayuda">La línea punteada marca el borde de la etiqueta y no se imprime. En el diálogo, elegí la impresora de etiquetas y su tamaño de papel.</span>
 </div>
 <div class="lienzo">
-  <div class="etiqueta">
-    <div class="fila1"><div class="acc">${acc}</div><div class="meta">${meta}</div></div>
+  <div class="etiqueta${esEstrecha(t) ? " estrecha" : ""}" id="etiqueta">
+    <div class="acc">${acc}</div>
+    <div class="meta">${meta}</div>
     <div class="codigo">${svg}</div>
-    <div class="pie"><div class="nombre">${nombre}</div><div class="fecha">${fecha}</div></div>
+    <div class="nombre">${nombre}</div>
+    <div class="fecha">${fecha}</div>
   </div>
 </div>
 <script>
@@ -156,6 +172,7 @@ export const htmlEtiqueta = (m: SampleDto, svg: string, tamanoId: string, autoIm
     document.documentElement.style.setProperty("--w", t.ancho + "mm");
     document.documentElement.style.setProperty("--h", t.alto + "mm");
     document.documentElement.style.setProperty("--bc", t.codigoAncho + "mm");
+    document.getElementById("etiqueta").classList.toggle("estrecha", !t.hoja && t.ancho < 60);
     try { localStorage.setItem(${JSON.stringify(CLAVE_TAMANO)}, id); } catch (e) {}
   }
   sel.addEventListener("change", function () { aplicar(sel.value); });
