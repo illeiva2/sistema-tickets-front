@@ -1,0 +1,12 @@
+Windows Registry Editor Version 5.00
+
+; Chrome: abrir el cuadro de dialogo de Windows en vez de la vista previa.
+; DisablePrintPreview es la politica oficial (Chrome 18 en adelante, sigue vigente).
+; UseSystemPrintDialog no existe en Chrome: se borra para que no figure con error.
+; Requiere cerrar Chrome del todo (tambien el proceso en segundo plano) o reiniciar.
+; Deshacer: importar chrome-etiquetas-deshacer.reg.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"DisablePrintPreview"=dword:00000001
+"UseSystemPrintDialog"=-
+
