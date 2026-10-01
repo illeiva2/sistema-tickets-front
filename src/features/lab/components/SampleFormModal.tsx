@@ -152,10 +152,14 @@ export const SampleFormModal: React.FC<{
   const [sampledAt, setSampledAt] = React.useState(
     toDateTimeLocal(editing ? new Date(editing.sampledAt) : new Date()),
   );
-  // En el alta, los valores iniciales del catálogo ("Camión" en Tipo de ingreso).
-  const [values, setValues] = React.useState<Record<string, string>>(() =>
-    editing ? aStrings(editing.fields, kind?.fields ?? []) : valoresIniciales(kind?.fields ?? []),
-  );
+  // Los valores iniciales del catálogo ("Camión" en Tipo de ingreso) rigen en
+  // el alta y, al editar, solo para lo que la muestra no tiene: una ficha
+  // cargada antes de que existiera el campo abre con "Camión" puesto, y así
+  // los datos del camión que dependen de él siguen visibles y no se pierden.
+  const [values, setValues] = React.useState<Record<string, string>>(() => ({
+    ...valoresIniciales(kind?.fields ?? []),
+    ...(editing ? aStrings(editing.fields, kind?.fields ?? []) : {}),
+  }));
   const [notes, setNotes] = React.useState(editing?.notes ?? "");
   const [errores, setErrores] = React.useState<Record<string, string>>({});
   // En edición el turno ya está cargado: no se pisa con el derivado de la hora.
