@@ -89,6 +89,8 @@ const muestra = (over: Partial<GridSampleDto> = {}): GridSampleDto => ({
   conditions: ["Brotado"],
   values: { "NIR|Proteína DryBasis": 12.34 },
   implausible: [],
+  rejectedAt: null,
+  rejectedReason: null,
   ...over,
 });
 
@@ -138,6 +140,14 @@ describe("construirColumnas", () => {
     expect(de("conditions").valor(r)).toBe("Brotado");
     expect(de("analyses").valor(r)).toBe("NIR");
     expect(de("conditions").valor(muestra({ conditions: [] }))).toBeUndefined();
+  });
+
+  it("la columna Rechazo trae el motivo del camión rechazado y queda vacía si no lo fue", () => {
+    const de = (id: string) => COLUMNAS_FIJAS.find((c) => c.id === id)!;
+    expect(de("rechazo").valor(muestra({ rejectedAt: "2026-10-01T13:05:00.000Z", rejectedReason: "Olor fuerte" }))).toBe("Olor fuerte");
+    expect(de("rechazo").valor(muestra({ rejectedAt: "2026-10-01T13:05:00.000Z", rejectedReason: null }))).toBe("Rechazado");
+    expect(de("rechazo").valor(muestra())).toBeUndefined();
+    expect(VISTA_SUGERIDA.columns).toContain("rechazo");
   });
 });
 

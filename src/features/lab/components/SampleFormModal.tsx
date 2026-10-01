@@ -16,6 +16,7 @@ import {
   opcionesDe,
   pctKey,
   toDateTimeLocal,
+  valoresIniciales,
 } from "../samples";
 import type { LabSite, SampleDto, SampleFieldDefDto, SampleKindDto } from "../types";
 import { imprimirEtiqueta } from "../etiqueta";
@@ -151,8 +152,9 @@ export const SampleFormModal: React.FC<{
   const [sampledAt, setSampledAt] = React.useState(
     toDateTimeLocal(editing ? new Date(editing.sampledAt) : new Date()),
   );
+  // En el alta, los valores iniciales del catálogo ("Camión" en Tipo de ingreso).
   const [values, setValues] = React.useState<Record<string, string>>(() =>
-    aStrings(editing?.fields, kind?.fields ?? []),
+    editing ? aStrings(editing.fields, kind?.fields ?? []) : valoresIniciales(kind?.fields ?? []),
   );
   const [notes, setNotes] = React.useState(editing?.notes ?? "");
   const [errores, setErrores] = React.useState<Record<string, string>>({});
@@ -168,7 +170,7 @@ export const SampleFormModal: React.FC<{
     setKindId(id);
     const k = kinds.find((x) => x.id === id);
     if (k?.defaultSite) setSite(k.defaultSite);
-    setValues({});
+    setValues(valoresIniciales(k?.fields ?? []));
     setErrores({});
     setTurnoTocado(false);
   };
@@ -276,7 +278,7 @@ export const SampleFormModal: React.FC<{
 
   const registrarOtra = () => {
     setCreada(null);
-    setValues({});
+    setValues(valoresIniciales(defs));
     setErrores({});
     setNotes("");
     setSampledAt(toDateTimeLocal(new Date()));

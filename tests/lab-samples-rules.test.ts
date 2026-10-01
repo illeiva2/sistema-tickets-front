@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { errorDeFormato, esVisible, pctKey } from "../src/features/lab/samples";
-import type { SampleFieldDefDto } from "../src/features/lab/types";
+import {
+  camposFiltrables,
+  errorDeFormato,
+  esVisible,
+  paramsDeFiltros,
+  pctKey,
+  valoresIniciales,
+} from "../src/features/lab/samples";
+import type { SampleFieldDefDto, SampleKindDto } from "../src/features/lab/types";
 
 // Espejo en el navegador de las reglas del catálogo (el backend las valida de
 // nuevo): qué campos se muestran según otros y el aviso de formato.
@@ -21,6 +28,8 @@ const def = (over: Partial<SampleFieldDefDto> & Pick<SampleFieldDefDto, "key" | 
   withPercent: false,
   suggest: false,
   uppercase: false,
+  defaultValue: null,
+  filterable: false,
   sortOrder: 0,
   isActive: true,
   ...over,
@@ -67,5 +76,74 @@ describe("errorDeFormato", () => {
 
   it("pctKey sigue la convención del backend", () => {
     expect(pctKey("picados")).toBe("picados_pct");
+  });
+});
+
+// Lo pedido por acopio y comercio el 1-oct-2026: "Tipo de ingreso" arranca en
+// Camión y se filtra en la lista y en Análisis.
+
+const kind = (id: string, name: string, fields: SampleFieldDefDto[], isActive = true): SampleKindDto => ({
+  id,
+  code: id.toUpperCase(),
+  name,
+  description: null,
+  defaultSite: null,
+  lockSite: false,
+  sortOrder: 0,
+  isActive,
+  fields,
+});
+
+const TIPO_INGRESO = def({
+  key: "tipo_ingreso",
+  label: "Tipo de ingreso",
+  type: "SELECT",
+  options: ["Camión", "Muestra del cliente"],
+  defaultValue: "Camión",
+  filterable: true,
+});
+
+describe("valoresIniciales", () => {
+  it("arranca con los valores iniciales de los campos activos y nada más", () => {
+    const defs = [
+      TIPO_INGRESO,
+      def({ key: "empresa", label: "Empresa", type: "TEXT" }),
+      def({ key: "viejo", label: "Viejo", type: "SELECT", options: ["a"], defaultValue: "a", isActive: false }),
+    ];
+    expect(valoresIniciales(defs)).toEqual({ tipo_ingreso: "Camión" });
+  });
+});
+
+describe("camposFiltrables", () => {
+  const recepcion = kind("recepcion", "Recepción de grano", [
+    TIPO_INGRESO,
+    def({ key: "equipo", label: "Equipo", type: "SELECT", options: ["Chasis", "Batea"] }),
+    def({ key: "chofer", label: "Chofer", type: "TEXT", filterable: true }),
+  ]);
+  const interna = kind("interna", "Interna", [
+    def({ key: "tipo_ingreso", label: "Tipo de ingreso", type: "SELECT", options: ["Camión", "Otro"], filterable: true }),
+  ]);
+  const inactivo = kind("inactivo", "Inactivo", [TIPO_INGRESO], false);
+
+  it("solo listas marcadas como filtro, de tipos activos; una key en dos tipos es un filtro con la unión de opciones", () => {
+    expect(camposFiltrables([recepcion, interna, inactivo])).toEqual([
+      { key: "tipo_ingreso", label: "Tipo de ingreso", options: ["Camión", "Muestra del cliente", "Otro"] },
+    ]);
+  });
+
+  it("con un tipo elegido, solo los de ese tipo", () => {
+    expect(camposFiltrables([recepcion, interna], "interna")).toEqual([
+      { key: "tipo_ingreso", label: "Tipo de ingreso", options: ["Camión", "Otro"] },
+    ]);
+    expect(camposFiltrables([recepcion, interna], "nada")).toEqual([]);
+  });
+});
+
+describe("paramsDeFiltros", () => {
+  it("los campos de la ficha viajan planos como f.<clave>; lo vacío no viaja", () => {
+    expect(
+      paramsDeFiltros({ q: "x", rejected: true, fields: { tipo_ingreso: "Camión", equipo: "" }, pageSize: 50 }),
+    ).toEqual({ q: "x", rejected: true, "f.tipo_ingreso": "Camión", pageSize: 50 });
+    expect(paramsDeFiltros({ from: "2026-10-01" })).toEqual({ from: "2026-10-01" });
   });
 });

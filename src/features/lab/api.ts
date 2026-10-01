@@ -1,4 +1,5 @@
 import type { ManualMeasurementInput, ProductoresStatusDto, SampleMeasurementDto } from "./types";
+import { paramsDeFiltros } from "./samples";
 import api from "@/lib/api";
 import type {
   DashboardSummaryDto,
@@ -215,9 +216,9 @@ export const labApi = {
     kinds: (includeInactive = false) =>
       get<SampleKindDto[]>("/samples/kinds", includeInactive ? { includeInactive: true } : undefined),
     summary: () => get<SamplesSummaryDto>("/samples/summary"),
-    list: (f: SampleFilters = {}) => get<SamplesPage>("/samples", { ...f }),
+    list: (f: SampleFilters = {}) => get<SamplesPage>("/samples", paramsDeFiltros(f)),
     /** Grilla de consulta: el filtro entero (hasta un tope) con los análisis pivoteados. */
-    grid: (f: GridFilters = {}) => get<SamplesGridDto>("/samples/grid", { ...f }),
+    grid: (f: GridFilters = {}) => get<SamplesGridDto>("/samples/grid", paramsDeFiltros(f)),
     /** Valores ya cargados de un campo con sugerencias (empresa, procedencia…), los más usados primero. */
     suggest: (key: string, kindId?: string) =>
       get<{ values: string[]; items?: { value: string; label?: string }[] }>("/samples/suggest", {
@@ -229,6 +230,10 @@ export const labApi = {
     create: (input: CreateSampleInput) => post<SampleDto>("/samples", input),
     update: (id: string, input: UpdateSampleInput) =>
       patch<SampleDto>(`/samples/${encodeURIComponent(id)}`, input),
+    /** Camión rechazado, con nota obligatoria (QC). Quitarlo también es QC. */
+    reject: (id: string, reason: string) =>
+      post<SampleDto>(`/samples/${encodeURIComponent(id)}/reject`, { reason }),
+    unreject: (id: string) => del<SampleDto>(`/samples/${encodeURIComponent(id)}/reject`),
     /** Re-enlaza mediciones sueltas cuya accesión ahora existe (MANAGEMENT). */
     relink: (days = 30) => post<RelinkResultDto>(`/samples/relink?days=${days}`, {}),
     /** Reporte de análisis diario del molino. Sin fecha = hoy (fecha de planta). */

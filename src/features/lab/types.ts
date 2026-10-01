@@ -288,6 +288,10 @@ export interface SampleFieldDefDto {
   suggest: boolean;
   /** TEXT: se guarda en mayúsculas. */
   uppercase: boolean;
+  /** Valor con el que arranca el campo en una muestra nueva ("Camión"). En una lista, una de sus opciones. */
+  defaultValue: string | null;
+  /** SELECT: la lista de muestras y Análisis ofrecen un desplegable para filtrar por este campo. */
+  filterable: boolean;
   sortOrder: number;
   isActive: boolean;
 }
@@ -334,6 +338,10 @@ export interface SampleDto {
   conditions?: string[];
   /** El Glutomatic no formó gluten (prueba guardada con 0). Distinto de "sin Glutomatic". */
   noLiga?: boolean;
+  /** Camión rechazado: cuándo, por qué y quién lo marcó. Null = no rechazado. */
+  rejectedAt: string | null;
+  rejectedReason: string | null;
+  rejectedBy?: { id: string; name: string } | null;
 }
 
 export interface SampleMeasurementParamDto {
@@ -444,6 +452,8 @@ export interface FieldDefInput {
   withPercent?: boolean;
   suggest?: boolean;
   uppercase?: boolean;
+  defaultValue?: string | null;
+  filterable?: boolean;
 }
 
 export interface FieldDefUpdateInput {
@@ -463,6 +473,8 @@ export interface FieldDefUpdateInput {
   withPercent?: boolean;
   suggest?: boolean;
   uppercase?: boolean;
+  defaultValue?: string | null;
+  filterable?: boolean;
 }
 
 export interface SamplesSummaryDto {
@@ -479,6 +491,10 @@ export interface SampleFilters {
   q?: string;
   from?: string;
   to?: string;
+  /** Igualdad exacta sobre campos de la ficha marcados como filtro: `{ tipo_ingreso: "Camión" }`. */
+  fields?: Record<string, string>;
+  /** true = solo camiones rechazados. */
+  rejected?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -527,6 +543,8 @@ export interface GridFilters {
   q?: string;
   from?: string;
   to?: string;
+  fields?: Record<string, string>;
+  rejected?: boolean;
   limit?: number;
 }
 

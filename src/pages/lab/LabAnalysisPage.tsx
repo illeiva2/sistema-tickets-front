@@ -25,12 +25,13 @@ import { useModules } from "@/contexts/ModulesContext";
 import { labApi, labError, labKeys } from "@/features/lab/api";
 import { exportarCsv, type ColumnaCsv } from "@/features/lab/export";
 import { fmtInt, toDateInput } from "@/features/lab/format";
-import { SITES, SITE_LABEL } from "@/features/lab/samples";
+import { SITES, SITE_LABEL, camposFiltrables } from "@/features/lab/samples";
 import { ExportButton } from "@/features/lab/components/LabLayout";
 import { LabFetchingHint, LabProgressBar, LabTableSkeleton } from "@/features/lab/components/Loading";
 import { AnalisisPorEquipo, SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
 import { GridColumnsPanel } from "@/features/lab/components/GridColumnsPanel";
 import { NoLigaBadge } from "@/features/lab/components/NoLigaBadge";
+import { RechazadoBadge } from "@/features/lab/components/RechazadoBadge";
 import {
   VIEW_KEY,
   VISTA_SUGERIDA,
@@ -158,7 +159,25 @@ export const LabAnalysisPage: React.FC = () => {
       return next;
     });
 
-  const hayFiltros = Boolean(filtros.q || filtros.site || filtros.kindId || filtros.to || filtros.from !== desdeInicial());
+  // Listas marcadas como filtro en el catálogo ("Tipo de ingreso"): un desplegable cada una.
+  const filtrables = React.useMemo(() => camposFiltrables(kinds, filtros.kindId), [kinds, filtros.kindId]);
+  const setCampo = (key: string, value: string) =>
+    setFiltros((f) => {
+      const fields = { ...(f.fields ?? {}) };
+      if (value) fields[key] = value;
+      else delete fields[key];
+      return { ...f, fields: Object.keys(fields).length > 0 ? fields : undefined };
+    });
+
+  const hayFiltros = Boolean(
+    filtros.q ||
+      filtros.site ||
+      filtros.kindId ||
+      filtros.to ||
+      filtros.from !== desdeInicial() ||
+      filtros.rejected ||
+      Object.keys(filtros.fields ?? {}).length > 0,
+  );
   const limpiar = () => {
     setTexto("");
     setFiltros({ from: desdeInicial() });
@@ -264,6 +283,30 @@ export const LabAnalysisPage: React.FC = () => {
               </option>
             ))}
           </select>
+          {filtrables.map((c) => (
+            <select
+              key={c.key}
+              className={CLASE_CONTROL}
+              value={filtros.fields?.[c.key] ?? ""}
+              onChange={(e) => setCampo(c.key, e.target.value)}
+              aria-label={c.label}
+            >
+              <option value="">{c.label}: todos</option>
+              {c.options.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          ))}
+          <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filtros.rejected === true}
+              onChange={(e) => setFiltros((f) => ({ ...f, rejected: e.target.checked ? true : undefined }))}
+            />
+            Solo rechazados
+          </label>
           <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
             Desde
             <input
@@ -467,6 +510,7 @@ const Celda: React.FC<{ c: ColumnaGrid; r: GridSampleDto; expandida: boolean }> 
           </span>
         )}
         {r.noLiga && <NoLigaBadge compact />}
+        {r.rejectedAt && <RechazadoBadge compact reason={r.rejectedReason} />}
       </span>
     );
   }
@@ -474,6 +518,14 @@ const Celda: React.FC<{ c: ColumnaGrid; r: GridSampleDto; expandida: boolean }> 
     const t = c.texto(r);
     if (!t) return <span className="text-muted-foreground">—</span>;
     return t === "No liga" ? <NoLigaBadge /> : <span className="text-muted-foreground">{t}</span>;
+  }
+  if (c.id === "rechazo") {
+    const t = c.texto(r);
+    return t ? (
+      <span className="block whitespace-normal min-w-[160px] text-red-700 dark:text-red-300">{t}</span>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
   }
   if (c.tipo === "numero") {
     const clave = claveAnalisis(c.id);
@@ -538,6 +590,7 @@ const Tarjeta: React.FC<{
             {r.accession}
             {r.conditions && r.conditions.length > 0 && <AlertTriangle size={13} className="text-amber-600" />}
             {r.noLiga && <NoLigaBadge compact />}
+            {r.rejectedAt && <RechazadoBadge compact reason={r.rejectedReason} />}
           </span>
           <span className="text-[11px] text-muted-foreground">{SITE_LABEL[r.site]}</span>
         </div>

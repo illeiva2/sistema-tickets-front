@@ -65,6 +65,9 @@ export const COLUMNAS_FIJAS: ColumnaGrid[] = [
   fijo("gluten", "Gluten (liga)", "texto", (r) =>
     r.noLiga ? "No liga" : (r.analyses?.GLUTOMATIC ?? 0) > 0 ? "Liga" : undefined,
   ),
+  // El camión rechazado es un hecho de la recepción, no una alteración del
+  // grano ni un resultado: columna propia, con el motivo que cargó QC.
+  fijo("rechazo", "Rechazo", "texto", (r) => (r.rejectedAt ? r.rejectedReason || "Rechazado" : undefined)),
   fijo(
     "analyses",
     "Equipos",
@@ -152,6 +155,7 @@ export const VISTA_SUGERIDA: SavedViewConfig = {
     "a:FN|Falling Number",
     "a:ALVEOLAB|W",
     "gluten",
+    "rechazo",
     "conditions",
   ],
   sort: [{ id: "sampledAt", desc: true }],
