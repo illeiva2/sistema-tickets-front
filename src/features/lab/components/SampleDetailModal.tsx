@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, FlaskConical, Pencil, Printer, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Copy, FlaskConical, Pencil, Printer, Trash2, Undo2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { labApi, labError, labKeys } from "../api";
@@ -19,6 +19,8 @@ import { LabModal } from "./LabModal";
 import { LabTableSkeleton } from "./Loading";
 import { ManualMeasurementModal } from "./ManualMeasurementModal";
 import { NoLigaBadge } from "./NoLigaBadge";
+import { RechazadoBadge } from "./RechazadoBadge";
+import { RejectSampleModal } from "./RejectSampleModal";
 import { imprimirEtiqueta } from "../etiqueta";
 
 /**
@@ -51,13 +53,24 @@ export const SampleDetailModal: React.FC<{
 
   // null = cerrado; editing null = alta; editing con medición = corrección.
   const [manual, setManual] = React.useState<{ editing: SampleMeasurementDto | null } | null>(null);
+  const [rechazar, setRechazar] = React.useState(false);
 
-  // Con el formulario manual abierto, Escape y el clic afuera cierran ese
-  // formulario, no la ficha entera.
+  // Con un formulario anidado abierto (análisis manual, rechazo), Escape y el
+  // clic afuera cierran ese formulario, no la ficha entera.
   const cerrar = React.useCallback(() => {
-    if (manual) return;
+    if (manual || rechazar) return;
     onClose();
-  }, [manual, onClose]);
+  }, [manual, rechazar, onClose]);
+
+  const qc = useQueryClient();
+  const quitarRechazo = useMutation({
+    mutationFn: (id: string) => labApi.samples.unreject(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: labKeys.samplesAll });
+      toast.success("Rechazo quitado");
+    },
+    onError: (e) => toast.error(labError(e)),
+  });
 
   const copiar = async () => {
     (await copiarAlPortapapeles(accession))
@@ -80,6 +93,7 @@ export const SampleDetailModal: React.FC<{
             />
           )}
           {data?.noLiga && <NoLigaBadge />}
+          {data?.rejectedAt && <RechazadoBadge reason={data.rejectedReason} />}
           <button
             type="button"
             onClick={() => void copiar()}
@@ -122,6 +136,33 @@ export const SampleDetailModal: React.FC<{
               Editar ficha
             </Button>
           )}
+          {/* El rechazo es del camión: solo en recepciones. Marcar pide la nota; quitar, confirmar. */}
+          {canEdit && data && data.kind.code === "RECEPCION" && !data.rejectedAt && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-700 dark:text-red-300"
+              onClick={() => setRechazar(true)}
+            >
+              <Ban size={13} className="mr-1.5" />
+              Rechazar camión
+            </Button>
+          )}
+          {canEdit && data && data.rejectedAt && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={quitarRechazo.isPending}
+              onClick={() => {
+                if (window.confirm("¿Quitar el rechazo? La muestra vuelve a quedar como no rechazada.")) {
+                  quitarRechazo.mutate(data.id);
+                }
+              }}
+            >
+              <Undo2 size={13} className="mr-1.5" />
+              Quitar rechazo
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onClose}>
             Cerrar
           </Button>
@@ -153,6 +194,8 @@ export const SampleDetailModal: React.FC<{
           onClose={() => setManual(null)}
         />
       )}
+
+      {rechazar && data && <RejectSampleModal sample={data} onClose={() => setRechazar(false)} />}
     </LabModal>
   );
 };
@@ -212,6 +255,19 @@ const Ficha: React.FC<{ sample: SampleDetailDto; kinds: SampleKindDto[]; accione
           <span className="mt-0.5 shrink-0 font-bold">✕</span>
           <span>
             <strong>No liga:</strong> el Glutomatic no formó gluten (la prueba quedó registrada en 0).
+          </span>
+        </div>
+      )}
+
+      {sample.rejectedAt && (
+        <div className="flex items-start gap-2 rounded-md border border-red-400 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-[13px] text-red-900 dark:text-red-200">
+          <Ban size={15} className="mt-0.5 shrink-0 text-red-600" />
+          <span>
+            <strong>Camión rechazado:</strong> {sample.rejectedReason || "sin motivo cargado"}
+            <span className="block text-[11.5px] opacity-80 mt-0.5">
+              {sample.rejectedBy ? `Marcó ${sample.rejectedBy.name} el ` : "El "}
+              {fmtDateTime(sample.rejectedAt)}
+            </span>
           </span>
         </div>
       )}

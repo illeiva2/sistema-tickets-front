@@ -1,6 +1,6 @@
 import React from "react";
 import { useQueries } from "@tanstack/react-query";
-import { AlertTriangle, Plus, Printer, Search, Settings2, X } from "lucide-react";
+import { AlertTriangle, Ban, Plus, Printer, Search, Settings2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { KpiCard } from "@/components/dashboards/shared";
@@ -8,7 +8,14 @@ import { useModules } from "@/contexts/ModulesContext";
 import { labApi, labError, labKeys } from "@/features/lab/api";
 import { exportarCsv, type ColumnaCsv } from "@/features/lab/export";
 import { fmtDateTime, fmtInt } from "@/features/lab/format";
-import { SITES, SITE_LABEL, SOURCE_LABEL, SOURCE_ORDER, SOURCE_SHORT } from "@/features/lab/samples";
+import {
+  SITES,
+  SITE_LABEL,
+  SOURCE_LABEL,
+  SOURCE_ORDER,
+  SOURCE_SHORT,
+  camposFiltrables,
+} from "@/features/lab/samples";
 import { ExportButton } from "@/features/lab/components/LabLayout";
 import {
   LabFetchingHint,
@@ -21,6 +28,8 @@ import { SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
 import { SampleCatalogModal } from "@/features/lab/components/SampleCatalogModal";
 import { imprimirEtiqueta } from "@/features/lab/etiqueta";
 import { NoLigaBadge } from "@/features/lab/components/NoLigaBadge";
+import { RechazadoBadge } from "@/features/lab/components/RechazadoBadge";
+import { RejectSampleModal } from "@/features/lab/components/RejectSampleModal";
 import type { LabSite, SampleDto, SampleFilters } from "@/features/lab/types";
 
 /**
@@ -45,6 +54,7 @@ const CSV: ColumnaCsv<SampleDto>[] = [
   { header: "Fecha y hora de toma", value: (s) => fmtDateTime(s.sampledAt) },
   { header: "Alteraciones", value: (s) => (s.conditions ?? []).join(" · ") },
   { header: "Gluten", value: (s) => (s.noLiga ? "No liga" : (s.analyses?.GLUTOMATIC ?? 0) > 0 ? "Liga" : "") },
+  { header: "Rechazo", value: (s) => (s.rejectedAt ? s.rejectedReason || "Rechazado" : "") },
   { header: "Registró", value: (s) => s.createdBy.name },
 ];
 
@@ -61,6 +71,8 @@ export const LabSamplesPage: React.FC = () => {
   /** Accesión de la ficha abierta; la ficha se consulta aparte (trae los análisis). */
   const [detalle, setDetalle] = React.useState<string | null>(null);
   const [catalogoAbierto, setCatalogoAbierto] = React.useState(false);
+  /** Muestra a la que se le está marcando el rechazo, desde la fila. */
+  const [rechazando, setRechazando] = React.useState<SampleDto | null>(null);
 
   React.useEffect(() => {
     const t = window.setTimeout(() => {
@@ -92,7 +104,25 @@ export const LabSamplesPage: React.FC = () => {
   const total = listQ.data?.total ?? 0;
   const aviso = listQ.data?.warning;
 
-  const hayFiltros = Boolean(filtros.q || filtros.site || filtros.kindId || filtros.from || filtros.to);
+  // Listas marcadas como filtro en el catálogo ("Tipo de ingreso"): un desplegable cada una.
+  const filtrables = React.useMemo(() => camposFiltrables(kinds, filtros.kindId), [kinds, filtros.kindId]);
+  const setCampo = (key: string, value: string) =>
+    setFiltros((f) => {
+      const fields = { ...(f.fields ?? {}) };
+      if (value) fields[key] = value;
+      else delete fields[key];
+      return { ...f, fields: Object.keys(fields).length > 0 ? fields : undefined, pageSize: PAGE_SIZE };
+    });
+
+  const hayFiltros = Boolean(
+    filtros.q ||
+      filtros.site ||
+      filtros.kindId ||
+      filtros.from ||
+      filtros.to ||
+      filtros.rejected ||
+      Object.keys(filtros.fields ?? {}).length > 0,
+  );
   const limpiar = () => {
     setTexto("");
     setFiltros({ pageSize: PAGE_SIZE });
@@ -212,6 +242,32 @@ export const LabSamplesPage: React.FC = () => {
               </option>
             ))}
           </select>
+          {filtrables.map((c) => (
+            <select
+              key={c.key}
+              className={CLASE_CONTROL}
+              value={filtros.fields?.[c.key] ?? ""}
+              onChange={(e) => setCampo(c.key, e.target.value)}
+              aria-label={c.label}
+            >
+              <option value="">{c.label}: todos</option>
+              {c.options.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          ))}
+          <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filtros.rejected === true}
+              onChange={(e) =>
+                setFiltros((f) => ({ ...f, rejected: e.target.checked ? true : undefined, pageSize: PAGE_SIZE }))
+              }
+            />
+            Solo rechazados
+          </label>
           <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
             Desde
             <input
@@ -326,6 +382,7 @@ export const LabSamplesPage: React.FC = () => {
                           </span>
                         )}
                         {s.noLiga && <NoLigaBadge className="ml-1.5" />}
+                        {s.rejectedAt && <RechazadoBadge reason={s.rejectedReason} className="ml-1.5" />}
                       </td>
                       <td className="px-2 py-2.5 text-[12.5px] min-w-[200px]">{s.displayName}</td>
                       <td className="px-2 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">
@@ -341,7 +398,22 @@ export const LabSamplesPage: React.FC = () => {
                       <td className="px-2 py-2.5 text-[12px] text-muted-foreground whitespace-nowrap">
                         {s.createdBy.name}
                       </td>
-                      <td className="px-2 pr-4 py-2.5 text-right">
+                      <td className="px-2 pr-4 py-2.5 text-right whitespace-nowrap">
+                        {/* Rechazar desde la fila: un clic y la nota. Solo recepciones; una interna no tiene camión. */}
+                        {puedeEscribir && s.kind.code === "RECEPCION" && !s.rejectedAt && (
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-red-600 mr-2.5"
+                            title="Rechazar camión"
+                            aria-label={`Rechazar camión de ${s.accession}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRechazando(s);
+                            }}
+                          >
+                            <Ban size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="text-muted-foreground hover:text-foreground"
@@ -399,6 +471,7 @@ export const LabSamplesPage: React.FC = () => {
         />
       )}
       {catalogoAbierto && <SampleCatalogModal onClose={() => setCatalogoAbierto(false)} />}
+      {rechazando && <RejectSampleModal sample={rechazando} onClose={() => setRechazando(null)} />}
     </div>
   );
 };

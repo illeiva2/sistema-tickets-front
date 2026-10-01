@@ -55,6 +55,10 @@ interface Borrador {
   withPercent: boolean;
   suggest: boolean;
   uppercase: boolean;
+  /** Valor con el que arranca el campo en una muestra nueva. Vacío = ninguno. */
+  defaultValue: string;
+  /** Lista: ofrecer un desplegable para filtrar por este campo en Muestras y Análisis. */
+  filterable: boolean;
 }
 
 const borradorVacio = (siguienteOrden: number): Borrador => ({
@@ -77,6 +81,8 @@ const borradorVacio = (siguienteOrden: number): Borrador => ({
   withPercent: false,
   suggest: false,
   uppercase: false,
+  defaultValue: "",
+  filterable: false,
 });
 
 const borradorDe = (d: SampleFieldDefDto): Borrador => ({
@@ -99,6 +105,8 @@ const borradorDe = (d: SampleFieldDefDto): Borrador => ({
   withPercent: d.withPercent,
   suggest: d.suggest,
   uppercase: d.uppercase,
+  defaultValue: d.defaultValue ?? "",
+  filterable: d.filterable,
 });
 
 export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -217,13 +225,15 @@ export const SampleCatalogModal: React.FC<{ onClose: () => void }> = ({ onClose 
                               solo si {d.visibleWhen.field} = {d.visibleWhen.values.join(" / ")}
                             </span>
                           )}
-                          {(d.pattern || d.withPercent || d.suggest || d.uppercase) && (
+                          {(d.pattern || d.withPercent || d.suggest || d.uppercase || d.defaultValue || d.filterable) && (
                             <span className="block text-[10.5px] text-muted-foreground font-normal">
                               {[
                                 d.pattern ? "formato" : null,
                                 d.withPercent ? "con %" : null,
                                 d.suggest ? "sugerencias" : null,
                                 d.uppercase ? "mayúsculas" : null,
+                                d.defaultValue ? `arranca en "${d.defaultValue}"` : null,
+                                d.filterable ? "filtro" : null,
                               ]
                                 .filter(Boolean)
                                 .join(" · ")}
@@ -401,6 +411,10 @@ const FormularioCampo: React.FC<{
         withPercent: b.type === "BOOLEAN" && b.withPercent,
         suggest: b.type === "TEXT" && b.suggest,
         uppercase: b.type === "TEXT" && b.uppercase,
+        // Valor inicial solo en listas y textos; en una lista tiene que ser una
+        // opción (el backend lo exige). Vacío viaja como null = ninguno.
+        defaultValue: b.type === "SELECT" || b.type === "TEXT" ? b.defaultValue.trim() || null : null,
+        filterable: b.type === "SELECT" && b.filterable,
       };
       if (esEdicion) {
         const input: FieldDefUpdateInput = { ...comun, isActive: b.isActive };
@@ -594,6 +608,43 @@ const FormularioCampo: React.FC<{
             placeholder="Trigo Sucio"
           />
         </Campo>
+        {b.type === "SELECT" && (
+          <>
+            <Campo
+              label="Valor inicial"
+              error={errores.defaultValue}
+              hint="Con el que arranca una muestra nueva. Vacío = se elige cada vez."
+            >
+              <select
+                className={CLASE_CONTROL}
+                value={b.defaultValue}
+                onChange={(e) => set("defaultValue", e.target.value)}
+              >
+                <option value="">— ninguno —</option>
+                {(() => {
+                  const ops = b.optionsTexto
+                    .split("\n")
+                    .map((o) => o.trim())
+                    .filter(Boolean);
+                  // Un valor vigente que ya no está entre las opciones se muestra
+                  // para que se vea por qué el backend lo va a rechazar.
+                  if (b.defaultValue && !ops.includes(b.defaultValue)) ops.push(b.defaultValue);
+                  return ops.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ));
+                })()}
+              </select>
+            </Campo>
+            <Check
+              label="Ofrecer como filtro"
+              checked={b.filterable}
+              onChange={(v) => set("filterable", v)}
+              hint="En la lista de muestras y en Análisis aparece un desplegable con estas opciones (comercio filtra por tipo de ingreso)."
+            />
+          </>
+        )}
         {b.type === "TEXT" && (
           <>
             <Campo
@@ -616,6 +667,18 @@ const FormularioCampo: React.FC<{
                 maxLength={120}
                 onChange={(e) => set("patternHint", e.target.value)}
                 placeholder="3 números y una letra, por ejemplo 123A"
+              />
+            </Campo>
+            <Campo
+              label="Valor inicial"
+              error={errores.defaultValue}
+              hint="Con el que arranca una muestra nueva. Vacío = en blanco."
+            >
+              <input
+                className={CLASE_CONTROL}
+                value={b.defaultValue}
+                maxLength={80}
+                onChange={(e) => set("defaultValue", e.target.value)}
               />
             </Campo>
             <Check

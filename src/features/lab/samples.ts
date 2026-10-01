@@ -1,4 +1,10 @@
-import type { LabSite, LabSource, SampleFieldDefDto, SampleMeasurementParamDto } from "./types";
+import type {
+  LabSite,
+  LabSource,
+  SampleFieldDefDto,
+  SampleKindDto,
+  SampleMeasurementParamDto,
+} from "./types";
 
 /**
  * Helpers del registro de muestras compartidos por la página y los modales.
@@ -42,6 +48,58 @@ export const opcionesDe = (def: Pick<SampleFieldDefDto, "options">): string[] =>
 
 /** Clave bajo la que viaja el porcentaje de una casilla con porcentaje (misma convención que el backend). */
 export const pctKey = (key: string): string => `${key}_pct`;
+
+/**
+ * Valores con los que arranca una muestra nueva: los valores iniciales del
+ * catálogo ("Camión" en Tipo de ingreso, para que el caso común no exija
+ * ningún clic). Solo en el alta; al editar se muestra lo guardado.
+ */
+export const valoresIniciales = (defs: SampleFieldDefDto[]): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const d of defs) if (d.isActive && d.defaultValue) out[d.key] = d.defaultValue;
+  return out;
+};
+
+export interface CampoFiltrable {
+  key: string;
+  label: string;
+  options: string[];
+}
+
+/**
+ * Listas marcadas "ofrecer como filtro" en el catálogo, de los tipos activos
+ * (o solo del tipo elegido). Una key presente en dos tipos es UN filtro, con
+ * la unión de sus opciones; es lo que la lista y Análisis muestran como
+ * desplegables al lado del tipo de muestra.
+ */
+export const camposFiltrables = (kinds: SampleKindDto[], kindId?: string): CampoFiltrable[] => {
+  const porKey = new Map<string, CampoFiltrable>();
+  for (const k of kinds) {
+    if (!k.isActive || (kindId && k.id !== kindId)) continue;
+    for (const f of k.fields) {
+      if (!f.isActive || f.type !== "SELECT" || !f.filterable) continue;
+      const ops = opcionesDe(f);
+      const e = porKey.get(f.key);
+      if (e) e.options = [...new Set([...e.options, ...ops])];
+      else porKey.set(f.key, { key: f.key, label: f.label, options: ops });
+    }
+  }
+  return [...porKey.values()];
+};
+
+/**
+ * Filtros de la lista y de la grilla como parámetros de consulta: los campos
+ * de la ficha viajan planos, `f.<clave>=<valor>`, que es como los lee el
+ * backend. Un valor vacío no viaja.
+ */
+export const paramsDeFiltros = <T extends { fields?: Record<string, string> }>(
+  f: T,
+): Record<string, unknown> => {
+  const { fields, ...resto } = f;
+  const out: Record<string, unknown> = { ...resto };
+  for (const [k, v] of Object.entries(fields ?? {})) if (v) out[`f.${k}`] = v;
+  return out;
+};
 
 /**
  * ¿Se pide este campo con lo cargado hasta ahora? Espejo de la regla del
