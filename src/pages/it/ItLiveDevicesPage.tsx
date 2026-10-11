@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
+  FileSpreadsheet,
   KeyRound,
   Loader2,
   Pause,
@@ -22,6 +23,7 @@ import { AgentAssetOnboardingPanel } from "@/features/it/live/components/AgentAs
 import type { AgentAssetOnboardingSubmission } from "@/features/it/live/agentAssetOnboarding";
 import { EnrollmentPanel } from "@/features/it/live/components/EnrollmentPanel";
 import { FleetMetrics } from "@/features/it/live/components/FleetMetrics";
+import { exportAgentInventory } from "@/features/it/live/inventoryExport";
 import { LiveDeviceTable } from "@/features/it/live/components/LiveDeviceTable";
 import type {
   AgentDevice,
@@ -66,6 +68,7 @@ function ItLiveDevicesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tokensOpen, setTokensOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const devicesQuery = useAgentDevices(filters, paused);
   const fleetQuery = useAgentFleet(paused);
@@ -201,6 +204,20 @@ function ItLiveDevicesPage() {
     toast.success("Token revocado");
   };
 
+  const exportInventory = async () => {
+    setExporting(true);
+    try {
+      const count = await exportAgentInventory();
+      toast.success(
+        `Planilla de ${count} ${count === 1 ? "equipo" : "equipos"} descargada. Incluye usuarios: compartila sólo con quien la necesite.`,
+      );
+    } catch (error) {
+      toast.error(getAgentErrorInfo(error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const items = devicesQuery.data?.items ?? [];
   const fleetItems = fleetQuery.data?.items ?? items;
   const pagination = devicesQuery.data?.pagination;
@@ -257,6 +274,21 @@ function ItLiveDevicesPage() {
               className={devicesQuery.isFetching ? "live-spin" : undefined}
             />
           </button>
+          {canManage ? (
+            <button
+              type="button"
+              className="live-button live-button--ghost"
+              disabled={exporting}
+              onClick={() => void exportInventory()}
+            >
+              {exporting ? (
+                <Loader2 size={15} className="live-spin" />
+              ) : (
+                <FileSpreadsheet size={15} />
+              )}
+              Exportar planilla
+            </button>
+          ) : null}
           {canManage ? (
             <button
               type="button"

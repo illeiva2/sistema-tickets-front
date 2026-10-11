@@ -3,6 +3,7 @@ import {
   Boxes,
   Clock3,
   Cpu,
+  FolderOpen,
   HardDrive,
   MemoryStick,
   Network,
@@ -39,15 +40,21 @@ interface CardsSectionProps {
   title: string;
   cards: InventoryCard[];
   icon: ReactNode;
+  /** Reemplaza al contador del encabezado (p. ej. "2 de 4 ranuras ocupadas"). */
+  summary?: string;
 }
 
-function CardsSection({ id, title, cards, icon }: CardsSectionProps) {
+function CardsSection({ id, title, cards, icon, summary }: CardsSectionProps) {
   return (
     <section className="inventory-snapshot__section" aria-labelledby={id}>
       <header className="inventory-snapshot__section-header">
         <span aria-hidden="true">{icon}</span>
         <h4 id={id}>{title}</h4>
-        {cards.length > 1 ? <small>{cards.length}</small> : null}
+        {summary ? (
+          <small>{summary}</small>
+        ) : cards.length > 1 ? (
+          <small>{cards.length}</small>
+        ) : null}
       </header>
       <ul className="inventory-snapshot__cards">
         {cards.map((card, index) => (
@@ -114,6 +121,11 @@ export function InventorySnapshotView({ payload }: InventorySnapshotViewProps) {
           title="Módulos de memoria"
           cards={parsed.memoryModules}
           icon={<MemoryStick size={16} />}
+          summary={
+            parsed.memorySlots
+              ? `${parsed.memoryModules.length} de ${parsed.memorySlots} ranuras ocupadas`
+              : undefined
+          }
         />
       ) : null}
 
@@ -123,6 +135,15 @@ export function InventorySnapshotView({ payload }: InventorySnapshotViewProps) {
           title="Discos"
           cards={parsed.disks}
           icon={<HardDrive size={16} />}
+        />
+      ) : null}
+
+      {parsed.volumes.length ? (
+        <CardsSection
+          id={id("volumes")}
+          title="Unidades"
+          cards={parsed.volumes}
+          icon={<FolderOpen size={16} />}
         />
       ) : null}
 

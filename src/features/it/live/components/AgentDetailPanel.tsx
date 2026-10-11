@@ -479,7 +479,11 @@ export function AgentDetailPanel({
               <div>
                 <dt>Sistema</dt>
                 <dd>
-                  {[snapshot.osName, snapshot.osVersion]
+                  {[
+                    snapshot.osName,
+                    snapshot.osVersion,
+                    snapshot.osBuild ? `build ${snapshot.osBuild}` : null,
+                  ]
                     .filter(Boolean)
                     .join(" · ") || "—"}
                 </dd>

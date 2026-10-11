@@ -60,6 +60,8 @@ export interface AgentDevice {
   agentVersion?: string | null;
   osName?: string | null;
   osVersion?: string | null;
+  /** Build + UBR ("26100.4061"); lo informa el back desde el agente. */
+  osBuild?: string | null;
   connState: AgentConnectionState;
   state: AgentOperationalState;
   lastSeenAt?: string | null;
@@ -84,6 +86,22 @@ export interface AgentDevice {
   activeSessions?: RemoteSession[];
   createdAt?: string;
   updatedAt: string;
+}
+
+/** Equipo con las ramas del último inventario que van a la planilla. */
+export interface AgentInventoryExportRow extends AgentDevice {
+  inventoryAt: string | null;
+  hardware: Record<string, unknown> | null;
+  cpu: Record<string, unknown> | null;
+  memoryModules: Record<string, unknown>[] | null;
+  memorySlots: number | null;
+  physicalDisks: Record<string, unknown>[] | null;
+  volumes: Record<string, unknown>[] | null;
+}
+
+export interface AgentInventoryExportResult {
+  generatedAt: string;
+  items: AgentInventoryExportRow[];
 }
 
 export interface AgentFleetSummary {

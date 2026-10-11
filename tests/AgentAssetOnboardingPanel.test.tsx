@@ -85,6 +85,49 @@ describe("mapeo de agente a alta patrimonial", () => {
     ).toBe("DESKTOP");
   });
 
+  it("usa gabinete, discos físicos y placa base que informa el agente 0.3", () => {
+    const form = mapAgentToAssetOnboardingForm(
+      { ...device, batteryPct: null, batteryCharging: null },
+      {
+        inventory: {
+          hardware: {
+            chassisType: "NOTEBOOK",
+            baseboardManufacturer: "ASUSTeK",
+            baseboardModel: "PRIME H510M-E",
+            baseboardSerial: "MB-1",
+          },
+          physicalDisks: [
+            {
+              model: "Samsung SSD 980 500GB",
+              sizeBytes: 500 * 1024 ** 3,
+              mediaType: "SSD",
+              busType: "NVME",
+            },
+          ],
+        },
+      },
+    );
+    // Sin batería informada, el gabinete igual la reconoce como notebook.
+    expect(form).toMatchObject({
+      type: "NOTEBOOK",
+      brand: "ASUSTeK",
+      model: "PRIME H510M-E",
+      serialNumber: "MB-1",
+      storage: "Samsung SSD 980 500GB · SSD NVMe · 500 GB",
+    });
+    expect(
+      mapAgentToAssetOnboardingForm(device, {
+        inventory: { hardware: { chassisType: "ALL_IN_ONE" } },
+      }).type,
+    ).toBe("DESKTOP");
+    expect(
+      mapAgentToAssetOnboardingForm(
+        { ...device, batteryPct: null, batteryCharging: null },
+        { inventory: { hardware: { chassisType: "TABLET" } } },
+      ).type,
+    ).toBe("NOTEBOOK");
+  });
+
   it("construye un alta en depósito y sólo agrega custodia explícita", () => {
     const form = mapAgentToAssetOnboardingForm(device, payload);
     const withoutCustody = buildAgentAssetOnboardingSubmission({

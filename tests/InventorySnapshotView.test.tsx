@@ -84,6 +84,86 @@ describe("InventorySnapshotView", () => {
     expect(container.textContent).not.toContain('{"');
   });
 
+  it("muestra discos físicos, unidades y el detalle de RAM del agente 0.3", () => {
+    const { container } = render(
+      <InventorySnapshotView
+        payload={{
+          hardware: {
+            manufacturer: "LENOVO",
+            model: "ThinkBook 16 G8 IRL (21SH)",
+            serialNumber: "PW0ABCDE",
+            chassisType: "NOTEBOOK",
+            baseboardModel: "LNVNB161216",
+          },
+          memoryModules: [
+            {
+              slot: "DIMM0",
+              capacityBytes: 16 * gib,
+              memoryType: "DDR5",
+              speedMts: 5600,
+              formFactor: "SODIMM",
+            },
+            {
+              slot: "DIMM1",
+              capacityBytes: 16 * gib,
+              memoryType: "DDR5",
+              speedMts: 5600,
+              formFactor: "SODIMM",
+            },
+          ],
+          memorySlots: 4,
+          physicalDisks: [
+            {
+              model: "Micron MTFDKCD512QGN",
+              sizeBytes: 512 * gib,
+              mediaType: "SSD",
+              busType: "NVME",
+            },
+          ],
+          volumes: [{ name: "C:\\", totalBytes: 400 * gib, usedBytes: 100 * gib }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Notebook")).toBeInTheDocument();
+    expect(screen.getByText("LNVNB161216")).toBeInTheDocument();
+    expect(screen.getByText("2 de 4 ranuras ocupadas")).toBeInTheDocument();
+    expect(screen.getAllByText("5.600 MT/s")).toHaveLength(2);
+    expect(screen.getAllByText("SO-DIMM (notebook)")).toHaveLength(2);
+    expect(screen.getByText("NVMe")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Unidades" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "C:" })).toBeInTheDocument();
+    expect(screen.getByText("300 GB")).toBeInTheDocument();
+    expect(screen.getByText("25 %")).toBeInTheDocument();
+    // Las ranuras y las unidades tienen su lugar: no caen en "Otros datos".
+    expect(container).not.toHaveTextContent("Otros datos");
+  });
+
+  it("sugiere el disco con su tipo y usa la placa base en PCs armadas", () => {
+    expect(
+      suggestAssetFromInventory({
+        hardware: {
+          baseboardManufacturer: "ASUSTeK COMPUTER INC.",
+          baseboardModel: "PRIME H510M-E",
+          baseboardSerial: "MB-123",
+        },
+        physicalDisks: [
+          {
+            model: "Kingston SA400S37480G",
+            sizeBytes: 480 * 1e9,
+            mediaType: "SSD",
+            busType: "SATA",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      brand: "ASUSTeK COMPUTER INC.",
+      model: "PRIME H510M-E",
+      serialNumber: "MB-123",
+      storage: "SSD SATA · Kingston SA400S37480G · 447,03 GB",
+    });
+  });
+
   it("tolera snapshots vacíos, valores no estándar y referencias circulares", () => {
     const circular: Record<string, unknown> = { label: "Dato recuperable" };
     circular.self = circular;

@@ -4,6 +4,7 @@ import type {
   AssetSpecs,
   AssetType,
 } from "../inventory/types";
+import { assetTypeFromChassis, diskKindLabel } from "./inventoryLabels";
 import type { AgentDevice } from "./types";
 
 export interface AgentAssetOnboardingFormValues {
@@ -80,7 +81,8 @@ function formatDisk(value: unknown): string {
   const labelParts = [
     firstText(disk.name, disk.device, disk.mountPoint),
     firstText(disk.model, disk.description),
-    firstText(disk.mediaType, disk.type),
+    // Disco físico del agente 0.3: "SSD NVMe", "HDD SATA".
+    diskKindLabel(disk.mediaType, disk.busType) ?? cleanText(disk.type),
   ].filter((part, index, parts) => part && parts.indexOf(part) === index);
   const totalBytes =
     finiteNumber(disk.totalBytes) ??
@@ -101,9 +103,13 @@ function storageFromInventory(
   inventory: UnknownRecord,
   payload?: UnknownRecord | null,
 ): string {
-  const disks = asArray(inventory.disks).length
-    ? asArray(inventory.disks)
-    : asArray(payload?.disks);
+  // Discos físicos del agente 0.3; los nombres viejos quedan de respaldo.
+  const candidates = [
+    asArray(inventory.physicalDisks),
+    asArray(inventory.disks),
+    asArray(payload?.disks),
+  ];
+  const disks = candidates.find((list) => list.length) ?? [];
   return disks.map(formatDisk).filter(Boolean).join("; ");
 }
 
@@ -172,6 +178,13 @@ function inferredType(
   const os = osFromDevice(device, inventory);
   if (/\b(server|servidor)\b/i.test(os)) return "SERVER";
 
+  // El gabinete que informa el firmware (agente 0.3) decide antes que la batería:
+  // una notebook con la batería agotada o retirada no informa batería.
+  const chassisType = assetTypeFromChassis(
+    asRecord(inventory.hardware)?.chassisType,
+  );
+  if (chassisType) return chassisType;
+
   const payloadBattery = asRecord(payload?.battery);
   const inventoryBattery = asRecord(inventory.battery);
   const hasBattery =
@@ -190,11 +203,25 @@ export function mapAgentToAssetOnboardingForm(
   const hardware = asRecord(inventory.hardware) ?? {};
   const cpu = asRecord(inventory.cpu);
 
+  // En las PCs armadas el firmware del equipo viene vacío: la placa base es lo
+  // único que las identifica, así que se usa como respaldo (editable en el form).
   return {
     type: inferredType(device, inventory, latestSnapshotPayload),
-    brand: firstText(hardware.manufacturer, hardware.brand),
-    model: firstText(hardware.model, hardware.productName),
-    serialNumber: firstText(hardware.serialNumber, hardware.serial),
+    brand: firstText(
+      hardware.manufacturer,
+      hardware.brand,
+      hardware.baseboardManufacturer,
+    ),
+    model: firstText(
+      hardware.model,
+      hardware.productName,
+      hardware.baseboardModel,
+    ),
+    serialNumber: firstText(
+      hardware.serialNumber,
+      hardware.serial,
+      hardware.baseboardSerial,
+    ),
     assetTag: "",
     location: "",
     cpu: firstText(cpu?.model, cpu?.name, inventory.cpu),
