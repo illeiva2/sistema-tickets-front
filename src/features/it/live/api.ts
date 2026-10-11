@@ -10,6 +10,7 @@ import type {
   AgentDeviceListResult,
   AgentEnrollmentToken,
   AgentEnrollmentTokenResult,
+  AgentInventoryExportResult,
   AgentInventorySnapshot,
   AgentLookups,
   AgentMetricSample,
@@ -65,6 +66,13 @@ export async function fetchAgentDevice(id: string): Promise<AgentDevice> {
     `/api/it/agents/devices/${id}`,
   );
   return unwrapDevice(response.data.data);
+}
+
+export async function fetchAgentInventoryExport(): Promise<AgentInventoryExportResult> {
+  const response = await api.get<ApiEnvelope<AgentInventoryExportResult>>(
+    "/api/it/agents/devices/export",
+  );
+  return response.data.data;
 }
 
 export async function fetchAgentMetrics(

@@ -1,3 +1,10 @@
+import {
+  chassisTypeLabel,
+  diskBusLabel,
+  diskKindLabel,
+  memoryFormFactorLabel,
+} from "../inventoryLabels";
+
 export interface InventoryField {
   label: string;
   value: string;
@@ -21,7 +28,12 @@ export interface ParsedInventorySnapshot {
   hardware?: InventoryCard;
   cpu?: InventoryCard;
   memoryModules: InventoryCard[];
+  /** Ranuras de memoria declaradas por el firmware (agente 0.3+). */
+  memorySlots?: number;
+  /** Discos físicos (agente 0.3+) o, en snapshots viejos, lo que vino como "disks". */
   disks: InventoryCard[];
+  /** Unidades lógicas (C:, D:) con capacidad y uso. */
+  volumes: InventoryCard[];
   networkAdapters: InventoryCard[];
   software: InventorySoftwareItem[];
   other: InventoryField[];
@@ -58,7 +70,11 @@ const TOP_LEVEL_ALIASES = {
   hardware: ["hardware", "computerSystem", "computer"],
   cpu: ["cpu", "processor"],
   memoryModules: ["memoryModules", "ramModules", "memory", "ram"],
-  disks: ["disks", "drives", "storageDevices", "storage"],
+  memorySlots: ["memorySlots", "ramSlots"],
+  // physicalDisks primero: es lo que manda el agente 0.3. El resto queda para
+  // snapshots con otra forma.
+  disks: ["physicalDisks", "disks", "drives", "storageDevices", "storage"],
+  volumes: ["volumes", "logicalDisks", "partitions"],
   networkAdapters: ["networkAdapters", "adapters", "network"],
   software: ["software", "installedSoftware", "applications", "programs"],
 } as const;
@@ -85,6 +101,17 @@ const genericLabels: Record<string, string> = {
   ipaddresses: "Direcciones IP",
   filesystem: "Sistema de archivos",
   status: "Estado",
+  chassistype: "Tipo de equipo",
+  baseboardmanufacturer: "Fabricante de la placa base",
+  baseboardmodel: "Placa base",
+  baseboardserial: "Número de serie de la placa",
+  speedmts: "Velocidad",
+  memorytype: "Tipo",
+  formfactor: "Formato",
+  slot: "Ranura",
+  sizebytes: "Capacidad",
+  mediatype: "Tipo",
+  bustype: "Interfaz",
 };
 
 function normalizeKey(key: string): string {
@@ -333,6 +360,11 @@ function flattenUnknown(
   output.push({ label, value: formatGeneric(value) });
 }
 
+const labelFormatter =
+  (translate: (value: unknown) => string | undefined): FieldFormatter =>
+  (value) =>
+    translate(value) ?? formatGeneric(value);
+
 const hardwareFields: readonly FieldDefinition[] = [
   { label: "Fabricante", aliases: ["manufacturer", "brand", "vendor"] },
   { label: "Modelo", aliases: ["model", "productName", "product"] },
@@ -341,7 +373,22 @@ const hardwareFields: readonly FieldDefinition[] = [
     aliases: ["serialNumber", "serial", "serviceTag"],
     mono: true,
   },
+  {
+    label: "Tipo de equipo",
+    aliases: ["chassisType", "chassis"],
+    format: labelFormatter(chassisTypeLabel),
+  },
   { label: "Versión de BIOS", aliases: ["biosVersion", "bios"] },
+  {
+    label: "Fabricante de la placa base",
+    aliases: ["baseboardManufacturer"],
+  },
+  { label: "Placa base", aliases: ["baseboardModel", "baseboardProduct"] },
+  {
+    label: "Número de serie de la placa",
+    aliases: ["baseboardSerial"],
+    mono: true,
+  },
 ];
 
 const cpuFields: readonly FieldDefinition[] = [
@@ -354,6 +401,7 @@ const cpuFields: readonly FieldDefinition[] = [
 ];
 
 const memoryFields: readonly FieldDefinition[] = [
+  { label: "Ranura", aliases: ["slot", "deviceLocator", "locator"] },
   {
     label: "Capacidad",
     aliases: [
@@ -365,19 +413,26 @@ const memoryFields: readonly FieldDefinition[] = [
     ],
     format: capacityFormatter,
   },
+  { label: "Tipo", aliases: ["memoryType", "type"] },
+  {
+    label: "Velocidad",
+    aliases: ["speedMts", "speedMhz", "clockSpeedMhz"],
+    format: (value, key) => {
+      const numeric = numericValue(value);
+      if (numeric === null) return formatGeneric(value);
+      // SMBIOS 3.x informa transferencias por segundo (MT/s), no MHz.
+      const unit = normalizeKey(key).endsWith("mts") ? "MT/s" : "MHz";
+      return `${numberFormatter.format(numeric)} ${unit}`;
+    },
+  },
+  {
+    label: "Formato",
+    aliases: ["formFactor"],
+    format: labelFormatter(memoryFormFactorLabel),
+  },
   { label: "Fabricante", aliases: ["manufacturer", "brand", "vendor"] },
   { label: "Número de parte", aliases: ["partNumber", "part"] },
   { label: "Número de serie", aliases: ["serialNumber", "serial"], mono: true },
-  {
-    label: "Velocidad",
-    aliases: ["speedMhz", "clockSpeedMhz"],
-    format: (value) => {
-      const numeric = numericValue(value);
-      return numeric === null
-        ? formatGeneric(value)
-        : `${numberFormatter.format(numeric)} MHz`;
-    },
-  },
 ];
 
 const diskFields: readonly FieldDefinition[] = [
@@ -408,8 +463,41 @@ const diskFields: readonly FieldDefinition[] = [
     label: "Sistema de archivos",
     aliases: ["fileSystem", "filesystem", "format"],
   },
+  { label: "Tipo", aliases: ["mediaType"] },
+  {
+    label: "Interfaz",
+    aliases: ["busType", "interface"],
+    format: labelFormatter(diskBusLabel),
+  },
   { label: "Número de serie", aliases: ["serialNumber", "serial"], mono: true },
 ];
+
+function volumeCard(value: unknown, index: number): InventoryCard | undefined {
+  const record = asRecord(value);
+  if (!record) return cardFromValue(value, `Unidad ${index + 1}`, diskFields);
+  const name = rawTextField(record, ["name", "mount", "driveLetter"]);
+  const total = numericValue(pickEntry(record, ["totalBytes", "sizeBytes"])?.value);
+  const used = numericValue(pickEntry(record, ["usedBytes"])?.value);
+  const fields = fieldsFromRecord(record, diskFields).filter(
+    (field) => field.label !== "Unidad",
+  );
+  if (total !== null && used !== null && total > 0 && used >= 0) {
+    fields.push(
+      { label: "Disponible", value: formatInventoryBytes(Math.max(total - used, 0)) },
+      {
+        label: "En uso",
+        value: `${numberFormatter.format(Math.round((used / total) * 100))} %`,
+      },
+    );
+  }
+  return fields.length
+    ? {
+        // "C:\" se muestra como "C:".
+        title: name ? name.replace(/[\\/]+$/, "") || name : `Unidad ${index + 1}`,
+        fields,
+      }
+    : undefined;
+}
 
 const networkFields: readonly FieldDefinition[] = [
   { label: "Nombre", aliases: ["name", "adapter", "interface"] },
@@ -518,6 +606,7 @@ export function parseInventorySnapshot(
   const empty: ParsedInventorySnapshot = {
     memoryModules: [],
     disks: [],
+    volumes: [],
     networkAdapters: [],
     software: [],
     other: [],
@@ -545,7 +634,9 @@ export function parseInventorySnapshot(
   const hardwareValue = take(TOP_LEVEL_ALIASES.hardware);
   const cpuValue = take(TOP_LEVEL_ALIASES.cpu);
   const memoryValue = take(TOP_LEVEL_ALIASES.memoryModules);
+  const memorySlotsValue = numericValue(take(TOP_LEVEL_ALIASES.memorySlots));
   const disksValue = take(TOP_LEVEL_ALIASES.disks);
+  const volumesValue = take(TOP_LEVEL_ALIASES.volumes);
   const networkValue = take(TOP_LEVEL_ALIASES.networkAdapters);
   const softwareValue = take(TOP_LEVEL_ALIASES.software);
 
@@ -577,6 +668,16 @@ export function parseInventorySnapshot(
     );
     return card ? [card] : [];
   });
+  const volumes = valuesAsItems(volumesValue).flatMap((item, index) => {
+    const card = volumeCard(item, index);
+    return card ? [card] : [];
+  });
+  const memorySlots =
+    memorySlotsValue !== null &&
+    Number.isInteger(memorySlotsValue) &&
+    memorySlotsValue > 0
+      ? memorySlotsValue
+      : undefined;
   const networkAdapters = valuesAsItems(networkValue).flatMap((item, index) => {
     const card = cardFromValue(
       item,
@@ -602,6 +703,7 @@ export function parseInventorySnapshot(
     !cpu &&
     memoryModules.length === 0 &&
     disks.length === 0 &&
+    volumes.length === 0 &&
     networkAdapters.length === 0 &&
     software.length === 0 &&
     other.length === 0;
@@ -611,7 +713,9 @@ export function parseInventorySnapshot(
     hardware,
     cpu,
     memoryModules,
+    memorySlots,
     disks,
+    volumes,
     networkAdapters,
     software,
     other,
@@ -663,6 +767,7 @@ export function suggestAssetFromInventory(
   const storageParts = disks.flatMap((item, index) => {
     const disk = asRecord(item);
     if (!disk) return textValue(item) || [];
+    const kind = diskKindLabel(disk.mediaType, disk.busType);
     const model = rawTextField(disk, ["model", "name", "device"]);
     const capacity = pickEntry(disk, [
       "totalBytes",
@@ -674,7 +779,9 @@ export function suggestAssetFromInventory(
     const formattedCapacity = capacity
       ? capacityFormatter(capacity.value, capacity.key)
       : undefined;
-    const description = [model, formattedCapacity].filter(Boolean).join(" · ");
+    const description = [kind, model, formattedCapacity]
+      .filter(Boolean)
+      .join(" · ");
     return description || `Disco ${index + 1}`;
   });
 
@@ -690,14 +797,18 @@ export function suggestAssetFromInventory(
         .join(" · ") || undefined
     : textValue(osValue) || undefined;
 
+  // Las PCs armadas no traen fabricante, modelo ni serie en el firmware del
+  // equipo; los de la placa base son lo único que las identifica.
   return {
-    brand: rawTextField(hardware, ["manufacturer", "brand", "vendor"]),
-    model: rawTextField(hardware, ["model", "productName", "product"]),
-    serialNumber: rawTextField(hardware, [
-      "serialNumber",
-      "serial",
-      "serviceTag",
-    ]),
+    brand:
+      rawTextField(hardware, ["manufacturer", "brand", "vendor"]) ??
+      rawTextField(hardware, ["baseboardManufacturer"]),
+    model:
+      rawTextField(hardware, ["model", "productName", "product"]) ??
+      rawTextField(hardware, ["baseboardModel", "baseboardProduct"]),
+    serialNumber:
+      rawTextField(hardware, ["serialNumber", "serial", "serviceTag"]) ??
+      rawTextField(hardware, ["baseboardSerial"]),
     cpu:
       rawTextField(cpuRecord, ["model", "name", "processorName"]) ??
       textValue(cpuValue) ??

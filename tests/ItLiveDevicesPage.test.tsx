@@ -25,6 +25,7 @@ vi.mock("../src/contexts/AuthContext", () => ({
   }),
 }));
 
+import toast from "react-hot-toast";
 import api from "../src/lib/api";
 import type {
   AgentDevice,
@@ -134,6 +135,27 @@ function installMocks() {
   apiMock.get.mockImplementation((url: string) => {
     if (url === "/api/it/agents/devices")
       return Promise.resolve(list([device, secondDevice]));
+    if (url === "/api/it/agents/devices/export")
+      return Promise.resolve({
+        data: {
+          success: true,
+          data: {
+            generatedAt: "2026-07-13T12:00:00.000Z",
+            items: [
+              {
+                ...device,
+                inventoryAt: "2026-07-13T11:50:00.000Z",
+                hardware: { manufacturer: "Dell", model: "Latitude 5440" },
+                cpu: null,
+                memoryModules: null,
+                memorySlots: null,
+                physicalDisks: null,
+                volumes: null,
+              },
+            ],
+          },
+        },
+      });
     if (url === "/api/it/agents/lookups")
       return Promise.resolve({
         data: {
@@ -384,6 +406,31 @@ describe("ItLiveDevicesPage", () => {
         },
       }),
     );
+  });
+
+  it("descarga la planilla del relevamiento y avisa que incluye usuarios", async () => {
+    const user = userEvent.setup();
+    // jsdom no implementa blobs descargables ni la navegación del <a download>.
+    const createObjectURL = vi.fn(() => "blob:planilla");
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    try {
+      renderPage();
+      await screen.findAllByText(device.hostname);
+      await user.click(screen.getByRole("button", { name: "Exportar planilla" }));
+      await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+      expect(apiMock.get).toHaveBeenCalledWith("/api/it/agents/devices/export");
+      expect(click).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:planilla");
+      expect(toast.success).toHaveBeenCalledWith(
+        expect.stringContaining("Planilla de 1 equipo descargada"),
+      );
+    } finally {
+      click.mockRestore();
+    }
   });
 
   it("permite pausar indefinidamente y refrescar de forma manual", async () => {
