@@ -65,6 +65,8 @@ export default defineConfig({
           "vendor-charts": ["recharts"],
           "vendor-markdown": ["react-markdown", "remark-gfm"],
           "vendor-dnd": ["@dnd-kit/core"],
+          // React Flow: sólo lo usa la pantalla Red en vivo (lazy).
+          "vendor-flow": ["@xyflow/react"],
         },
       },
     },

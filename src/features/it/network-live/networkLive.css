@@ -1,0 +1,576 @@
+/* Red en vivo: hereda las variables y el armazón de .it-network (network.css). */
+.it-network-live {
+  --live-ok: var(--net-accent);
+  --live-fiber: var(--net-cyan);
+  --live-warn: #ffd35d;
+  --live-error: var(--net-red);
+  --live-off: #3a4f56;
+}
+
+.it-network-live .network-commandbar > span[data-stale] {
+  color: var(--live-warn);
+}
+
+/* ── Resumen ─────────────────────────────────────────────────────────────── */
+.netlive-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  border-bottom: 1px solid var(--net-line);
+  background: var(--net-line);
+}
+.netlive-kpis article {
+  display: grid;
+  gap: 4px;
+  padding: 16px clamp(16px, 3vw, 28px);
+  background: #061014;
+}
+.netlive-kpis span {
+  color: var(--net-muted);
+  font: 700 0.6rem Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.netlive-kpis strong {
+  font-size: 1.7rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.netlive-kpis small {
+  overflow: hidden;
+  color: #a7bcc1;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.netlive-kpis article[data-tone="ok"] strong {
+  color: var(--live-ok);
+}
+.netlive-kpis article[data-tone="warn"] strong {
+  color: var(--live-warn);
+}
+.netlive-kpis article[data-tone="error"] strong {
+  color: var(--live-error);
+}
+
+/* ── Contenido ───────────────────────────────────────────────────────────── */
+.netlive-content {
+  display: grid;
+  gap: 14px;
+}
+.netlive-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  color: var(--live-warn);
+  border: 1px solid rgba(255, 211, 93, 0.4);
+  background: rgba(255, 211, 93, 0.06);
+  font-size: 0.8rem;
+}
+.netlive-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+.netlive-search input {
+  flex: 1;
+  min-width: 220px;
+  min-height: 38px;
+  padding: 0 12px;
+  color: var(--net-text);
+  border: 1px solid var(--net-line2);
+  border-radius: 2px;
+  background: #050b0e;
+  font-size: 0.85rem;
+}
+.netlive-search input:focus-visible {
+  outline: 2px solid var(--net-accent);
+  outline-offset: 1px;
+}
+.netlive-search__error {
+  flex-basis: 100%;
+  color: var(--live-warn);
+  font-size: 0.78rem;
+}
+
+/* ── Lienzo ──────────────────────────────────────────────────────────────── */
+.netlive-canvas {
+  height: clamp(560px, 74vh, 940px);
+  border: 1px solid var(--net-line2);
+  background: rgba(3, 7, 9, 0.6);
+}
+.netlive-canvas .react-flow {
+  --xy-background-color: transparent;
+  --xy-controls-button-background-color: #0b171c;
+  --xy-controls-button-background-color-hover: #12232a;
+  --xy-controls-button-color: var(--net-text);
+  --xy-controls-button-border-color: var(--net-line2);
+  --xy-edge-label-background-color: #071014;
+  --xy-edge-label-color: var(--net-text);
+  background: transparent;
+}
+.netlive-canvas .react-flow__node {
+  cursor: default;
+}
+.netlive-canvas .react-flow__attribution {
+  background: transparent;
+}
+.netlive-canvas .react-flow__attribution a {
+  color: #4b6168;
+}
+.netlive-handle {
+  min-width: 0;
+  min-height: 0;
+  width: 6px;
+  height: 6px;
+  opacity: 0;
+  border: 0;
+  pointer-events: none;
+}
+
+/* ── Nodo de equipo ──────────────────────────────────────────────────────── */
+.netlive-node {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--net-text);
+  border: 1px solid var(--net-line2);
+  border-left: 3px solid var(--live-ok);
+  border-radius: 2px;
+  background: linear-gradient(160deg, #0b171c, #061014);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.netlive-node[data-role="router"],
+.netlive-node[data-role="core"] {
+  background: linear-gradient(160deg, #10202a, #071218);
+}
+.netlive-node[data-status="down"] {
+  border-left-color: var(--live-error);
+}
+.netlive-node[data-status="stale"] {
+  border-left-color: var(--live-warn);
+  opacity: 0.82;
+}
+.netlive-node[data-highlighted] {
+  border-color: rgba(93, 255, 207, 0.55);
+}
+.netlive-node[data-expanded] {
+  border-color: var(--net-accent);
+  box-shadow:
+    0 0 0 1px rgba(93, 255, 207, 0.25),
+    0 22px 60px rgba(0, 0, 0, 0.6);
+}
+.netlive-node__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 9px 12px;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.netlive-node[data-expanded] .netlive-node__head {
+  border-bottom: 1px solid var(--net-line);
+}
+.netlive-node__head:focus-visible {
+  outline: 2px solid var(--net-accent);
+  outline-offset: -2px;
+}
+.netlive-node__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--net-cyan);
+  border: 1px solid var(--net-line2);
+  background: #050b0e;
+}
+.netlive-node[data-role="ap"] .netlive-node__icon {
+  width: 26px;
+  height: 26px;
+  color: var(--net-accent);
+}
+.netlive-node__title {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.netlive-node__title strong,
+.netlive-node__title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.netlive-node__title strong {
+  font-size: 0.8rem;
+}
+.netlive-node__title small {
+  color: var(--net-muted);
+  font: 400 0.62rem Consolas, monospace;
+}
+.netlive-node__summary {
+  color: #a7bcc1 !important;
+}
+.netlive-node[data-status="down"] .netlive-node__summary {
+  color: var(--live-error) !important;
+}
+.netlive-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--live-ok);
+  box-shadow: 0 0 10px rgba(93, 255, 207, 0.6);
+}
+.netlive-dot[data-status="down"] {
+  background: var(--live-error);
+  box-shadow: 0 0 10px rgba(255, 102, 125, 0.6);
+}
+.netlive-dot[data-status="stale"] {
+  background: var(--live-warn);
+  box-shadow: none;
+}
+.netlive-node__body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+}
+.netlive-node__detail {
+  overflow: auto;
+  min-height: 0;
+}
+.netlive-node__meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--net-line);
+}
+.netlive-node__meta dt,
+.netlive-port-detail dt {
+  color: var(--net-muted);
+  font: 700 0.55rem Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.netlive-node__meta dd,
+.netlive-port-detail dd {
+  overflow: hidden;
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.netlive-hint {
+  margin: 0;
+  color: var(--net-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+/* ── Panel de puertos ────────────────────────────────────────────────────── */
+.netlive-ports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 18px;
+}
+.netlive-ports__block {
+  display: grid;
+  gap: 5px;
+}
+.netlive-ports__label {
+  color: var(--net-muted);
+  font: 700 0.55rem Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.netlive-ports__grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 22px;
+  grid-template-rows: 22px;
+  gap: 4px;
+}
+.netlive-ports__grid[data-rows="2"] {
+  grid-template-rows: repeat(2, 22px);
+}
+.netlive-port {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: #9fb4b9;
+  border: 1px solid #2a4148;
+  border-radius: 2px;
+  background: #050b0e;
+  font: 700 0.55rem/20px Consolas, monospace;
+  cursor: pointer;
+}
+.netlive-port[data-tone="up"] {
+  color: #00170f;
+  border-color: var(--live-ok);
+  background: var(--live-ok);
+}
+.netlive-port[data-tone="up-fiber"] {
+  color: #001018;
+  border-color: var(--live-fiber);
+  background: var(--live-fiber);
+}
+.netlive-port[data-tone="slow"] {
+  color: #1d1600;
+  border-color: var(--live-warn);
+  background: var(--live-warn);
+}
+.netlive-port[data-tone="disabled"] {
+  color: #4b6168;
+  border-style: dashed;
+  background: transparent;
+}
+.netlive-port[data-uplink] {
+  box-shadow: inset 0 -3px rgba(0, 0, 0, 0.45);
+}
+.netlive-port[data-neighbor]::after {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  content: "";
+  border-radius: 50%;
+  background: #e9f7f7;
+}
+.netlive-port[data-tone="down"][data-neighbor]::after,
+.netlive-port[data-tone="disabled"][data-neighbor]::after {
+  background: var(--net-cyan);
+}
+.netlive-port[aria-pressed="true"] {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+.netlive-port:focus-visible {
+  outline: 2px solid var(--net-accent);
+  outline-offset: 1px;
+}
+
+/* ── Detalle de puerto ───────────────────────────────────────────────────── */
+.netlive-port-detail {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--net-line);
+  background: #050b0e;
+}
+.netlive-port-detail header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.netlive-port-detail header strong {
+  font-size: 0.85rem;
+}
+.netlive-port-detail header span {
+  color: var(--net-muted);
+  font: 700 0.6rem Consolas, monospace;
+  text-transform: uppercase;
+}
+.netlive-port-detail header span[data-tone="up"] {
+  color: var(--live-ok);
+}
+.netlive-port-detail header span[data-tone="up-fiber"] {
+  color: var(--live-fiber);
+}
+.netlive-port-detail header span[data-tone="slow"] {
+  color: var(--live-warn);
+}
+.netlive-port-detail__description {
+  margin: 0;
+  color: #a7bcc1;
+  font-size: 0.75rem;
+}
+.netlive-port-detail dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.netlive-port-detail__link {
+  margin: 0;
+  color: #a7bcc1;
+  font-size: 0.75rem;
+}
+.netlive-port-detail__link button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  color: var(--net-accent);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.netlive-neighbors {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.netlive-neighbors li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--net-cyan);
+  background: rgba(84, 216, 255, 0.05);
+}
+.netlive-neighbors li[data-protocol="mndp"] {
+  border-left-color: var(--net-line2);
+}
+.netlive-neighbors strong {
+  font-size: 0.75rem;
+}
+.netlive-neighbors span {
+  color: #a7bcc1;
+  font: 400 0.64rem Consolas, monospace;
+  word-break: break-all;
+}
+.netlive-neighbors small {
+  color: var(--net-muted);
+  font: 700 0.55rem Consolas, monospace;
+  text-transform: uppercase;
+}
+
+/* ── WAN ─────────────────────────────────────────────────────────────────── */
+.netlive-wan button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
+  color: var(--net-muted);
+  border: 1px dashed var(--net-line2);
+  border-radius: 999px;
+  background: #050b0e;
+  text-align: left;
+  cursor: pointer;
+}
+.netlive-wan[data-up] button {
+  color: var(--net-cyan);
+  border-style: solid;
+  border-color: rgba(84, 216, 255, 0.55);
+}
+.netlive-wan span {
+  display: grid;
+  min-width: 0;
+}
+.netlive-wan strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.netlive-wan small {
+  font: 400 0.6rem Consolas, monospace;
+}
+
+/* ── Enlaces ─────────────────────────────────────────────────────────────── */
+.netlive-canvas .react-flow__edge.netlive-edge .react-flow__edge-path {
+  stroke: #4f7480;
+}
+.netlive-canvas .react-flow__edge.netlive-edge--fdb .react-flow__edge-path {
+  stroke-dasharray: 6 5;
+}
+.netlive-canvas .react-flow__edge.netlive-edge--lldp .react-flow__edge-path {
+  stroke: #5f8f86;
+}
+.netlive-canvas .react-flow__edge.netlive-edge--wan .react-flow__edge-path {
+  stroke: rgba(84, 216, 255, 0.7);
+  stroke-dasharray: 2 4;
+}
+.netlive-canvas .react-flow__edge.netlive-edge--down .react-flow__edge-path {
+  stroke: rgba(255, 102, 125, 0.7);
+}
+.netlive-canvas .react-flow__edge.netlive-edge--highlighted .react-flow__edge-path {
+  stroke: var(--net-accent);
+}
+.netlive-edge-label {
+  position: absolute;
+  z-index: 20;
+  padding: 2px 6px;
+  color: var(--net-text);
+  border: 1px solid rgba(93, 255, 207, 0.6);
+  border-radius: 2px;
+  background: #071014;
+  font: 700 10px/1.3 Consolas, monospace;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── Leyenda ─────────────────────────────────────────────────────────────── */
+.netlive-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--net-muted);
+  font-size: 0.72rem;
+}
+.netlive-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.netlive-legend__port {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #2a4148;
+  border-radius: 2px;
+  background: #050b0e;
+}
+.netlive-legend__port[data-tone="up"] {
+  border-color: var(--live-ok);
+  background: var(--live-ok);
+}
+.netlive-legend__port[data-tone="up-fiber"] {
+  border-color: var(--live-fiber);
+  background: var(--live-fiber);
+}
+.netlive-legend__port[data-tone="slow"] {
+  border-color: var(--live-warn);
+  background: var(--live-warn);
+}
+.netlive-legend__port[data-tone="disabled"] {
+  border-style: dashed;
+  background: transparent;
+}
+.netlive-legend__line {
+  width: 26px;
+  height: 0;
+  border-top: 2px solid #5f8f86;
+}
+.netlive-legend__line[data-source="fdb"] {
+  border-top: 2px dashed #4f7480;
+}
+
+@media (max-width: 760px) {
+  .netlive-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .netlive-canvas {
+    height: 70vh;
+  }
+}

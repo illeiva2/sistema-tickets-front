@@ -60,6 +60,7 @@ const ItPurchasesPage = lazyConReintento(() => import("./pages/it/ItPurchasesPag
 const ItStaffPage = lazyConReintento(() => import("./pages/it/ItStaffPage"));
 const ItNetworkPage = lazyConReintento(() => import("./pages/it/ItNetworkPage"));
 const ItLiveDevicesPage = lazyConReintento(() => import("./pages/it/ItLiveDevicesPage"));
+const ItNetworkLivePage = lazyConReintento(() => import("./pages/it/ItNetworkLivePage"));
 
 // Fallback mientras carga el chunk de la pagina. Mantiene el layout estable
 // (sin flash blanco) usando un mini skeleton.
@@ -118,6 +119,7 @@ function App() {
                   <Route path="staff" element={<ItStaffPage />} />
                   <Route path="network" element={<ItNetworkPage />} />
                   <Route path="live" element={<ItLiveDevicesPage />} />
+                  <Route path="network-live" element={<ItNetworkLivePage />} />
                 </Route>
                 <Route
                   path="files"

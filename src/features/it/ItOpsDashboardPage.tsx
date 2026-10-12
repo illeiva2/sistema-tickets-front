@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Smartphone,
   Users,
+  Waypoints,
   Wrench,
 } from "lucide-react";
 import { ModulePreviewCard } from "./components/ModulePreviewCard";
@@ -82,6 +83,15 @@ const MODULES = [
       "Números, operadoras, planes y trazabilidad de asignaciones de SIM.",
     icon: Smartphone,
     href: "/it/staff?tab=lines",
+    status: "available",
+  },
+  {
+    code: "MOD-09",
+    title: "Red en vivo",
+    description:
+      "Router, switches y APs como los informan los propios equipos: enlaces y estado de cada puerto.",
+    icon: Waypoints,
+    href: "/it/network-live",
     status: "available",
   },
 ] as const;
