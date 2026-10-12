@@ -83,9 +83,49 @@ export interface LiveCollector {
   stale: boolean;
 }
 
+/** PC con el agente de inventario que corresponde a un equipo final (por MAC o IP reciente). */
+export interface LiveAgentRef {
+  id: string;
+  hostname: string;
+  loggedInUser: string | null;
+  assetId: string | null;
+}
+
+/** Equipo final (PC, impresora, cámara, teléfono, cliente Wi-Fi) en su puerto de acceso. */
+export interface LiveEndpoint {
+  mac: string;
+  deviceId: string;
+  portKey: string;
+  vlan: number | null;
+  ip: string | null;
+  /** Nombre que pidió por DHCP. */
+  hostname: string | null;
+  /** AP por el que se conecta, si es un cliente Wi-Fi. */
+  viaDeviceId: string | null;
+  /** El puerto tiene varios equipos detrás (switch sin gestión, DVR…). */
+  shared: boolean;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  movedAt: string | null;
+  agent: LiveAgentRef | null;
+}
+
 export interface NetworkLiveView {
   generatedAt: string;
   collectors: LiveCollector[];
   devices: LiveDevice[];
   links: LiveLink[];
+  endpoints: LiveEndpoint[];
+}
+
+export interface LiveSearchResult extends LiveEndpoint {
+  deviceName: string;
+  deviceRole: string;
+  /** false = no se lo ve hace más de 10 min: es dónde estuvo la última vez. */
+  online: boolean;
+}
+
+export interface LiveSearchResponse {
+  query: string;
+  results: LiveSearchResult[];
 }

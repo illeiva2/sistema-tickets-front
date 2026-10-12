@@ -1,7 +1,8 @@
 import { ArrowUpRight } from "lucide-react";
-import { formatHeartbeat } from "@/features/it/live/format";
+import { formatDate, formatHeartbeat } from "@/features/it/live/format";
+import { endpointTitle } from "../endpoints";
 import type { TreeEdge } from "../topology";
-import type { LiveDevice, LivePort } from "../types";
+import type { LiveDevice, LiveEndpoint, LivePort } from "../types";
 import {
   NEIGHBOR_PROTOCOL_LABELS,
   PORT_TONE_LABELS,
@@ -12,15 +13,19 @@ import {
   sortedNeighbors,
 } from "../ports";
 
+const MAX_LISTED = 60;
+
 interface PortDetailProps {
   device: LiveDevice;
   port: LivePort;
   edge: TreeEdge | undefined;
+  endpoints: LiveEndpoint[];
+  highlightMac: string | null;
   devices: Map<string, LiveDevice>;
   onGoTo: (deviceId: string) => void;
 }
 
-export function PortDetail({ device, port, edge, devices, onGoTo }: PortDetailProps) {
+export function PortDetail({ device, port, edge, endpoints, highlightMac, devices, onGoTo }: PortDetailProps) {
   const tone = portTone(port);
   const otherId = edge ? (edge.parentId === device.id ? edge.childId : edge.parentId) : null;
   const other = otherId ? devices.get(otherId) : undefined;
@@ -29,6 +34,15 @@ export function PortDetail({ device, port, edge, devices, onGoTo }: PortDetailPr
       ? edge.childPorts
       : edge.parentPorts
     : [];
+  // Las PCs con agente primero; el equipo buscado, arriba de todo.
+  const listed = [...endpoints].sort(
+    (a, b) =>
+      Number(b.mac === highlightMac) - Number(a.mac === highlightMac) ||
+      Number(Boolean(b.agent)) - Number(Boolean(a.agent)) ||
+      endpointTitle(a).localeCompare(endpointTitle(b), "es"),
+  );
+  const shared = endpoints.some((endpoint) => endpoint.shared);
+  const viaAp = endpoints.find((endpoint) => endpoint.viaDeviceId)?.viaDeviceId;
 
   return (
     <section className="netlive-port-detail" aria-label={`Puerto ${port.name}`}>
@@ -69,6 +83,49 @@ export function PortDetail({ device, port, edge, devices, onGoTo }: PortDetailPr
         </p>
       ) : null}
 
+      {listed.length ? (
+        <div className="netlive-endpoints">
+          <p className="netlive-endpoints__summary">
+            <strong>
+              {listed.length} equipo{listed.length === 1 ? "" : "s"} conectado{listed.length === 1 ? "" : "s"}
+            </strong>
+            {viaAp ? ` · clientes Wi-Fi de ${devices.get(viaAp)?.name ?? "un AP"}` : ""}
+            {shared ? " · hay varios equipos detrás de este puerto: probablemente un switch sin gestión o un grabador de cámaras" : ""}
+          </p>
+          <ul>
+            {listed.slice(0, MAX_LISTED).map((endpoint) => (
+              <li key={endpoint.mac} data-highlighted={endpoint.mac === highlightMac || undefined} data-agent={Boolean(endpoint.agent) || undefined}>
+                <strong>{endpointTitle(endpoint)}</strong>
+                <span>
+                  {[
+                    endpoint.agent && endpoint.hostname && endpoint.hostname !== endpoint.agent.hostname ? endpoint.hostname : null,
+                    // Lo que ya es el título no se repite.
+                    endpoint.ip !== endpointTitle(endpoint) ? endpoint.ip : null,
+                    endpoint.mac !== endpointTitle(endpoint) ? endpoint.mac : null,
+                    endpoint.vlan ? `VLAN ${endpoint.vlan}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                <small>
+                  {[
+                    endpoint.agent?.loggedInUser ? `Usuario ${endpoint.agent.loggedInUser}` : endpoint.agent ? "PC con agente" : null,
+                    endpoint.movedAt
+                      ? `llegó a este puerto ${formatHeartbeat(endpoint.movedAt)}`
+                      : `visto desde ${formatDate(endpoint.firstSeenAt)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
+              </li>
+            ))}
+          </ul>
+          {listed.length > MAX_LISTED ? (
+            <p className="netlive-hint">…y {listed.length - MAX_LISTED} más.</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {port.neighbors.length ? (
         <ul className="netlive-neighbors">
           {sortedNeighbors(port.neighbors).map((neighbor, index) => (
@@ -88,11 +145,9 @@ export function PortDetail({ device, port, edge, devices, onGoTo }: PortDetailPr
             </li>
           ))}
         </ul>
-      ) : !other ? (
+      ) : !other && !listed.length ? (
         <p className="netlive-hint">
-          {port.linkUp
-            ? "Hay algo conectado, pero no se anuncia por LLDP. Las PCs y demás equipos aparecen en la próxima etapa."
-            : "Libre."}
+          {port.linkUp ? "Tiene enlace, pero todavía no se vio ningún equipo en este puerto." : "Libre."}
         </p>
       ) : null}
     </section>

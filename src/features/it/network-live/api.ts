@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import type { NetworkLiveView } from "./types";
+import type { LiveSearchResponse, NetworkLiveView } from "./types";
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -16,6 +16,19 @@ export async function fetchNetworkLive(): Promise<NetworkLiveView> {
     collectors: data.collectors ?? [],
     devices: data.devices ?? [],
     links: data.links ?? [],
+    endpoints: data.endpoints ?? [],
+  };
+}
+
+/** "¿Dónde está X?" en el historial: también lo que ya no está conectado. */
+export async function searchNetworkLive(query: string): Promise<LiveSearchResponse> {
+  const response = await api.get<ApiEnvelope<LiveSearchResponse>>(
+    "/api/it/network/live/search",
+    { params: { q: query } },
+  );
+  return {
+    query: response.data.data.query,
+    results: response.data.data.results ?? [],
   };
 }
 

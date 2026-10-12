@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -8,13 +9,34 @@ vi.mock("../src/lib/api", () => ({
 }));
 
 // React Flow necesita medir el DOM, que jsdom no tiene: el lienzo se prueba aparte (lógica pura).
+// Acá sólo interesa qué le pasa la página: equipo y puerto elegidos, MAC y camino resaltados.
 vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => ({
-  LiveTopologyCanvas: ({ topology }: { topology: { devices: Map<string, { name: string }> } }) => (
-    <ul aria-label="lienzo">
-      {[...topology.devices.values()].map((device) => (
-        <li key={device.name}>{device.name}</li>
-      ))}
-    </ul>
+  LiveTopologyCanvas: ({
+    topology,
+    selectedId,
+    selectedPort,
+    highlight,
+    highlightMac,
+  }: {
+    topology: { devices: Map<string, { name: string }> };
+    selectedId: string | null;
+    selectedPort: string | null;
+    highlight: { deviceIds: Set<string> } | null;
+    highlightMac: string | null;
+  }) => (
+    <div
+      data-testid="lienzo"
+      data-selected={selectedId ?? ""}
+      data-port={selectedPort ?? ""}
+      data-mac={highlightMac ?? ""}
+      data-path={highlight ? [...highlight.deviceIds].sort().join(",") : ""}
+    >
+      <ul aria-label="lienzo">
+        {[...topology.devices.values()].map((device) => (
+          <li key={device.name}>{device.name}</li>
+        ))}
+      </ul>
+    </div>
   ),
 }));
 
@@ -23,6 +45,7 @@ import ItNetworkLivePage from "../src/pages/it/ItNetworkLivePage";
 
 const apiMock = api as unknown as { get: ReturnType<typeof vi.fn> };
 const now = new Date().toISOString();
+const threeHoursAgo = new Date(Date.now() - 3 * 3600_000).toISOString();
 
 const baseDevice = {
   collector: "red-colector-srvdatos",
@@ -55,6 +78,66 @@ const port = (key: string, linkUp: boolean) => ({
   linkChangedAt: null,
 });
 
+const endpoint = (mac: string, portKey: string, overrides: Record<string, unknown> = {}) => ({
+  mac,
+  deviceId: "d1",
+  portKey,
+  vlan: 200,
+  ip: null,
+  hostname: null,
+  viaDeviceId: null,
+  shared: false,
+  firstSeenAt: now,
+  lastSeenAt: now,
+  movedAt: null,
+  agent: null,
+  ...overrides,
+});
+
+function liveView() {
+  return {
+    generatedAt: now,
+    collectors: [
+      { slug: "red-colector-srvdatos", version: "0.2.0", host: "SRV-DATOS", lastReceivedAt: now, devicesTotal: 2, devicesOk: 1, stale: false },
+    ],
+    devices: [
+      { ...baseDevice, id: "d1", key: "10.0.0.3", role: "access", name: "SWITCH-CRS-TALLER", status: "ok", ports: [port("ether1", true), port("ether2", false)] },
+      { ...baseDevice, id: "d2", key: "10.0.0.5", role: "access", name: "SWITCH-CRS-MOLINO", status: "down", lastError: "sin conexión con la API cifrada", ports: [] },
+      { ...baseDevice, id: "ap", key: "ap-x", source: "unifi", role: "ap", name: "AP-010", status: "ok", clients: 4, ports: [] },
+    ],
+    links: [
+      {
+        id: "l1",
+        a: { deviceId: "d1", ports: ["ether2"] },
+        b: { deviceId: "ap", ports: ["eth0"] },
+        source: "lldp",
+        firstSeenAt: now,
+        lastSeenAt: now,
+      },
+    ],
+    endpoints: [
+      endpoint("AA:BB:CC:00:00:01", "ether1", {
+        ip: "192.168.100.41",
+        hostname: "pc-jperez",
+        agent: { id: "agent-1", hostname: "PC-JPEREZ", loggedInUser: "jperez", assetId: null },
+      }),
+      endpoint("AA:BB:CC:00:00:02", "ether2", { ip: "192.168.110.20", hostname: "notebook-ana", viaDeviceId: "ap" }),
+      endpoint("AA:BB:CC:00:00:03", "ether1", { ip: "192.168.100.50" }),
+    ],
+  };
+}
+
+function mockApi(searchResults: unknown[] = []) {
+  apiMock.get.mockImplementation((url: string, config?: { params?: { q?: string } }) =>
+    Promise.resolve({
+      data: {
+        success: true,
+        data: url.endsWith("/search") ? { query: config?.params?.q ?? "", results: searchResults } : liveView(),
+      },
+    }),
+  );
+}
+
 function renderPage() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
@@ -74,23 +157,7 @@ describe("ItNetworkLivePage", () => {
   });
 
   it("muestra el resumen, el estado del colector y el diagrama", async () => {
-    apiMock.get.mockResolvedValue({
-      data: {
-        success: true,
-        data: {
-          generatedAt: now,
-          collectors: [
-            { slug: "red-colector-srvdatos", version: "0.1.0", host: "SRV-DATOS", lastReceivedAt: now, devicesTotal: 2, devicesOk: 1, stale: false },
-          ],
-          devices: [
-            { ...baseDevice, id: "d1", key: "10.0.0.3", role: "access", name: "SWITCH-CRS-TALLER", status: "ok", ports: [port("ether1", true), port("ether2", false)] },
-            { ...baseDevice, id: "d2", key: "10.0.0.5", role: "access", name: "SWITCH-CRS-MOLINO", status: "down", lastError: "sin conexión con la API cifrada", ports: [] },
-            { ...baseDevice, id: "ap", key: "ap-x", source: "unifi", role: "ap", name: "AP-010", status: "ok", clients: 4, ports: [] },
-          ],
-          links: [],
-        },
-      },
-    });
+    mockApi();
 
     renderPage();
 
@@ -100,8 +167,77 @@ describe("ItNetworkLivePage", () => {
     // Router y switches 1/2 (MOLINO no responde) y puertos con enlace 1/2.
     expect(screen.getAllByText("1/2", { selector: "strong" })).toHaveLength(2);
     expect(screen.getByText("4 clientes Wi-Fi")).toBeInTheDocument();
+    expect(screen.getByText("2 por cable · 1 Wi-Fi")).toBeInTheDocument();
     expect(screen.getByText("SWITCH-CRS-MOLINO", { selector: "small" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Buscar equipo de red")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buscar en la red")).toBeInTheDocument();
+  });
+
+  it("busca una PC por usuario, dice dónde está y resalta el camino", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByLabelText("Buscar en la red"), "jperez");
+    const results = screen.getByLabelText("Resultados de la búsqueda");
+    expect(results).toHaveTextContent("PC-JPEREZ");
+    expect(results).toHaveTextContent("SWITCH-CRS-TALLER · puerto ether1");
+
+    await user.click(screen.getByRole("button", { name: /PC-JPEREZ/ }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("PC-JPEREZ (usuario jperez): SWITCH-CRS-TALLER · puerto ether1");
+    const canvas = screen.getByTestId("lienzo");
+    expect(canvas).toHaveAttribute("data-selected", "d1");
+    expect(canvas).toHaveAttribute("data-port", "ether1");
+    expect(canvas).toHaveAttribute("data-mac", "AA:BB:CC:00:00:01");
+    expect(canvas).toHaveAttribute("data-path", "d1");
+    expect(screen.queryByLabelText("Resultados de la búsqueda")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quitar el resaltado" }));
+    expect(screen.getByTestId("lienzo")).toHaveAttribute("data-path", "");
+  });
+
+  it("ubica un cliente Wi-Fi en su AP y va directo si hay un solo resultado", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByLabelText("Buscar en la red"), "192.168.110.20{Enter}");
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "notebook-ana: Wi-Fi por AP-010 (SWITCH-CRS-TALLER · puerto ether2)",
+    );
+    expect(screen.getByTestId("lienzo")).toHaveAttribute("data-path", "ap,d1");
+    // Con un único resultado no hace falta el historial.
+    expect(apiMock.get).not.toHaveBeenCalledWith("/api/it/network/live/search", expect.anything());
+  });
+
+  it("busca en el historial lo que ya no está conectado", async () => {
+    mockApi([
+      {
+        ...endpoint("AA:BB:CC:00:00:09", "ether1", { hostname: "pc-contador", ip: "192.168.100.77", lastSeenAt: threeHoursAgo }),
+        deviceName: "SWITCH-CRS-TALLER",
+        deviceRole: "access",
+        online: false,
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByLabelText("Buscar en la red"), "contador");
+    expect(screen.getByText(/Nada conectado ahora coincide/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(await screen.findByText("En el historial")).toBeInTheDocument();
+    expect(apiMock.get).toHaveBeenCalledWith("/api/it/network/live/search", { params: { q: "contador" } });
+    expect(screen.getByLabelText("Resultados de la búsqueda")).toHaveTextContent("no se ve desde hace 3 h");
+
+    await user.click(screen.getByRole("button", { name: /pc-contador/ }));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "pc-contador no se ve desde hace 3 h. La última vez estaba en SWITCH-CRS-TALLER · puerto ether1.",
+    );
+    expect(screen.getByTestId("lienzo")).toHaveAttribute("data-port", "ether1");
   });
 
   it("explica qué falta cuando el colector todavía no envió nada", async () => {

@@ -3,7 +3,7 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { Globe, Network, Router, Server, Wifi, WifiOff } from "lucide-react";
 import { formatHeartbeat, formatUptime } from "@/features/it/live/format";
 import type { TreeEdge, WanPort } from "../topology";
-import type { LiveDevice } from "../types";
+import type { LiveDevice, LiveEndpoint } from "../types";
 import { formatSpeed, portBlocks, portStats } from "../ports";
 import { STACK_HANDLE_OFFSET, type NodeSize } from "../layout";
 import { PortDetail } from "./PortDetail";
@@ -26,9 +26,9 @@ const PORT_PITCH = 26; // botón de 22 px + separación de 4 px
 
 /**
  * Tamaño de cada nodo, el mismo que usa el diagramado: compacto, con el panel de puertos, o con
- * el panel y el detalle del puerto elegido.
+ * el panel y el detalle del puerto elegido (más alto si el puerto tiene equipos para listar).
  */
-export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail = false): NodeSize {
+export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail = false, withList = false): NodeSize {
   if (!expanded) {
     return device.role === "ap" ? { width: 184, height: 60 } : { width: 228, height: 74 };
   }
@@ -39,7 +39,7 @@ export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail
   const rows = Math.max(1, ...blocks.map((block) => block.rows));
   return {
     width: Math.min(Math.max(360, panel + 36), 960),
-    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? 250 : 110),
+    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? (withList ? 380 : 250) : 110),
   };
 }
 
@@ -59,6 +59,9 @@ export interface DeviceNodeData extends Record<string, unknown> {
   highlighted: boolean;
   selectedPort: string | null;
   linkedPorts: Map<string, TreeEdge>;
+  endpointsByPort: Map<string, LiveEndpoint[]>;
+  /** MAC buscada: se la destaca en el detalle del puerto. */
+  highlightMac: string | null;
   devices: Map<string, LiveDevice>;
   onToggle: (deviceId: string) => void;
   onSelectPort: (deviceId: string, portKey: string | null) => void;
@@ -67,17 +70,18 @@ export interface DeviceNodeData extends Record<string, unknown> {
 
 export type DeviceFlowNode = Node<DeviceNodeData, "device">;
 
-function summary(device: LiveDevice) {
+function summary(device: LiveDevice, endpointsByPort: Map<string, LiveEndpoint[]>) {
   if (device.status !== "ok") return device.lastError ?? STATUS_LABELS[device.status];
   if (device.role === "ap") {
     return `${device.clients ?? 0} cliente${device.clients === 1 ? "" : "s"} Wi-Fi`;
   }
   const { up, total } = portStats(device);
-  return `${up}/${total} puertos con enlace`;
+  const endpoints = [...endpointsByPort.values()].reduce((sum, list) => sum + list.length, 0);
+  return `${up}/${total} puertos con enlace${endpoints ? ` · ${endpoints} equipo${endpoints === 1 ? "" : "s"}` : ""}`;
 }
 
 export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlowNode>) {
-  const { device, size, expanded, highlighted, selectedPort, linkedPorts, devices } = data;
+  const { device, size, expanded, highlighted, selectedPort, linkedPorts, endpointsByPort, highlightMac, devices } = data;
   const port = selectedPort ? device.ports.find((candidate) => candidate.key === selectedPort) : undefined;
 
   return (
@@ -116,7 +120,7 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
           <small>
             {[device.managementIp, device.model].filter(Boolean).join(" · ") || ROLE_LABELS[device.role] || device.role}
           </small>
-          <small className="netlive-node__summary">{summary(device)}</small>
+          <small className="netlive-node__summary">{summary(device, endpointsByPort)}</small>
         </span>
         <span className="netlive-dot" data-status={device.status} aria-label={STATUS_LABELS[device.status]} />
       </button>
@@ -126,6 +130,7 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
           <PortPanel
             ports={device.ports}
             linkedPorts={linkedPorts}
+            endpointsByPort={endpointsByPort}
             selectedPort={selectedPort}
             onSelect={(key) => data.onSelectPort(device.id, key)}
           />
@@ -135,6 +140,8 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
                 device={device}
                 port={port}
                 edge={linkedPorts.get(port.key)}
+                endpoints={endpointsByPort.get(port.key) ?? []}
+                highlightMac={highlightMac}
                 devices={devices}
                 onGoTo={data.onGoTo}
               />
