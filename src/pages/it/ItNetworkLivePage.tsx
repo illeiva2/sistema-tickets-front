@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   AlertTriangle,
+  BellOff,
   Database,
   History,
   Loader2,
@@ -11,13 +13,17 @@ import {
   Radar,
   RefreshCw,
   Search,
+  Siren,
   X,
 } from "lucide-react";
 import "@/features/it/network/network.css";
 import "@/features/it/network-live/networkLive.css";
+import { useAuth } from "@/hooks/useAuth";
 import { formatHeartbeat } from "@/features/it/live/format";
 import { getNetworkLiveErrorMessage } from "@/features/it/network-live/api";
+import { EventsPanel } from "@/features/it/network-live/components/EventsPanel";
 import { LiveTopologyCanvas } from "@/features/it/network-live/components/LiveTopologyCanvas";
+import type { DescribedEvent } from "@/features/it/network-live/history";
 import {
   directHit,
   endpointTitle,
@@ -35,7 +41,11 @@ import type {
   LiveSearchResult,
   NetworkLiveView,
 } from "@/features/it/network-live/types";
-import { useNetworkLive, useNetworkLiveSearch } from "@/features/it/network-live/useNetworkLive";
+import {
+  useMuteDeviceAlerts,
+  useNetworkLive,
+  useNetworkLiveSearch,
+} from "@/features/it/network-live/useNetworkLive";
 
 const LEGEND_TONES: PortTone[] = ["up", "up-fiber", "slow", "down", "disabled"];
 const MAX_HITS = 8;
@@ -86,6 +96,9 @@ function deviceFacts(device: LiveDevice) {
 }
 
 export default function ItNetworkLivePage() {
+  const { user } = useAuth();
+  const canMute = user?.role === "ADMIN";
+  const [tab, setTab] = useState<"diagram" | "history">("diagram");
   const [paused, setPaused] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedPort, setSelectedPort] = useState<string | null>(null);
@@ -110,6 +123,27 @@ export default function ItNetworkLivePage() {
   const highlight = useMemo(
     () => (topology && focus ? pathToRoot(topology, ...focus.from) : null),
     [topology, focus],
+  );
+  const alerts = useMemo(() => view?.alerts ?? [], [view]);
+  const alertIds = useMemo(
+    () => new Set(alerts.flatMap((alert) => (alert.deviceId ? [alert.deviceId] : []))),
+    [alerts],
+  );
+
+  const { mutate: muteAlerts } = useMuteDeviceAlerts();
+  const onMute = useCallback(
+    (deviceId: string, muted: boolean) =>
+      muteAlerts(
+        { deviceId, muted },
+        {
+          onSuccess: (device) =>
+            toast.success(
+              muted ? `${device.name}: alertas silenciadas` : `${device.name}: alertas activas otra vez`,
+            ),
+          onError: (error) => toast.error(getNetworkLiveErrorMessage(error)),
+        },
+      ),
+    [muteAlerts],
   );
 
   const onToggle = useCallback((deviceId: string) => {
@@ -160,6 +194,27 @@ export default function ItNetworkLivePage() {
   const showHit = (hit: SearchHit) => {
     if (hit.kind === "device") showDevice(hit.device);
     else showEndpoint(hit.endpoint, false);
+  };
+
+  /** Un cambio del historial, en el diagrama: el equipo (y el puerto) donde pasó, con su camino. */
+  const openFromHistory = (event: DescribedEvent) => {
+    if (!event.deviceId) return;
+    setTab("diagram");
+    setSelectedId(event.deviceId);
+    setSelectedPort(event.portKey && !event.portKey.includes("+") ? event.portKey : null);
+    setFocus({
+      from: [event.deviceId],
+      mac: event.mac,
+      text: `${event.title}${event.place ? ` · ${event.place}` : ""}`,
+      offline: false,
+    });
+  };
+
+  const showAlertDevice = (deviceId: string) => {
+    const device = topology?.devices.get(deviceId);
+    if (!device) return;
+    setTab("diagram");
+    showDevice(device);
   };
 
   const onSearch = (event: FormEvent) => {
@@ -319,6 +374,50 @@ export default function ItNetworkLivePage() {
           </div>
         ) : (
           <>
+            {alerts.length ? (
+              <section className="netlive-alerts" aria-label="Avisos abiertos">
+                <p className="netlive-alerts__title">
+                  <Siren size={15} aria-hidden="true" />
+                  {alerts.length === 1 ? "1 aviso abierto" : `${alerts.length} avisos abiertos`}
+                  <small>se cierran solos cuando el equipo vuelve</small>
+                </p>
+                <ul>
+                  {alerts.map((alert) => {
+                    const device = alert.deviceId ? topology.devices.get(alert.deviceId) : undefined;
+                    return (
+                      <li key={alert.id}>
+                        <button
+                          type="button"
+                          disabled={!device}
+                          onClick={() => (alert.deviceId ? showAlertDevice(alert.deviceId) : undefined)}
+                        >
+                          <strong>
+                            {alert.kind === "collector_silent" ? "Colector sin datos" : (device?.name ?? "Equipo de red")}
+                          </strong>
+                          <span>{alert.detail}</span>
+                          <small>
+                            avisado {formatHeartbeat(alert.openedAt)}
+                            {alert.ticketId ? " · con ticket" : ""}
+                          </small>
+                        </button>
+                        {canMute && device ? (
+                          <button
+                            type="button"
+                            className="netlive-alerts__mute"
+                            title="Silenciar las alertas de este equipo (cierra el aviso y su ticket)"
+                            onClick={() => onMute(device.id, true)}
+                          >
+                            <BellOff size={13} aria-hidden="true" />
+                            Silenciar
+                          </button>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : null}
+
             <div className="netlive-finder">
               <form className="netlive-search" onSubmit={onSearch} role="search">
                 <label htmlFor="netlive-search-input" className="sr-only">
@@ -449,45 +548,69 @@ export default function ItNetworkLivePage() {
               ) : null}
             </div>
 
-            <LiveTopologyCanvas
-              topology={topology}
-              endpointIndex={endpointIndex}
-              selectedId={selectedId}
-              selectedPort={selectedPort}
-              highlight={highlight}
-              highlightMac={focus?.mac ?? null}
-              onToggle={onToggle}
-              onSelectPort={onSelectPort}
-              onGoTo={onGoTo}
-            />
-
-            <div className="netlive-legend" aria-label="Referencias">
-              {LEGEND_TONES.map((tone) => (
-                <span key={tone}>
-                  <i className="netlive-legend__port" data-tone={tone} aria-hidden="true" />
-                  {PORT_TONE_LABELS[tone]}
-                </span>
-              ))}
-              <span>
-                <i className="netlive-legend__port" data-tone="up" data-endpoints aria-hidden="true" />
-                Con equipos conectados
-              </span>
-              <span>
-                <i className="netlive-legend__port" data-tone="up" data-endpoints data-shared aria-hidden="true" />
-                Varios equipos detrás (switch sin gestión, grabador…)
-              </span>
-              <span>
-                <i className="netlive-legend__line" data-source="lldp" aria-hidden="true" />
-                Conexión confirmada por LLDP
-              </span>
-              <span>
-                <i className="netlive-legend__line" data-source="fdb" aria-hidden="true" />
-                Deducida de las tablas MAC
-              </span>
-              {topology.unplaced.length ? (
-                <span>{topology.unplaced.length} sin ubicar (abajo)</span>
-              ) : null}
+            <div className="netlive-segmented netlive-tabs" role="tablist" aria-label="Vista">
+              <button type="button" role="tab" aria-selected={tab === "diagram"} onClick={() => setTab("diagram")}>
+                <Radar size={14} aria-hidden="true" />
+                Diagrama
+              </button>
+              <button type="button" role="tab" aria-selected={tab === "history"} onClick={() => setTab("history")}>
+                <History size={14} aria-hidden="true" />
+                Historial
+              </button>
             </div>
+
+            {tab === "history" ? (
+              <EventsPanel devices={topology.devices} paused={paused} onOpen={openFromHistory} />
+            ) : (
+              <>
+                <LiveTopologyCanvas
+                  topology={topology}
+                  endpointIndex={endpointIndex}
+                  selectedId={selectedId}
+                  selectedPort={selectedPort}
+                  highlight={highlight}
+                  highlightMac={focus?.mac ?? null}
+                  alertIds={alertIds}
+                  canMute={canMute}
+                  onToggle={onToggle}
+                  onSelectPort={onSelectPort}
+                  onGoTo={onGoTo}
+                  onMute={onMute}
+                />
+
+                <div className="netlive-legend" aria-label="Referencias">
+                  {LEGEND_TONES.map((tone) => (
+                    <span key={tone}>
+                      <i className="netlive-legend__port" data-tone={tone} aria-hidden="true" />
+                      {PORT_TONE_LABELS[tone]}
+                    </span>
+                  ))}
+                  <span>
+                    <i className="netlive-legend__port" data-tone="up" data-endpoints aria-hidden="true" />
+                    Con equipos conectados
+                  </span>
+                  <span>
+                    <i className="netlive-legend__port" data-tone="up" data-endpoints data-shared aria-hidden="true" />
+                    Varios equipos detrás (switch sin gestión, grabador…)
+                  </span>
+                  <span>
+                    <i className="netlive-legend__line" data-source="lldp" aria-hidden="true" />
+                    Conexión confirmada por LLDP
+                  </span>
+                  <span>
+                    <i className="netlive-legend__line" data-source="fdb" aria-hidden="true" />
+                    Deducida de las tablas MAC
+                  </span>
+                  {topology.unplaced.length ? (
+                    <span>{topology.unplaced.length} sin ubicar (abajo)</span>
+                  ) : null}
+                  <span>
+                    <i className="netlive-legend__alert" aria-hidden="true" />
+                    Con un aviso abierto
+                  </span>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

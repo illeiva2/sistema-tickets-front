@@ -3,6 +3,7 @@ import { formatDate, formatHeartbeat } from "@/features/it/live/format";
 import { endpointTitle } from "../endpoints";
 import type { TreeEdge } from "../topology";
 import type { LiveDevice, LiveEndpoint, LivePort } from "../types";
+import { RecentEvents } from "./RecentEvents";
 import {
   NEIGHBOR_PROTOCOL_LABELS,
   PORT_TONE_LABELS,
@@ -150,6 +151,8 @@ export function PortDetail({ device, port, edge, endpoints, highlightMac, device
           {port.linkUp ? "Tiene enlace, pero todavía no se vio ningún equipo en este puerto." : "Libre."}
         </p>
       ) : null}
+
+      <RecentEvents deviceId={device.id} portKey={port.key} devices={devices} title="Historial del puerto" />
     </section>
   );
 }

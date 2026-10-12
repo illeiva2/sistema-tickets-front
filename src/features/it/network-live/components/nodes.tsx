@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { Globe, Network, Router, Server, Wifi, WifiOff } from "lucide-react";
+import { Bell, BellOff, Globe, Network, Router, Server, Wifi, WifiOff } from "lucide-react";
 import { formatHeartbeat, formatUptime } from "@/features/it/live/format";
 import type { TreeEdge, WanPort } from "../topology";
 import type { LiveDevice, LiveEndpoint } from "../types";
@@ -8,6 +8,7 @@ import { formatSpeed, portBlocks, portStats } from "../ports";
 import { STACK_HANDLE_OFFSET, type NodeSize } from "../layout";
 import { PortDetail } from "./PortDetail";
 import { PortPanel } from "./PortPanel";
+import { RecentEvents } from "./RecentEvents";
 
 export const STATUS_LABELS: Record<string, string> = {
   ok: "Responde",
@@ -39,7 +40,8 @@ export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail
   const rows = Math.max(1, ...blocks.map((block) => block.rows));
   return {
     width: Math.min(Math.max(360, panel + 36), 960),
-    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? (withList ? 380 : 250) : 110),
+    // Sin puerto elegido el detalle muestra los últimos cambios del equipo.
+    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? (withList ? 380 : 250) : 200),
   };
 }
 
@@ -62,10 +64,15 @@ export interface DeviceNodeData extends Record<string, unknown> {
   endpointsByPort: Map<string, LiveEndpoint[]>;
   /** MAC buscada: se la destaca en el detalle del puerto. */
   highlightMac: string | null;
+  /** Tiene un aviso abierto (caído y notificado). */
+  alerting: boolean;
+  /** El usuario puede silenciar o reactivar las alertas (ADMIN). */
+  canMute: boolean;
   devices: Map<string, LiveDevice>;
   onToggle: (deviceId: string) => void;
   onSelectPort: (deviceId: string, portKey: string | null) => void;
   onGoTo: (deviceId: string) => void;
+  onMute: (deviceId: string, muted: boolean) => void;
 }
 
 export type DeviceFlowNode = Node<DeviceNodeData, "device">;
@@ -81,7 +88,7 @@ function summary(device: LiveDevice, endpointsByPort: Map<string, LiveEndpoint[]
 }
 
 export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlowNode>) {
-  const { device, size, expanded, highlighted, selectedPort, linkedPorts, endpointsByPort, highlightMac, devices } = data;
+  const { device, size, expanded, highlighted, selectedPort, linkedPorts, endpointsByPort, highlightMac, alerting, canMute, devices } = data;
   const port = selectedPort ? device.ports.find((candidate) => candidate.key === selectedPort) : undefined;
 
   return (
@@ -91,6 +98,7 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
       data-status={device.status}
       data-expanded={expanded || undefined}
       data-highlighted={highlighted || undefined}
+      data-alert={alerting || undefined}
       style={{ width: size.width, height: size.height }}
     >
       <Handle type="target" id="t" position={Position.Top} isConnectable={false} className="netlive-handle" />
@@ -122,7 +130,10 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
           </small>
           <small className="netlive-node__summary">{summary(device, endpointsByPort)}</small>
         </span>
-        <span className="netlive-dot" data-status={device.status} aria-label={STATUS_LABELS[device.status]} />
+        <span className="netlive-node__status">
+          {device.alertsMuted ? <BellOff size={13} className="netlive-node__muted" aria-label="Alertas silenciadas" /> : null}
+          <span className="netlive-dot" data-status={device.status} aria-label={STATUS_LABELS[device.status]} />
+        </span>
       </button>
 
       {expanded ? (
@@ -146,7 +157,10 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
                 onGoTo={data.onGoTo}
               />
             ) : (
-              <p className="netlive-hint">Tocá un puerto para ver qué tiene conectado.</p>
+              <>
+                <p className="netlive-hint">Tocá un puerto para ver qué tiene conectado.</p>
+                <RecentEvents deviceId={device.id} devices={devices} title="Últimos cambios del equipo" />
+              </>
             )}
           </div>
           <dl className="netlive-node__meta">
@@ -165,6 +179,31 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
             <div>
               <dt>Leído</dt>
               <dd>{formatHeartbeat(device.lastOkAt ?? device.lastPolledAt)}</dd>
+            </div>
+            <div>
+              <dt>Alertas</dt>
+              <dd>
+                {canMute ? (
+                  <button
+                    type="button"
+                    className="netlive-mute nodrag nopan"
+                    aria-pressed={device.alertsMuted}
+                    title={
+                      device.alertsMuted
+                        ? "Volver a avisar si este equipo se cae"
+                        : "No avisar si este equipo se cae (por ejemplo, un AP que se sabe apagado)"
+                    }
+                    onClick={() => data.onMute(device.id, !device.alertsMuted)}
+                  >
+                    {device.alertsMuted ? <BellOff size={12} aria-hidden="true" /> : <Bell size={12} aria-hidden="true" />}
+                    {device.alertsMuted ? "Silenciadas" : "Activas"}
+                  </button>
+                ) : device.alertsMuted ? (
+                  "Silenciadas"
+                ) : (
+                  "Activas"
+                )}
+              </dd>
             </div>
           </dl>
         </div>
