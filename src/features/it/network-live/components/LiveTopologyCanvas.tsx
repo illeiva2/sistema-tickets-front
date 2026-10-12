@@ -12,6 +12,7 @@ import "@xyflow/react/dist/style.css";
 import { layoutTopology } from "../layout";
 import { linkPortLabel } from "../ports";
 import { linkedPortKeys, type Topology, type TreeEdge } from "../topology";
+import type { LiveEndpoint } from "../types";
 import { edgeTypes, type PortFlowEdge } from "./PortEdge";
 import {
   WAN_NODE_SIZE,
@@ -23,12 +24,22 @@ import {
 
 interface LiveTopologyCanvasProps {
   topology: Topology;
+  endpointIndex: Map<string, Map<string, LiveEndpoint[]>>;
   selectedId: string | null;
   selectedPort: string | null;
+  /** Camino resaltado (resultado de una búsqueda): equipos y enlaces hasta el router. */
+  highlight: { deviceIds: Set<string>; edgeIds: Set<string> } | null;
+  highlightMac: string | null;
   onToggle: (deviceId: string) => void;
   onSelectPort: (deviceId: string, portKey: string | null) => void;
   onGoTo: (deviceId: string) => void;
 }
+
+const NO_ENDPOINTS = new Map<string, LiveEndpoint[]>();
+
+// React Flow apaga los eventos del puntero en los nodos que no se pueden elegir ni arrastrar; los
+// nuestros tienen botones (cabecera, puertos, WAN), así que se vuelven a prender a mano.
+const INTERACTIVE_NODE = { pointerEvents: "all" } as const;
 
 export function LiveTopologyCanvas(props: LiveTopologyCanvasProps) {
   return (
@@ -55,22 +66,36 @@ function strokeWidth(edge: TreeEdge) {
   return 1.3;
 }
 
-function Canvas({ topology, selectedId, selectedPort, onToggle, onSelectPort, onGoTo }: LiveTopologyCanvasProps) {
+function Canvas({
+  topology,
+  endpointIndex,
+  selectedId,
+  selectedPort,
+  highlight,
+  highlightMac,
+  onToggle,
+  onSelectPort,
+  onGoTo,
+}: LiveTopologyCanvasProps) {
   const { fitView } = useReactFlow();
 
   const { nodes, edges } = useMemo(() => {
     const sizeOf = (id: string) => {
       const device = topology.devices.get(id);
-      return device
-        ? deviceNodeSize(device, id === selectedId, id === selectedId && selectedPort !== null)
-        : WAN_NODE_SIZE;
+      if (!device) return WAN_NODE_SIZE;
+      const port = id === selectedId ? selectedPort : null;
+      const listed = port !== null && Boolean(endpointIndex.get(id)?.get(port)?.length);
+      return deviceNodeSize(device, id === selectedId, port !== null, listed);
     };
     const layout = layoutTopology(topology, sizeOf);
-    const neighbors = new Set<string>();
-    for (const edge of topology.edges) {
+    // Con un camino buscado se resalta sólo el camino; si no, los vecinos del equipo abierto.
+    const neighbors = new Set<string>(highlight?.deviceIds);
+    for (const edge of highlight ? [] : topology.edges) {
       if (edge.parentId === selectedId) neighbors.add(edge.childId);
       if (edge.childId === selectedId) neighbors.add(edge.parentId);
     }
+    const isHighlighted = (edge: TreeEdge) =>
+      highlight ? highlight.edgeIds.has(edge.id) : edge.parentId === selectedId || edge.childId === selectedId;
 
     const deviceNodes: DeviceFlowNode[] = [...topology.devices.values()].map((device) => ({
       id: device.id,
@@ -80,6 +105,7 @@ function Canvas({ topology, selectedId, selectedPort, onToggle, onSelectPort, on
       zIndex: device.id === selectedId ? 10 : 1,
       draggable: false,
       selectable: false,
+      style: INTERACTIVE_NODE,
       data: {
         device,
         size: sizeOf(device.id),
@@ -87,6 +113,8 @@ function Canvas({ topology, selectedId, selectedPort, onToggle, onSelectPort, on
         highlighted: neighbors.has(device.id),
         selectedPort: device.id === selectedId ? selectedPort : null,
         linkedPorts: linkedPortKeys(topology, device.id),
+        endpointsByPort: endpointIndex.get(device.id) ?? NO_ENDPOINTS,
+        highlightMac: device.id === selectedId ? highlightMac : null,
         devices: topology.devices,
         onToggle,
         onSelectPort,
@@ -100,11 +128,12 @@ function Canvas({ topology, selectedId, selectedPort, onToggle, onSelectPort, on
       position: layout.positions.get(wan.id) ?? { x: 0, y: 0 },
       draggable: false,
       selectable: false,
+      style: INTERACTIVE_NODE,
       data: { wan, onSelectPort },
     }));
 
     const flowEdges: (PortFlowEdge | Edge)[] = [...topology.edges, ...topology.extraEdges].map((edge) => {
-      const highlighted = edge.parentId === selectedId || edge.childId === selectedId;
+      const highlighted = isHighlighted(edge);
       const parent = topology.devices.get(edge.parentId);
       const child = topology.devices.get(edge.childId);
       const parentPorts = edge.parentPorts.map((key) => linkPortLabel(parent, key)).join("+");
@@ -138,7 +167,7 @@ function Canvas({ topology, selectedId, selectedPort, onToggle, onSelectPort, on
     }
 
     return { nodes: [...wanNodes, ...deviceNodes], edges: flowEdges };
-  }, [topology, selectedId, selectedPort, onToggle, onSelectPort, onGoTo]);
+  }, [topology, endpointIndex, selectedId, selectedPort, highlight, highlightMac, onToggle, onSelectPort, onGoTo]);
 
   // Al abrir un equipo se lo centra (el diagramado cambió porque el nodo creció); al cerrarlo se
   // vuelve a ver todo. La primera vista la encuadra la prop fitView, cuando los nodos ya están medidos.

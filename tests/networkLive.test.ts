@@ -8,8 +8,17 @@ import {
 } from "../src/features/it/network-live/ports";
 import { buildTopology, wanLabel } from "../src/features/it/network-live/topology";
 import { layoutTopology } from "../src/features/it/network-live/layout";
+import {
+  directHit,
+  endpointTitle,
+  endpointWhere,
+  indexEndpoints,
+  pathToRoot,
+  searchLive,
+} from "../src/features/it/network-live/endpoints";
 import type {
   LiveDevice,
+  LiveEndpoint,
   LiveLink,
   LivePort,
   NetworkLiveView,
@@ -98,8 +107,36 @@ function fixture(): NetworkLiveView {
       link("l6", "s2", ["1"], "ap-3", ["eth0"], "lldp"),
       link("l7", "router", ["ether9"], "s2", ["2"]),
     ],
+    endpoints: [],
   };
 }
+
+const endpoint = (mac: string, deviceId: string, portKey: string, overrides: Partial<LiveEndpoint> = {}): LiveEndpoint => ({
+  mac,
+  deviceId,
+  portKey,
+  vlan: 200,
+  ip: null,
+  hostname: null,
+  viaDeviceId: null,
+  shared: false,
+  firstSeenAt: new Date().toISOString(),
+  lastSeenAt: new Date().toISOString(),
+  movedAt: null,
+  agent: null,
+  ...overrides,
+});
+
+const endpointsFixture = () => [
+  endpoint("AA:BB:CC:00:00:01", "s1", "ether11", { viaDeviceId: "ap-2", ip: "192.168.110.20", hostname: "notebook-ana" }),
+  endpoint("AA:BB:CC:00:00:02", "s2", "5", {
+    ip: "192.168.100.41",
+    hostname: "pc-jperez",
+    agent: { id: "a1", hostname: "PC-JPEREZ", loggedInUser: "jperez", assetId: null },
+  }),
+  endpoint("AA:BB:CC:00:00:03", "s2", "5", { ip: "192.168.100.4" }),
+  endpoint("0C:C4:7A:12:34:56", "s1", "ether10"),
+];
 
 describe("Red en vivo: puertos", () => {
   it("rotula con el número de fábrica en MikroTik y la posición en SNMP", () => {
@@ -174,6 +211,69 @@ describe("Red en vivo: árbol", () => {
     expect(wanLabel({ name: "ether4-WAN TELECOM", description: null })).toBe("WAN TELECOM");
     expect(wanLabel({ name: "sfp1-wan", description: null })).toBe("sfp1-wan");
     expect(wanLabel({ name: "sfp1-wan", description: "Fibra EPEC" })).toBe("Fibra EPEC");
+  });
+});
+
+describe("Red en vivo: equipos finales", () => {
+  it("nombra cada equipo por la PC del agente, el nombre DHCP, la IP o la MAC", () => {
+    const [wifi, agent, onlyIp, bare] = endpointsFixture();
+    expect(endpointTitle(agent)).toBe("PC-JPEREZ");
+    expect(endpointTitle(wifi)).toBe("notebook-ana");
+    expect(endpointTitle(onlyIp)).toBe("192.168.100.4");
+    expect(endpointTitle(bare)).toBe("0C:C4:7A:12:34:56");
+  });
+
+  it("los agrupa por switch y puerto", () => {
+    const index = indexEndpoints(endpointsFixture());
+    expect(index.get("s2")?.get("5")?.map((item) => item.mac)).toEqual(["AA:BB:CC:00:00:02", "AA:BB:CC:00:00:03"]);
+    expect(index.get("s1")?.get("ether11")).toHaveLength(1);
+    expect(index.has("router")).toBe(false);
+  });
+
+  it("busca por usuario, nombre, IP y MAC en cualquier formato", () => {
+    const view = fixture();
+    const endpoints = endpointsFixture();
+    const macs = (query: string) =>
+      searchLive(view.devices, endpoints, query).map((hit) => (hit.kind === "endpoint" ? hit.endpoint.mac : hit.device.id));
+
+    expect(macs("jperez")).toEqual(["AA:BB:CC:00:00:02"]);
+    expect(macs("NOTEBOOK")).toEqual(["AA:BB:CC:00:00:01"]);
+    // "192.168.100.4" también trae la .41 (prefijo), pero la exacta va primero.
+    expect(macs("192.168.100.4")).toEqual(["AA:BB:CC:00:00:03", "AA:BB:CC:00:00:02"]);
+    expect(macs("192.168.100.41")).toEqual(["AA:BB:CC:00:00:02"]);
+    expect(macs("0cc4.7a12.3456")).toEqual(["0C:C4:7A:12:34:56"]);
+    expect(macs("0c-c4-7a")).toEqual(["0C:C4:7A:12:34:56"]);
+    expect(macs("taller")).toEqual(["s1"]);
+    expect(macs("x")).toEqual([]);
+  });
+
+  it("al confirmar va directo al único resultado o a la única coincidencia exacta", () => {
+    const view = fixture();
+    const endpoints = endpointsFixture();
+    const direct = (query: string) => {
+      const hit = directHit(searchLive(view.devices, endpoints, query));
+      return hit ? (hit.kind === "endpoint" ? hit.endpoint.mac : hit.device.id) : null;
+    };
+    expect(direct("192.168.100.4")).toBe("AA:BB:CC:00:00:03");
+    expect(direct("pc-jperez")).toBe("AA:BB:CC:00:00:02");
+    expect(direct("AA:BB:CC")).toBeNull();
+    expect(direct("SWT")).toBeNull();
+  });
+
+  it("dice dónde está, también si es un cliente Wi-Fi", () => {
+    const topology = buildTopology(fixture());
+    const [wifi, agent] = endpointsFixture();
+    expect(endpointWhere(agent, topology.devices)).toBe("SWT-007 · puerto 5");
+    expect(endpointWhere(wifi, topology.devices)).toBe("Wi-Fi por AP-2 (SWITCH-CRS-TALLER · puerto ether11)");
+    expect(endpointWhere({ ...agent, deviceId: "gone" }, topology.devices, "SWITCH-VIEJO")).toBe("SWITCH-VIEJO · puerto 5");
+  });
+
+  it("arma el camino hasta el router desde el AP y el switch", () => {
+    const topology = buildTopology(fixture());
+    const path = pathToRoot(topology, "ap-2", "s1");
+    expect([...path.deviceIds].sort()).toEqual(["ap-2", "core", "router", "s1"]);
+    expect([...path.edgeIds].sort()).toEqual(["l1", "l2", "l5"]);
+    expect([...pathToRoot(topology, "lost").deviceIds]).toEqual(["lost"]);
   });
 });
 
