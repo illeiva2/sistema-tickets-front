@@ -5,6 +5,7 @@ import {
   Controls,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
   type Edge,
 } from "@xyflow/react";
@@ -30,9 +31,13 @@ interface LiveTopologyCanvasProps {
   /** Camino resaltado (resultado de una búsqueda): equipos y enlaces hasta el router. */
   highlight: { deviceIds: Set<string>; edgeIds: Set<string> } | null;
   highlightMac: string | null;
+  /** Equipos con un aviso abierto. */
+  alertIds: Set<string>;
+  canMute: boolean;
   onToggle: (deviceId: string) => void;
   onSelectPort: (deviceId: string, portKey: string | null) => void;
   onGoTo: (deviceId: string) => void;
+  onMute: (deviceId: string, muted: boolean) => void;
 }
 
 const NO_ENDPOINTS = new Map<string, LiveEndpoint[]>();
@@ -73,9 +78,12 @@ function Canvas({
   selectedPort,
   highlight,
   highlightMac,
+  alertIds,
+  canMute,
   onToggle,
   onSelectPort,
   onGoTo,
+  onMute,
 }: LiveTopologyCanvasProps) {
   const { fitView } = useReactFlow();
 
@@ -115,10 +123,13 @@ function Canvas({
         linkedPorts: linkedPortKeys(topology, device.id),
         endpointsByPort: endpointIndex.get(device.id) ?? NO_ENDPOINTS,
         highlightMac: device.id === selectedId ? highlightMac : null,
+        alerting: alertIds.has(device.id),
+        canMute,
         devices: topology.devices,
         onToggle,
         onSelectPort,
         onGoTo,
+        onMute,
       },
     }));
 
@@ -167,7 +178,34 @@ function Canvas({
     }
 
     return { nodes: [...wanNodes, ...deviceNodes], edges: flowEdges };
-  }, [topology, endpointIndex, selectedId, selectedPort, highlight, highlightMac, onToggle, onSelectPort, onGoTo]);
+  }, [
+    topology,
+    endpointIndex,
+    selectedId,
+    selectedPort,
+    highlight,
+    highlightMac,
+    alertIds,
+    canMute,
+    onToggle,
+    onSelectPort,
+    onGoTo,
+    onMute,
+  ]);
+
+  // Si el lienzo aparece con un equipo ya elegido (al volver del historial), se lo centra apenas
+  // los nodos están medidos; si no, la primera vista la encuadra la prop fitView.
+  const nodesInitialized = useNodesInitialized();
+  const initialFocus = useRef(false);
+  useEffect(() => {
+    if (!nodesInitialized || initialFocus.current) return;
+    initialFocus.current = true;
+    if (!selectedId) return;
+    const timer = window.setTimeout(() => {
+      void fitView({ nodes: [{ id: selectedId }], duration: 0, padding: 0.35, maxZoom: 1.05 });
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [nodesInitialized, selectedId, fitView]);
 
   // Al abrir un equipo se lo centra (el diagramado cambió porque el nodo creció); al cerrarlo se
   // vuelve a ver todo. La primera vista la encuadra la prop fitView, cuando los nodos ya están medidos.

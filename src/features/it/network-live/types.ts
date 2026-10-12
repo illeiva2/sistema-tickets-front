@@ -55,6 +55,8 @@ export interface LiveDevice {
   lastError: string | null;
   lastPolledAt: string;
   lastOkAt: string | null;
+  /** Sin avisos aunque se caiga (lo decide un ADMIN). */
+  alertsMuted: boolean;
   ports: LivePort[];
 }
 
@@ -110,12 +112,67 @@ export interface LiveEndpoint {
   agent: LiveAgentRef | null;
 }
 
+/** Incidente avisado que sigue abierto: equipo caído o colector sin mandar datos. */
+export interface LiveAlert {
+  id: string;
+  kind: "device_down" | "collector_silent" | string;
+  deviceId: string | null;
+  openedAt: string;
+  lastNotifiedAt: string | null;
+  ticketId: string | null;
+  detail: string | null;
+}
+
 export interface NetworkLiveView {
   generatedAt: string;
   collectors: LiveCollector[];
   devices: LiveDevice[];
   links: LiveLink[];
   endpoints: LiveEndpoint[];
+  alerts: LiveAlert[];
+}
+
+export type LiveEventKind =
+  | "device_new"
+  | "device_down"
+  | "device_up"
+  | "device_restart"
+  | "port_down"
+  | "port_up"
+  | "port_speed"
+  | "link_new"
+  | "endpoint_new"
+  | "endpoint_moved"
+  | "collector_silent"
+  | "collector_back";
+
+/** Algo que cambió en la red (GET /api/it/network/live/events). */
+export interface LiveEvent {
+  id: string;
+  at: string;
+  kind: LiveEventKind | string;
+  deviceId: string | null;
+  portKey: string | null;
+  macAddress: string | null;
+  /** Enlace nuevo: el equipo de enfrente. Equipo final que se mudó: de dónde venía. */
+  peerDeviceId: string | null;
+  peerPortKey: string | null;
+  detail: Record<string, unknown> | null;
+  endpoint: { ip: string | null; hostname: string | null; agent: LiveAgentRef | null } | null;
+}
+
+export interface LiveEventsQuery {
+  since?: string;
+  deviceId?: string;
+  portKey?: string;
+  mac?: string;
+  kinds?: LiveEventKind[];
+  limit?: number;
+}
+
+export interface LiveEventsResponse {
+  events: LiveEvent[];
+  hasMore: boolean;
 }
 
 export interface LiveSearchResult extends LiveEndpoint {

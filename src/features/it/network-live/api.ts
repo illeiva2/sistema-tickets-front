@@ -1,5 +1,11 @@
 import api from "@/lib/api";
-import type { LiveSearchResponse, NetworkLiveView } from "./types";
+import type {
+  LiveDevice,
+  LiveEventsQuery,
+  LiveEventsResponse,
+  LiveSearchResponse,
+  NetworkLiveView,
+} from "./types";
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -14,9 +20,10 @@ export async function fetchNetworkLive(): Promise<NetworkLiveView> {
   return {
     generatedAt: data.generatedAt,
     collectors: data.collectors ?? [],
-    devices: data.devices ?? [],
+    devices: (data.devices ?? []).map((device) => ({ ...device, alertsMuted: device.alertsMuted ?? false })),
     links: data.links ?? [],
     endpoints: data.endpoints ?? [],
+    alerts: data.alerts ?? [],
   };
 }
 
@@ -30,6 +37,28 @@ export async function searchNetworkLive(query: string): Promise<LiveSearchRespon
     query: response.data.data.query,
     results: response.data.data.results ?? [],
   };
+}
+
+/** Historial: lo más nuevo primero; filtrando por equipo también trae lo del otro lado. */
+export async function fetchNetworkEvents(query: LiveEventsQuery): Promise<LiveEventsResponse> {
+  const { kinds, ...rest } = query;
+  const response = await api.get<ApiEnvelope<LiveEventsResponse>>(
+    "/api/it/network/live/events",
+    { params: { ...rest, ...(kinds?.length ? { kinds: kinds.join(",") } : {}) } },
+  );
+  return {
+    events: response.data.data.events ?? [],
+    hasMore: Boolean(response.data.data.hasMore),
+  };
+}
+
+/** Silenciar (o volver a escuchar) las alertas de un equipo. Sólo ADMIN. */
+export async function setDeviceAlertsMuted(deviceId: string, muted: boolean) {
+  const response = await api.patch<ApiEnvelope<Pick<LiveDevice, "id" | "name" | "alertsMuted">>>(
+    `/api/it/network/live/devices/${encodeURIComponent(deviceId)}/alerts`,
+    { muted },
+  );
+  return response.data.data;
 }
 
 export function getNetworkLiveErrorMessage(error: unknown): string {

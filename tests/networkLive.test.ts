@@ -16,9 +16,11 @@ import {
   pathToRoot,
   searchLive,
 } from "../src/features/it/network-live/endpoints";
+import { dayLabel, describeEvent, groupByDay } from "../src/features/it/network-live/history";
 import type {
   LiveDevice,
   LiveEndpoint,
+  LiveEvent,
   LiveLink,
   LivePort,
   NetworkLiveView,
@@ -59,6 +61,7 @@ const device = (id: string, role: string, overrides: Partial<LiveDevice> = {}): 
   lastError: null,
   lastPolledAt: new Date().toISOString(),
   lastOkAt: new Date().toISOString(),
+  alertsMuted: false,
   ports: [],
   ...overrides,
 });
@@ -108,6 +111,7 @@ function fixture(): NetworkLiveView {
       link("l7", "router", ["ether9"], "s2", ["2"]),
     ],
     endpoints: [],
+    alerts: [],
   };
 }
 
@@ -274,6 +278,72 @@ describe("Red en vivo: equipos finales", () => {
     expect([...path.deviceIds].sort()).toEqual(["ap-2", "core", "router", "s1"]);
     expect([...path.edgeIds].sort()).toEqual(["l1", "l2", "l5"]);
     expect([...pathToRoot(topology, "lost").deviceIds]).toEqual(["lost"]);
+  });
+});
+
+describe("Red en vivo: historial", () => {
+  const event = (overrides: Partial<LiveEvent>): LiveEvent => ({
+    id: "e",
+    at: "2026-10-12T15:00:00.000Z",
+    kind: "device_down",
+    deviceId: null,
+    portKey: null,
+    macAddress: null,
+    peerDeviceId: null,
+    peerPortKey: null,
+    detail: null,
+    endpoint: null,
+    ...overrides,
+  });
+  const devices = buildTopology(fixture()).devices;
+
+  it("cuenta cada cambio en castellano, con su tono y a dónde lleva", () => {
+    expect(describeEvent(event({ kind: "device_down", deviceId: "s1", detail: { error: "timeout" } }), devices)).toMatchObject({
+      tone: "bad",
+      title: "SWITCH-CRS-TALLER dejó de responder",
+      place: "timeout",
+      deviceId: "s1",
+    });
+    expect(describeEvent(event({ kind: "device_down", deviceId: "ap-1" }), devices).title).toBe("AP-1 se desconectó del controlador");
+    expect(describeEvent(event({ kind: "device_up", deviceId: "s1", detail: { restarted: true } }), devices).title).toBe(
+      "SWITCH-CRS-TALLER volvió a responder (se reinició)",
+    );
+    expect(
+      describeEvent(event({ kind: "port_speed", deviceId: "s1", portKey: "ether10", detail: { name: "ether10", from: 1000, to: 100 } }), devices),
+    ).toMatchObject({ tone: "warn", title: "Puerto ether10: de 1 Gb/s a 100 Mb/s", place: "SWITCH-CRS-TALLER", portKey: "ether10" });
+    expect(describeEvent(event({ kind: "port_down", deviceId: "s1", portKey: "ether10", detail: { name: "ether10" } }), devices).tone).toBe("off");
+    expect(
+      describeEvent(event({ kind: "link_new", deviceId: "core", portKey: "lag130", peerDeviceId: "s1", peerPortKey: "sfp-sfpplus1+sfp-sfpplus2", detail: { source: "fdb" } }), devices),
+    ).toMatchObject({
+      title: "Conexión nueva: SWT-FO01 (LAG 130) ↔ SWITCH-CRS-TALLER (sfp-sfpplus1+sfp-sfpplus2)",
+      place: "deducida de las tablas MAC",
+    });
+    expect(
+      describeEvent(event({ kind: "endpoint_new", deviceId: "s1", portKey: "ether11", macAddress: "AA:BB:CC:00:00:09", detail: { viaDeviceId: "ap-2" } }), devices),
+    ).toMatchObject({ title: "Equipo nuevo en la red: AA:BB:CC:00:00:09", place: "Wi-Fi por AP-2", mac: "AA:BB:CC:00:00:09" });
+    expect(describeEvent(event({ kind: "collector_back", detail: { silentMinutes: 12 } }), devices)).toMatchObject({
+      tone: "good",
+      deviceId: null,
+      place: "estuvo 12 min sin mandar",
+    });
+    expect(describeEvent(event({ kind: "device_new", deviceId: "no-existe" }), devices).title).toBe(
+      "un equipo que ya no informa: equipo de red nuevo",
+    );
+  });
+
+  it("agrupa por día: hoy, ayer y después la fecha", () => {
+    const now = new Date(2026, 9, 12, 18, 0);
+    const at = (day: number, hour: number) => new Date(2026, 9, day, hour, 0).toISOString();
+    const groups = groupByDay(
+      [event({ id: "a", at: at(12, 9) }), event({ id: "b", at: at(12, 1) }), event({ id: "c", at: at(11, 23) }), event({ id: "d", at: at(9, 10) })],
+      now,
+    );
+    expect(groups.map((group) => [group.day.split(" ")[0], group.events.map((item) => item.id)])).toEqual([
+      ["Hoy", ["a", "b"]],
+      ["Ayer", ["c"]],
+      [dayLabel(at(9, 10), now).split(" ")[0], ["d"]],
+    ]);
+    expect(dayLabel(at(9, 10), now)).not.toBe("Ayer");
   });
 });
 

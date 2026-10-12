@@ -8,6 +8,15 @@ vi.mock("../src/lib/api", () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
 
+const session = vi.hoisted(() => ({ role: "ADMIN" }));
+vi.mock("../src/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "user-1", role: session.role } }),
+}));
+
+vi.mock("react-hot-toast", () => ({
+  default: { success: vi.fn(), error: vi.fn() },
+}));
+
 // React Flow necesita medir el DOM, que jsdom no tiene: el lienzo se prueba aparte (lógica pura).
 // Acá sólo interesa qué le pasa la página: equipo y puerto elegidos, MAC y camino resaltados.
 vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => ({
@@ -17,12 +26,14 @@ vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => (
     selectedPort,
     highlight,
     highlightMac,
+    alertIds,
   }: {
     topology: { devices: Map<string, { name: string }> };
     selectedId: string | null;
     selectedPort: string | null;
     highlight: { deviceIds: Set<string> } | null;
     highlightMac: string | null;
+    alertIds: Set<string>;
   }) => (
     <div
       data-testid="lienzo"
@@ -30,6 +41,7 @@ vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => (
       data-port={selectedPort ?? ""}
       data-mac={highlightMac ?? ""}
       data-path={highlight ? [...highlight.deviceIds].sort().join(",") : ""}
+      data-alerts={[...alertIds].sort().join(",")}
     >
       <ul aria-label="lienzo">
         {[...topology.devices.values()].map((device) => (
@@ -40,10 +52,11 @@ vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => (
   ),
 }));
 
+import toast from "react-hot-toast";
 import api from "../src/lib/api";
 import ItNetworkLivePage from "../src/pages/it/ItNetworkLivePage";
 
-const apiMock = api as unknown as { get: ReturnType<typeof vi.fn> };
+const apiMock = api as unknown as { get: ReturnType<typeof vi.fn>; patch: ReturnType<typeof vi.fn> };
 const now = new Date().toISOString();
 const threeHoursAgo = new Date(Date.now() - 3 * 3600_000).toISOString();
 
@@ -61,6 +74,7 @@ const baseDevice = {
   lastError: null,
   lastPolledAt: now,
   lastOkAt: now,
+  alertsMuted: false,
 };
 
 const port = (key: string, linkUp: boolean) => ({
@@ -124,18 +138,61 @@ function liveView() {
       endpoint("AA:BB:CC:00:00:02", "ether2", { ip: "192.168.110.20", hostname: "notebook-ana", viaDeviceId: "ap" }),
       endpoint("AA:BB:CC:00:00:03", "ether1", { ip: "192.168.100.50" }),
     ],
+    alerts: [
+      {
+        id: "al-1",
+        kind: "device_down",
+        deviceId: "d2",
+        openedAt: now,
+        lastNotifiedAt: now,
+        ticketId: "t-1",
+        detail: "SWITCH-CRS-MOLINO no responde desde hace 5 min.",
+      },
+    ],
   };
 }
+
+const events = [
+  {
+    id: "e2",
+    at: now,
+    kind: "device_down",
+    deviceId: "d2",
+    portKey: null,
+    macAddress: null,
+    peerDeviceId: null,
+    peerPortKey: null,
+    detail: { error: "sin conexión con la API cifrada" },
+    endpoint: null,
+  },
+  {
+    id: "e1",
+    at: now,
+    kind: "endpoint_moved",
+    deviceId: "d1",
+    portKey: "ether1",
+    macAddress: "AA:BB:CC:00:00:01",
+    peerDeviceId: "d2",
+    peerPortKey: "ether7",
+    detail: { vlan: 200 },
+    endpoint: { ip: "192.168.100.41", hostname: "pc-jperez", agent: { id: "agent-1", hostname: "PC-JPEREZ", loggedInUser: "jperez", assetId: null } },
+  },
+];
 
 function mockApi(searchResults: unknown[] = []) {
   apiMock.get.mockImplementation((url: string, config?: { params?: { q?: string } }) =>
     Promise.resolve({
       data: {
         success: true,
-        data: url.endsWith("/search") ? { query: config?.params?.q ?? "", results: searchResults } : liveView(),
+        data: url.endsWith("/search")
+          ? { query: config?.params?.q ?? "", results: searchResults }
+          : url.endsWith("/events")
+            ? { events, hasMore: false }
+            : liveView(),
       },
     }),
   );
+  apiMock.patch.mockResolvedValue({ data: { success: true, data: { id: "d2", name: "SWITCH-CRS-MOLINO", alertsMuted: true } } });
 }
 
 function renderPage() {
@@ -154,6 +211,57 @@ function renderPage() {
 describe("ItNetworkLivePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    session.role = "ADMIN";
+  });
+
+  it("muestra los avisos abiertos, marca el equipo y un ADMIN lo puede silenciar", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+
+    const alerts = await screen.findByLabelText("Avisos abiertos");
+    expect(alerts).toHaveTextContent("1 aviso abierto");
+    expect(alerts).toHaveTextContent("SWITCH-CRS-MOLINO no responde desde hace 5 min.");
+    expect(alerts).toHaveTextContent("con ticket");
+    expect(screen.getByTestId("lienzo")).toHaveAttribute("data-alerts", "d2");
+
+    await user.click(screen.getByRole("button", { name: /Silenciar/ }));
+
+    expect(apiMock.patch).toHaveBeenCalledWith("/api/it/network/live/devices/d2/alerts", { muted: true });
+    expect(toast.success).toHaveBeenCalledWith("SWITCH-CRS-MOLINO: alertas silenciadas");
+  });
+
+  it("un AGENT ve los avisos pero no los puede silenciar", async () => {
+    session.role = "AGENT";
+    mockApi();
+    renderPage();
+
+    expect(await screen.findByLabelText("Avisos abiertos")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Silenciar/ })).not.toBeInTheDocument();
+  });
+
+  it("el historial cuenta los cambios por día y lleva al diagrama", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: /Historial/ }));
+
+    const history = await screen.findByLabelText("Historial de la red");
+    expect(await screen.findByText("SWITCH-CRS-MOLINO dejó de responder")).toBeInTheDocument();
+    expect(history).toHaveTextContent("Hoy");
+    expect(history).toHaveTextContent("PC-JPEREZ cambió de lugar");
+    expect(history).toHaveTextContent("de SWITCH-CRS-MOLINO · puerto ether7 a SWITCH-CRS-TALLER · puerto ether1");
+    const call = apiMock.get.mock.calls.find((args) => args[0] === "/api/it/network/live/events");
+    expect(call?.[1]).toMatchObject({ params: { limit: 200, since: expect.any(String) } });
+
+    await user.click(screen.getByRole("button", { name: /PC-JPEREZ cambió de lugar/ }));
+
+    const canvas = await screen.findByTestId("lienzo");
+    expect(canvas).toHaveAttribute("data-selected", "d1");
+    expect(canvas).toHaveAttribute("data-port", "ether1");
+    expect(canvas).toHaveAttribute("data-mac", "AA:BB:CC:00:00:01");
+    expect(screen.getByRole("status")).toHaveTextContent("PC-JPEREZ cambió de lugar");
   });
 
   it("muestra el resumen, el estado del colector y el diagrama", async () => {
