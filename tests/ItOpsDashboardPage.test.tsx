@@ -125,7 +125,7 @@ describe("ItOpsDashboardPage", () => {
     const inventoryLink = screen.getByRole("link", { name: "Activos" });
     expect(inventoryLink).toHaveAttribute("href", "/it/inventory");
     expect(inventoryLink).toHaveAttribute("data-status", "available");
-    expect(screen.getAllByText(/Abrir módulo · Disponible/i)).toHaveLength(7);
+    expect(screen.getAllByText(/Abrir módulo · Disponible/i)).toHaveLength(8);
 
     const peopleLink = screen.getByRole("link", { name: "Personas" });
     expect(peopleLink).toHaveAttribute("data-status", "available");

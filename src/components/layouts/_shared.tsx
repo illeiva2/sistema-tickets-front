@@ -30,6 +30,7 @@ import {
   Smartphone,
   Network,
   Radar,
+  Waypoints,
   ShieldCheck,
   FlaskConical,
 } from "lucide-react";
@@ -461,6 +462,13 @@ export const useNavItems = (): NavItem[] => {
       to: "/it/network",
       label: "Red y topología",
       icon: <Network size={16} />,
+      showFor: ["AGENT", "ADMIN"],
+      section: "it",
+    },
+    {
+      to: "/it/network-live",
+      label: "Red en vivo",
+      icon: <Waypoints size={16} />,
       showFor: ["AGENT", "ADMIN"],
       section: "it",
     },
