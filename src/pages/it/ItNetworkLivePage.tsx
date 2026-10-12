@@ -39,8 +39,10 @@ import type {
   LiveDevice,
   LiveEndpoint,
   LiveSearchResult,
+  LiveWifiClient,
   NetworkLiveView,
 } from "@/features/it/network-live/types";
+import { indexWifi, isWeak, signalQuality, wifiNetwork, wifiTitle } from "@/features/it/network-live/wifi";
 import {
   useMuteDeviceAlerts,
   useNetworkLive,
@@ -72,6 +74,7 @@ function summarize(view: NetworkLiveView) {
     apsOk: aps.filter((device) => device.status === "ok").length,
     apsTotal: aps.length,
     clients: aps.reduce((sum, device) => sum + (device.status === "ok" ? device.clients ?? 0 : 0), 0),
+    weakWifi: view.wifiClients.filter(isWeak).length,
     endpoints: view.endpoints.length,
     wifi,
     wired: view.endpoints.length - wifi,
@@ -110,14 +113,20 @@ export default function ItNetworkLivePage() {
   const view = query.data;
   const topology = useMemo(() => (view ? buildTopology(view) : null), [view]);
   const endpointIndex = useMemo(() => indexEndpoints(view?.endpoints ?? []), [view]);
+  const wifi = useMemo(() => indexWifi(view?.wifiClients ?? []), [view]);
   const stats = useMemo(() => (view ? summarize(view) : null), [view]);
   const collector = view?.collectors[0];
 
   const term = search.trim();
-  const hits = useMemo(() => (view ? searchLive(view.devices, view.endpoints, term) : []), [view, term]);
+  const hits = useMemo(
+    () => (view ? searchLive(view.devices, view.endpoints, term, view.wifiClients) : []),
+    [view, term],
+  );
   const history = useNetworkLiveSearch(submitted);
   const historyExtra = useMemo(() => {
-    const live = new Set(hits.flatMap((hit) => (hit.kind === "endpoint" ? [hit.endpoint.mac] : [])));
+    const live = new Set(
+      hits.flatMap((hit) => (hit.kind === "endpoint" ? [hit.endpoint.mac] : hit.kind === "wifi" ? [hit.client.mac] : [])),
+    );
     return (history.data?.results ?? []).filter((result) => !live.has(result.mac));
   }, [hits, history.data]);
   const highlight = useMemo(
@@ -191,9 +200,36 @@ export default function ItNetworkLivePage() {
     setResultsOpen(false);
   };
 
+  /** Cliente Wi-Fi que sólo conoce UniFi: se lo muestra en su AP, marcado en la lista de clientes. */
+  const showWifi = (client: LiveWifiClient) => {
+    const ap = topology?.devices.get(client.apDeviceId);
+    if (!ap) return;
+    const user = client.agent?.loggedInUser ? ` (usuario ${client.agent.loggedInUser})` : "";
+    setSelectedPort(null);
+    setSelectedId(ap.id);
+    setFocus({
+      from: [ap.id],
+      mac: client.mac,
+      text: `${wifiTitle(client)}${user}: Wi-Fi por ${ap.name} (${wifiNetwork(client)})`,
+      offline: false,
+    });
+    setResultsOpen(false);
+  };
+
   const showHit = (hit: SearchHit) => {
     if (hit.kind === "device") showDevice(hit.device);
+    else if (hit.kind === "wifi") showWifi(hit.client);
     else showEndpoint(hit.endpoint, false);
+  };
+
+  /** Red y señal de un equipo si está conectado por Wi-Fi. */
+  const wifiFacts = (mac: string) => {
+    const client = wifi.byMac.get(mac);
+    if (!client) return null;
+    const quality = signalQuality(client.signal);
+    return [client.ssid, client.signal !== null ? `${client.signal} dBm${quality ? ` (${quality.label})` : ""}` : null]
+      .filter(Boolean)
+      .join(" · ");
   };
 
   /** Un cambio del historial, en el diagrama: el equipo (y el puerto) donde pasó, con su camino. */
@@ -308,7 +344,9 @@ export default function ItNetworkLivePage() {
             <strong>
               {stats.apsOk}/{stats.apsTotal}
             </strong>
-            <small>{stats.clients} clientes Wi-Fi</small>
+            <small>
+              {stats.clients} clientes Wi-Fi{stats.weakWifi ? ` · ${stats.weakWifi} con señal débil` : ""}
+            </small>
           </article>
           <article>
             <span>Equipos conectados</span>
@@ -467,12 +505,28 @@ export default function ItNetworkLivePage() {
                                 <span>{deviceFacts(hit.device)}</span>
                               </button>
                             </li>
+                          ) : hit.kind === "wifi" ? (
+                            <li key={`wifi-${hit.client.mac}`}>
+                              <button type="button" data-kind="endpoint" onClick={() => showHit(hit)}>
+                                <strong>{wifiTitle(hit.client)}</strong>
+                                <span>
+                                  Wi-Fi por {topology.devices.get(hit.client.apDeviceId)?.name ?? "un AP"}
+                                </span>
+                                <small>
+                                  {[endpointFacts(hit.client), wifiFacts(hit.client.mac)]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </small>
+                              </button>
+                            </li>
                           ) : (
                             <li key={`endpoint-${hit.endpoint.mac}`}>
                               <button type="button" data-kind="endpoint" onClick={() => showHit(hit)}>
                                 <strong>{endpointTitle(hit.endpoint)}</strong>
                                 <span>{endpointWhere(hit.endpoint, topology.devices)}</span>
-                                <small>{endpointFacts(hit.endpoint)}</small>
+                                <small>
+                                  {[endpointFacts(hit.endpoint), wifiFacts(hit.endpoint.mac)].filter(Boolean).join(" · ")}
+                                </small>
                               </button>
                             </li>
                           ),
@@ -570,6 +624,8 @@ export default function ItNetworkLivePage() {
                   selectedPort={selectedPort}
                   highlight={highlight}
                   highlightMac={focus?.mac ?? null}
+                  wifiByAp={wifi.byAp}
+                  wifiByMac={wifi.byMac}
                   alertIds={alertIds}
                   canMute={canMute}
                   onToggle={onToggle}

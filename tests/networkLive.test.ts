@@ -17,12 +17,14 @@ import {
   searchLive,
 } from "../src/features/it/network-live/endpoints";
 import { dayLabel, describeEvent, groupByDay } from "../src/features/it/network-live/history";
+import { bandLabel, indexWifi, rateLabel, signalQuality, wifiNetwork } from "../src/features/it/network-live/wifi";
 import type {
   LiveDevice,
   LiveEndpoint,
   LiveEvent,
   LiveLink,
   LivePort,
+  LiveWifiClient,
   NetworkLiveView,
 } from "../src/features/it/network-live/types";
 
@@ -111,6 +113,7 @@ function fixture(): NetworkLiveView {
       link("l7", "router", ["ether9"], "s2", ["2"]),
     ],
     endpoints: [],
+    wifiClients: [],
     alerts: [],
   };
 }
@@ -278,6 +281,69 @@ describe("Red en vivo: equipos finales", () => {
     expect([...path.deviceIds].sort()).toEqual(["ap-2", "core", "router", "s1"]);
     expect([...path.edgeIds].sort()).toEqual(["l1", "l2", "l5"]);
     expect([...pathToRoot(topology, "lost").deviceIds]).toEqual(["lost"]);
+  });
+});
+
+describe("Red en vivo: Wi-Fi", () => {
+  const client = (mac: string, overrides: Partial<LiveWifiClient> = {}): LiveWifiClient => ({
+    mac,
+    apDeviceId: "ap-2",
+    ssid: "GRF_Privado",
+    band: "5",
+    channel: 44,
+    signal: -60,
+    txKbps: 866700,
+    rxKbps: 780000,
+    uptimeSeconds: 3600,
+    hostname: null,
+    ip: null,
+    vlan: 200,
+    firstSeenAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+    agent: null,
+    ...overrides,
+  });
+
+  it("califica la señal, nombra la banda y la velocidad", () => {
+    expect([-50, -55, -60, -67, -70, -75, -76, -90].map((dbm) => signalQuality(dbm)?.label)).toEqual([
+      "excelente",
+      "excelente",
+      "buena",
+      "buena",
+      "regular",
+      "regular",
+      "débil",
+      "débil",
+    ]);
+    expect(signalQuality(null)).toBeNull();
+    expect(bandLabel("2.4")).toBe("2,4 GHz");
+    expect(rateLabel(866700)).toBe("867 Mb/s");
+    expect(rateLabel(6500)).toBe("6,5 Mb/s");
+    expect(wifiNetwork(client("a"))).toBe("GRF_Privado · 5 GHz · canal 44");
+  });
+
+  it("agrupa por AP de mejor a peor señal", () => {
+    const { byAp, byMac } = indexWifi([client("A", { signal: -80 }), client("B", { signal: -50 }), client("C", { apDeviceId: "ap-1" })]);
+    expect(byAp.get("ap-2")?.map((item) => item.mac)).toEqual(["B", "A"]);
+    expect(byAp.get("ap-1")).toHaveLength(1);
+    expect(byMac.get("A")?.signal).toBe(-80);
+  });
+
+  it("la búsqueda encuentra a los clientes Wi-Fi que no están en las tablas MAC, sin repetir los que sí", () => {
+    const view = fixture();
+    const endpoints = endpointsFixture();
+    const wifi = [
+      client("AA:BB:CC:00:00:01", { hostname: "notebook-ana" }),
+      client("AA:BB:CC:00:00:77", { hostname: "celular-depósito", ip: "192.168.80.12" }),
+    ];
+    const found = (query: string) =>
+      searchLive(view.devices, endpoints, query, wifi).map((hit) =>
+        hit.kind === "wifi" ? `wifi:${hit.client.mac}` : hit.kind === "endpoint" ? hit.endpoint.mac : hit.device.id,
+      );
+    expect(found("notebook")).toEqual(["AA:BB:CC:00:00:01"]);
+    expect(found("celular")).toEqual(["wifi:AA:BB:CC:00:00:77"]);
+    expect(found("192.168.80.12")).toEqual(["wifi:AA:BB:CC:00:00:77"]);
+    expect(directHit(searchLive(view.devices, endpoints, "celular-depósito", wifi))?.kind).toBe("wifi");
   });
 });
 

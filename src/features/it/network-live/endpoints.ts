@@ -1,6 +1,6 @@
 import { linkPortLabel } from "./ports";
 import type { Topology } from "./topology";
-import type { LiveDevice, LiveEndpoint } from "./types";
+import type { LiveDevice, LiveEndpoint, LiveWifiClient } from "./types";
 
 /** Cómo se llama un equipo final: la PC del agente, el nombre DHCP, la IP o, si no hay nada, la MAC. */
 export function endpointTitle(endpoint: Pick<LiveEndpoint, "agent" | "hostname" | "ip" | "mac">) {
@@ -34,17 +34,26 @@ export function indexEndpoints(endpoints: LiveEndpoint[]) {
 
 const compactMac = (value: string) => value.replace(/[.\-:\s]/g, "").toUpperCase();
 
-/** `exact`: coincide entero (IP, MAC, nombre o usuario), no sólo una parte. */
+/**
+ * `exact`: coincide entero (IP, MAC, nombre o usuario), no sólo una parte. `wifi`: cliente que
+ * UniFi ve asociado a un AP pero que no aparece en las tablas MAC (se ubica en el AP).
+ */
 export type SearchHit =
   | { kind: "device"; device: LiveDevice; exact: boolean }
-  | { kind: "endpoint"; endpoint: LiveEndpoint; exact: boolean };
+  | { kind: "endpoint"; endpoint: LiveEndpoint; exact: boolean }
+  | { kind: "wifi"; client: LiveWifiClient; exact: boolean };
 
 /**
  * Busca entre lo conectado ahora: equipos de red por nombre, IP o MAC, y equipos finales por
  * nombre de la PC, usuario, nombre DHCP, IP o MAC (en cualquier formato). Las coincidencias
  * exactas van primero: "192.168.100.4" trae también la .41, pero después.
  */
-export function searchLive(devices: LiveDevice[], endpoints: LiveEndpoint[], query: string): SearchHit[] {
+export function searchLive(
+  devices: LiveDevice[],
+  endpoints: LiveEndpoint[],
+  query: string,
+  wifiClients: LiveWifiClient[] = [],
+): SearchHit[] {
   const text = query.trim().toLowerCase();
   if (text.length < 2) return [];
   const mac = compactMac(text);
@@ -63,26 +72,31 @@ export function searchLive(devices: LiveDevice[], endpoints: LiveEndpoint[], que
       hits.push({ kind: "device", device, exact });
     }
   }
-  for (const endpoint of endpoints) {
+  // Lo mismo para equipos finales y clientes Wi-Fi: devuelve null si no coincide.
+  const match = (item: Pick<LiveEndpoint, "mac" | "ip" | "hostname" | "agent">): { exact: boolean } | null => {
     if (looksLikeMac) {
-      const endpointMac = compactMac(endpoint.mac);
-      if (endpointMac.includes(mac)) hits.push({ kind: "endpoint", endpoint, exact: endpointMac === mac });
-      continue;
+      const itemMac = compactMac(item.mac);
+      return itemMac.includes(mac) ? { exact: itemMac === mac } : null;
     }
     const exact =
-      endpoint.ip === text ||
-      sameText(endpoint.hostname) ||
-      sameText(endpoint.agent?.hostname) ||
-      sameText(endpoint.agent?.loggedInUser);
-    if (
-      exact ||
-      (looksLikeIp && endpoint.ip?.startsWith(text)) ||
-      containsText(endpoint.hostname) ||
-      containsText(endpoint.agent?.hostname) ||
-      containsText(endpoint.agent?.loggedInUser)
-    ) {
-      hits.push({ kind: "endpoint", endpoint, exact });
-    }
+      item.ip === text || sameText(item.hostname) || sameText(item.agent?.hostname) || sameText(item.agent?.loggedInUser);
+    const partial =
+      (looksLikeIp && item.ip?.startsWith(text)) ||
+      containsText(item.hostname) ||
+      containsText(item.agent?.hostname) ||
+      containsText(item.agent?.loggedInUser);
+    return exact || partial ? { exact } : null;
+  };
+
+  for (const endpoint of endpoints) {
+    const found = match(endpoint);
+    if (found) hits.push({ kind: "endpoint", endpoint, ...found });
+  }
+  const inTables = new Set(endpoints.map((endpoint) => endpoint.mac));
+  for (const client of wifiClients) {
+    if (inTables.has(client.mac)) continue;
+    const found = match(client);
+    if (found) hits.push({ kind: "wifi", client, ...found });
   }
   return hits.sort((a, b) => Number(b.exact) - Number(a.exact));
 }

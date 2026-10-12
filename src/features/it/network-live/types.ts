@@ -123,12 +123,35 @@ export interface LiveAlert {
   detail: string | null;
 }
 
+/** Cliente Wi-Fi según el controlador UniFi (se actualiza cada 5 min). Sin invitados. */
+export interface LiveWifiClient {
+  mac: string;
+  apDeviceId: string;
+  ssid: string | null;
+  /** "2.4", "5" o "6" (GHz). */
+  band: string | null;
+  channel: number | null;
+  /** dBm: -50 es muy buena, -80 mala. */
+  signal: number | null;
+  txKbps: number | null;
+  rxKbps: number | null;
+  /** Hace cuánto está asociado al AP. */
+  uptimeSeconds: number | null;
+  hostname: string | null;
+  ip: string | null;
+  vlan: number | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  agent: LiveAgentRef | null;
+}
+
 export interface NetworkLiveView {
   generatedAt: string;
   collectors: LiveCollector[];
   devices: LiveDevice[];
   links: LiveLink[];
   endpoints: LiveEndpoint[];
+  wifiClients: LiveWifiClient[];
   alerts: LiveAlert[];
 }
 

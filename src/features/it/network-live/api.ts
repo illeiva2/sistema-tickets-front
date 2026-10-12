@@ -23,6 +23,7 @@ export async function fetchNetworkLive(): Promise<NetworkLiveView> {
     devices: (data.devices ?? []).map((device) => ({ ...device, alertsMuted: device.alertsMuted ?? false })),
     links: data.links ?? [],
     endpoints: data.endpoints ?? [],
+    wifiClients: data.wifiClients ?? [],
     alerts: data.alerts ?? [],
   };
 }
