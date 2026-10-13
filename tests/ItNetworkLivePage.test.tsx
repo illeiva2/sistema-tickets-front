@@ -108,6 +108,25 @@ const endpoint = (mac: string, portKey: string, overrides: Record<string, unknow
   ...overrides,
 });
 
+const wifiClient = (mac: string, overrides: Record<string, unknown> = {}) => ({
+  mac,
+  apDeviceId: "ap",
+  ssid: "GRF_Privado",
+  band: "5",
+  channel: 44,
+  signal: -60,
+  txKbps: 866700,
+  rxKbps: 780000,
+  uptimeSeconds: 3600,
+  hostname: null,
+  ip: null,
+  vlan: 200,
+  firstSeenAt: now,
+  lastSeenAt: now,
+  agent: null,
+  ...overrides,
+});
+
 function liveView() {
   return {
     generatedAt: now,
@@ -137,6 +156,11 @@ function liveView() {
       }),
       endpoint("AA:BB:CC:00:00:02", "ether2", { ip: "192.168.110.20", hostname: "notebook-ana", viaDeviceId: "ap" }),
       endpoint("AA:BB:CC:00:00:03", "ether1", { ip: "192.168.100.50" }),
+    ],
+    wifiClients: [
+      wifiClient("AA:BB:CC:00:00:02", { hostname: "notebook-ana", ip: "192.168.110.20", signal: -82 }),
+      // Sólo lo conoce UniFi: no está en las tablas MAC.
+      wifiClient("AA:BB:CC:00:00:77", { hostname: "celular-deposito", ip: "192.168.110.77", signal: -58 }),
     ],
     alerts: [
       {
@@ -231,6 +255,26 @@ describe("ItNetworkLivePage", () => {
     expect(toast.success).toHaveBeenCalledWith("SWITCH-CRS-MOLINO: alertas silenciadas");
   });
 
+  it("encuentra un cliente Wi-Fi que sólo conoce UniFi y lo muestra en su AP", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByLabelText("Buscar en la red"), "celular");
+    const results = screen.getByLabelText("Resultados de la búsqueda");
+    expect(results).toHaveTextContent("celular-deposito");
+    expect(results).toHaveTextContent("Wi-Fi por AP-010");
+    expect(results).toHaveTextContent("GRF_Privado · -58 dBm (buena)");
+
+    await user.click(screen.getByRole("button", { name: /celular-deposito/ }));
+
+    const canvas = screen.getByTestId("lienzo");
+    expect(canvas).toHaveAttribute("data-selected", "ap");
+    expect(canvas).toHaveAttribute("data-port", "");
+    expect(canvas).toHaveAttribute("data-mac", "AA:BB:CC:00:00:77");
+    expect(screen.getByRole("status")).toHaveTextContent("celular-deposito: Wi-Fi por AP-010 (GRF_Privado · 5 GHz · canal 44)");
+  });
+
   it("un AGENT ve los avisos pero no los puede silenciar", async () => {
     session.role = "AGENT";
     mockApi();
@@ -274,7 +318,7 @@ describe("ItNetworkLivePage", () => {
     expect(screen.getByText(/Colector SRV-DATOS/)).toBeInTheDocument();
     // Router y switches 1/2 (MOLINO no responde) y puertos con enlace 1/2.
     expect(screen.getAllByText("1/2", { selector: "strong" })).toHaveLength(2);
-    expect(screen.getByText("4 clientes Wi-Fi")).toBeInTheDocument();
+    expect(screen.getByText("4 clientes Wi-Fi · 1 con señal débil")).toBeInTheDocument();
     expect(screen.getByText("2 por cable · 1 Wi-Fi")).toBeInTheDocument();
     expect(screen.getByText("SWITCH-CRS-MOLINO", { selector: "small" })).toBeInTheDocument();
     expect(screen.getByLabelText("Buscar en la red")).toBeInTheDocument();

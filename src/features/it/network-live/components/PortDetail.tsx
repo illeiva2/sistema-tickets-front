@@ -2,8 +2,10 @@ import { ArrowUpRight } from "lucide-react";
 import { formatDate, formatHeartbeat } from "@/features/it/live/format";
 import { endpointTitle } from "../endpoints";
 import type { TreeEdge } from "../topology";
-import type { LiveDevice, LiveEndpoint, LivePort } from "../types";
+import type { LiveDevice, LiveEndpoint, LivePort, LiveWifiClient } from "../types";
+import { wifiNetwork } from "../wifi";
 import { RecentEvents } from "./RecentEvents";
+import { SignalBars } from "./WifiClients";
 import {
   NEIGHBOR_PROTOCOL_LABELS,
   PORT_TONE_LABELS,
@@ -21,12 +23,13 @@ interface PortDetailProps {
   port: LivePort;
   edge: TreeEdge | undefined;
   endpoints: LiveEndpoint[];
+  wifiByMac: Map<string, LiveWifiClient>;
   highlightMac: string | null;
   devices: Map<string, LiveDevice>;
   onGoTo: (deviceId: string) => void;
 }
 
-export function PortDetail({ device, port, edge, endpoints, highlightMac, devices, onGoTo }: PortDetailProps) {
+export function PortDetail({ device, port, edge, endpoints, wifiByMac, highlightMac, devices, onGoTo }: PortDetailProps) {
   const tone = portTone(port);
   const otherId = edge ? (edge.parentId === device.id ? edge.childId : edge.parentId) : null;
   const other = otherId ? devices.get(otherId) : undefined;
@@ -108,6 +111,12 @@ export function PortDetail({ device, port, edge, endpoints, highlightMac, device
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
+                {wifiByMac.get(endpoint.mac) ? (
+                  <span className="netlive-endpoints__wifi">
+                    {wifiNetwork(wifiByMac.get(endpoint.mac)!)}
+                    <SignalBars dbm={wifiByMac.get(endpoint.mac)!.signal} />
+                  </span>
+                ) : null}
                 <small>
                   {[
                     endpoint.agent?.loggedInUser ? `Usuario ${endpoint.agent.loggedInUser}` : endpoint.agent ? "PC con agente" : null,

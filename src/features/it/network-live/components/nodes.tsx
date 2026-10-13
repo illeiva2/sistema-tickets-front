@@ -3,12 +3,14 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { Bell, BellOff, Globe, Network, Router, Server, Wifi, WifiOff } from "lucide-react";
 import { formatHeartbeat, formatUptime } from "@/features/it/live/format";
 import type { TreeEdge, WanPort } from "../topology";
-import type { LiveDevice, LiveEndpoint } from "../types";
+import type { LiveDevice, LiveEndpoint, LiveWifiClient } from "../types";
+import { isWeak } from "../wifi";
 import { formatSpeed, portBlocks, portStats } from "../ports";
 import { STACK_HANDLE_OFFSET, type NodeSize } from "../layout";
 import { PortDetail } from "./PortDetail";
 import { PortPanel } from "./PortPanel";
 import { RecentEvents } from "./RecentEvents";
+import { WifiClients } from "./WifiClients";
 
 export const STATUS_LABELS: Record<string, string> = {
   ok: "Responde",
@@ -40,8 +42,8 @@ export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail
   const rows = Math.max(1, ...blocks.map((block) => block.rows));
   return {
     width: Math.min(Math.max(360, panel + 36), 960),
-    // Sin puerto elegido el detalle muestra los últimos cambios del equipo.
-    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? (withList ? 380 : 250) : 200),
+    // Sin puerto elegido el detalle muestra los últimos cambios del equipo (y en un AP, sus clientes Wi-Fi).
+    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? (withList ? 380 : 250) : device.role === "ap" ? 340 : 200),
   };
 }
 
@@ -64,6 +66,10 @@ export interface DeviceNodeData extends Record<string, unknown> {
   endpointsByPort: Map<string, LiveEndpoint[]>;
   /** MAC buscada: se la destaca en el detalle del puerto. */
   highlightMac: string | null;
+  /** Si es un AP: sus clientes Wi-Fi según UniFi. */
+  wifiClients: LiveWifiClient[];
+  /** Clientes Wi-Fi por MAC, para mostrar red y señal en los equipos de cada puerto. */
+  wifiByMac: Map<string, LiveWifiClient>;
   /** Tiene un aviso abierto (caído y notificado). */
   alerting: boolean;
   /** El usuario puede silenciar o reactivar las alertas (ADMIN). */
@@ -77,10 +83,11 @@ export interface DeviceNodeData extends Record<string, unknown> {
 
 export type DeviceFlowNode = Node<DeviceNodeData, "device">;
 
-function summary(device: LiveDevice, endpointsByPort: Map<string, LiveEndpoint[]>) {
+function summary(device: LiveDevice, endpointsByPort: Map<string, LiveEndpoint[]>, wifiClients: LiveWifiClient[]) {
   if (device.status !== "ok") return device.lastError ?? STATUS_LABELS[device.status];
   if (device.role === "ap") {
-    return `${device.clients ?? 0} cliente${device.clients === 1 ? "" : "s"} Wi-Fi`;
+    const weak = wifiClients.filter(isWeak).length;
+    return `${device.clients ?? 0} cliente${device.clients === 1 ? "" : "s"} Wi-Fi${weak ? ` · ${weak} con señal débil` : ""}`;
   }
   const { up, total } = portStats(device);
   const endpoints = [...endpointsByPort.values()].reduce((sum, list) => sum + list.length, 0);
@@ -88,7 +95,21 @@ function summary(device: LiveDevice, endpointsByPort: Map<string, LiveEndpoint[]
 }
 
 export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlowNode>) {
-  const { device, size, expanded, highlighted, selectedPort, linkedPorts, endpointsByPort, highlightMac, alerting, canMute, devices } = data;
+  const {
+    device,
+    size,
+    expanded,
+    highlighted,
+    selectedPort,
+    linkedPorts,
+    endpointsByPort,
+    highlightMac,
+    wifiClients,
+    wifiByMac,
+    alerting,
+    canMute,
+    devices,
+  } = data;
   const port = selectedPort ? device.ports.find((candidate) => candidate.key === selectedPort) : undefined;
 
   return (
@@ -128,7 +149,7 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
           <small>
             {[device.managementIp, device.model].filter(Boolean).join(" · ") || ROLE_LABELS[device.role] || device.role}
           </small>
-          <small className="netlive-node__summary">{summary(device, endpointsByPort)}</small>
+          <small className="netlive-node__summary">{summary(device, endpointsByPort, wifiClients)}</small>
         </span>
         <span className="netlive-node__status">
           {device.alertsMuted ? <BellOff size={13} className="netlive-node__muted" aria-label="Alertas silenciadas" /> : null}
@@ -152,13 +173,18 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
                 port={port}
                 edge={linkedPorts.get(port.key)}
                 endpoints={endpointsByPort.get(port.key) ?? []}
+                wifiByMac={wifiByMac}
                 highlightMac={highlightMac}
                 devices={devices}
                 onGoTo={data.onGoTo}
               />
             ) : (
               <>
-                <p className="netlive-hint">Tocá un puerto para ver qué tiene conectado.</p>
+                {device.role === "ap" ? (
+                  <WifiClients clients={wifiClients} total={device.clients} highlightMac={highlightMac} />
+                ) : (
+                  <p className="netlive-hint">Tocá un puerto para ver qué tiene conectado.</p>
+                )}
                 <RecentEvents deviceId={device.id} devices={devices} title="Últimos cambios del equipo" />
               </>
             )}

@@ -13,7 +13,7 @@ import "@xyflow/react/dist/style.css";
 import { layoutTopology } from "../layout";
 import { linkPortLabel } from "../ports";
 import { linkedPortKeys, type Topology, type TreeEdge } from "../topology";
-import type { LiveEndpoint } from "../types";
+import type { LiveEndpoint, LiveWifiClient } from "../types";
 import { edgeTypes, type PortFlowEdge } from "./PortEdge";
 import {
   WAN_NODE_SIZE,
@@ -31,6 +31,9 @@ interface LiveTopologyCanvasProps {
   /** Camino resaltado (resultado de una búsqueda): equipos y enlaces hasta el router. */
   highlight: { deviceIds: Set<string>; edgeIds: Set<string> } | null;
   highlightMac: string | null;
+  /** Clientes Wi-Fi según UniFi: por AP y por MAC. */
+  wifiByAp: Map<string, LiveWifiClient[]>;
+  wifiByMac: Map<string, LiveWifiClient>;
   /** Equipos con un aviso abierto. */
   alertIds: Set<string>;
   canMute: boolean;
@@ -41,6 +44,7 @@ interface LiveTopologyCanvasProps {
 }
 
 const NO_ENDPOINTS = new Map<string, LiveEndpoint[]>();
+const NO_WIFI: LiveWifiClient[] = [];
 
 // React Flow apaga los eventos del puntero en los nodos que no se pueden elegir ni arrastrar; los
 // nuestros tienen botones (cabecera, puertos, WAN), así que se vuelven a prender a mano.
@@ -78,6 +82,8 @@ function Canvas({
   selectedPort,
   highlight,
   highlightMac,
+  wifiByAp,
+  wifiByMac,
   alertIds,
   canMute,
   onToggle,
@@ -123,6 +129,8 @@ function Canvas({
         linkedPorts: linkedPortKeys(topology, device.id),
         endpointsByPort: endpointIndex.get(device.id) ?? NO_ENDPOINTS,
         highlightMac: device.id === selectedId ? highlightMac : null,
+        wifiClients: wifiByAp.get(device.id) ?? NO_WIFI,
+        wifiByMac,
         alerting: alertIds.has(device.id),
         canMute,
         devices: topology.devices,
@@ -185,6 +193,8 @@ function Canvas({
     selectedPort,
     highlight,
     highlightMac,
+    wifiByAp,
+    wifiByMac,
     alertIds,
     canMute,
     onToggle,
