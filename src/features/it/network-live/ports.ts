@@ -1,4 +1,4 @@
-import type { LiveDevice, LiveNeighbor, LivePort } from "./types";
+import type { LiveDevice, LiveNeighbor, LivePort, LivePortPoe } from "./types";
 
 /** Cómo se pinta un puerto en el panel frontal. */
 export type PortTone = "up" | "up-fiber" | "slow" | "down" | "disabled";
@@ -24,6 +24,28 @@ export const PORT_TONE_LABELS: Record<PortTone, string> = {
   down: "Sin enlace",
   disabled: "Deshabilitado",
 };
+
+export function formatWatts(watts: number | null | undefined) {
+  if (watts == null) return "—";
+  return `${watts.toLocaleString("es-AR", { maximumFractionDigits: 1 })} W`;
+}
+
+const POE_STATUS_LABELS: Record<string, string> = {
+  off: "Sin equipo",
+  disabled: "Apagado",
+  fault: "Falla",
+};
+
+/** "3,6 W · clase 4" si alimenta un equipo; si no, el estado ("Sin equipo", "Apagado", "Falla"). */
+export function poeLabel(poe: LivePortPoe) {
+  if (poe.status !== "on") return POE_STATUS_LABELS[poe.status] ?? poe.status;
+  return [formatWatts(poe.powerW), poe.class != null ? `clase ${poe.class}` : null].filter(Boolean).join(" · ");
+}
+
+/** "17,7 W de 390 W" (o sólo lo entregado si el switch no informa la potencia nominal). */
+export function poeUsage(poe: { budgetW: number | null; usedW: number | null }) {
+  return poe.budgetW != null ? `${formatWatts(poe.usedW)} de ${formatWatts(poe.budgetW)}` : formatWatts(poe.usedW);
+}
 
 export function formatSpeed(mbps: number | null | undefined) {
   if (mbps == null || mbps <= 0) return "—";

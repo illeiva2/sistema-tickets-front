@@ -650,6 +650,10 @@ export default function ItNetworkLivePage() {
                     Varios equipos detrás (switch sin gestión, grabador…)
                   </span>
                   <span>
+                    <i className="netlive-legend__port" data-tone="up" data-poe aria-hidden="true" />
+                    Alimenta un equipo por PoE
+                  </span>
+                  <span>
                     <i className="netlive-legend__line" data-source="lldp" aria-hidden="true" />
                     Conexión confirmada por LLDP
                   </span>

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   formatSpeed,
+  formatWatts,
   linkPortLabel,
+  poeLabel,
+  poeUsage,
   portBlocks,
   portLabel,
   portTone,
@@ -183,6 +186,18 @@ describe("Red en vivo: puertos", () => {
 
   it("muestra los agregados no detallados como LAG", () => {
     expect(linkPortLabel(undefined, "lag130")).toBe("LAG 130");
+  });
+
+  it("PoE: watts con coma, el puerto que alimenta con su clase y el total del switch", () => {
+    expect(formatWatts(3.6)).toBe("3,6 W");
+    expect(formatWatts(17.75)).toBe("17,8 W");
+    expect(formatWatts(null)).toBe("—");
+    expect(poeLabel({ status: "on", powerW: 5, class: 4 })).toBe("5 W · clase 4");
+    expect(poeLabel({ status: "on", powerW: 3.2, class: null })).toBe("3,2 W");
+    expect(poeLabel({ status: "off", powerW: null, class: null })).toBe("Sin equipo");
+    expect(poeLabel({ status: "disabled", powerW: null, class: null })).toBe("Apagado");
+    expect(poeUsage({ budgetW: 390, usedW: 17.7 })).toBe("17,7 W de 390 W");
+    expect(poeUsage({ budgetW: null, usedW: 4.7 })).toBe("4,7 W");
   });
 });
 

@@ -426,6 +426,10 @@
   padding-top: 8px;
   border-top: 1px solid var(--net-line);
 }
+/* El PoE del switch va en su propia línea: como sexta celda correría "Alertas" a la segunda. */
+.netlive-node__meta-wide {
+  grid-column: 1 / -1;
+}
 .netlive-node__meta dt,
 .netlive-port-detail dt {
   color: var(--net-muted);
@@ -541,6 +545,18 @@
   width: 9px;
   height: 3px;
   border-radius: 1px;
+}
+/* Alimenta un equipo por PoE: un rayo abajo a la derecha (los puntos de arriba ya tienen dueño).
+   Más específico que los tonos: su `background` abreviado borraría la imagen. */
+.netlive-port[data-tone][data-poe],
+.netlive-legend__port[data-tone][data-poe] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 14'%3E%3Cpath d='M6.5.5 1 8h3.6l-1 5.5L9 6H5.4z' fill='%23ffd84d' stroke='%23001a10' stroke-width='1' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1px bottom 1px;
+  background-size: 7px 10px;
+}
+.netlive-legend__port[data-tone][data-poe] {
+  background-size: 5px 7px;
 }
 .netlive-port[aria-pressed="true"] {
   outline: 2px solid #ffffff;
