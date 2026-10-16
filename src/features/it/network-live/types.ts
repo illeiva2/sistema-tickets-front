@@ -34,6 +34,15 @@ export interface LivePort {
   pvid: number | null;
   neighbors: LiveNeighbor[];
   linkChangedAt: string | null;
+  /** PoE (colector 0.4+): si el puerto alimenta un equipo, cuánto entrega y su clase. */
+  poe?: LivePortPoe | null;
+}
+
+export interface LivePortPoe {
+  /** on = entrega; off = habilitado sin equipo; disabled = apagado a mano; fault = falla. */
+  status: "on" | "off" | "disabled" | "fault" | string;
+  powerW: number | null;
+  class: number | null;
 }
 
 export interface LiveDevice {
@@ -57,6 +66,8 @@ export interface LiveDevice {
   lastOkAt: string | null;
   /** Sin avisos aunque se caiga (lo decide un ADMIN). */
   alertsMuted: boolean;
+  /** Switches PoE: potencia nominal y la que está entregando, en W. */
+  poe?: { budgetW: number | null; usedW: number | null } | null;
   ports: LivePort[];
 }
 

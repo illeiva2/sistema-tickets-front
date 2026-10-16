@@ -3,6 +3,7 @@ import type { LiveEndpoint, LivePort } from "../types";
 import {
   PORT_TONE_LABELS,
   formatSpeed,
+  formatWatts,
   portBlocks,
   portLabel,
   portTone,
@@ -38,6 +39,7 @@ export function PortPanel({ ports, linkedPorts, endpointsByPort, selectedPort, o
               const count = endpoints.length
                 ? `, ${endpoints.length} equipo${endpoints.length === 1 ? "" : "s"}${shared ? " (compartido)" : ""}`
                 : "";
+              const poe = port.poe?.status === "on" ? `, PoE ${formatWatts(port.poe.powerW)}` : "";
               return (
                 <button
                   key={port.key}
@@ -48,9 +50,10 @@ export function PortPanel({ ports, linkedPorts, endpointsByPort, selectedPort, o
                   data-neighbor={port.neighbors.length > 0 || undefined}
                   data-endpoints={endpoints.length > 0 || undefined}
                   data-shared={shared || undefined}
+                  data-poe={port.poe?.status === "on" || undefined}
                   aria-pressed={selected}
-                  aria-label={`Puerto ${port.name}: ${PORT_TONE_LABELS[tone]}${port.linkUp ? `, ${formatSpeed(port.speedMbps)}` : ""}${count}`}
-                  title={`${port.name}${port.description ? ` · ${port.description}` : ""}${count ? ` ·${count.slice(1)}` : ""}`}
+                  aria-label={`Puerto ${port.name}: ${PORT_TONE_LABELS[tone]}${port.linkUp ? `, ${formatSpeed(port.speedMbps)}` : ""}${count}${poe}`}
+                  title={`${port.name}${port.description ? ` · ${port.description}` : ""}${count ? ` ·${count.slice(1)}` : ""}${poe ? ` ·${poe.slice(1)}` : ""}`}
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelect(selected ? null : port.key);

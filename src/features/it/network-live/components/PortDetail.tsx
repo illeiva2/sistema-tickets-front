@@ -12,6 +12,7 @@ import {
   formatSpeed,
   linkPortLabel,
   neighborTitle,
+  poeLabel,
   portTone,
   sortedNeighbors,
 } from "../ports";
@@ -72,6 +73,12 @@ export function PortDetail({ device, port, edge, endpoints, wifiByMac, highlight
           <dt>Último cambio</dt>
           <dd>{port.linkChangedAt ? formatHeartbeat(port.linkChangedAt) : "—"}</dd>
         </div>
+        {port.poe ? (
+          <div>
+            <dt>PoE</dt>
+            <dd data-poe={port.poe.status}>{poeLabel(port.poe)}</dd>
+          </div>
+        ) : null}
       </dl>
 
       {other ? (

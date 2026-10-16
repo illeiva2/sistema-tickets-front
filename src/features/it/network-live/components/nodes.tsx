@@ -5,7 +5,7 @@ import { formatHeartbeat, formatUptime } from "@/features/it/live/format";
 import type { TreeEdge, WanPort } from "../topology";
 import type { LiveDevice, LiveEndpoint, LiveWifiClient } from "../types";
 import { isWeak } from "../wifi";
-import { formatSpeed, portBlocks, portStats } from "../ports";
+import { formatSpeed, formatWatts, poeUsage, portBlocks, portStats } from "../ports";
 import { STACK_HANDLE_OFFSET, type NodeSize } from "../layout";
 import { PortDetail } from "./PortDetail";
 import { PortPanel } from "./PortPanel";
@@ -26,6 +26,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const PORT_PITCH = 26; // botón de 22 px + separación de 4 px
+const POE_ROW = 37; // la línea del PoE al pie del nodo (29 px) + separación de 8 px
 
 /**
  * Tamaño de cada nodo, el mismo que usa el diagramado: compacto, con el panel de puertos, o con
@@ -43,7 +44,13 @@ export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail
   return {
     width: Math.min(Math.max(360, panel + 36), 960),
     // Sin puerto elegido el detalle muestra los últimos cambios del equipo (y en un AP, sus clientes Wi-Fi).
-    height: 74 + 24 + rows * PORT_PITCH + (withDetail ? (withList ? 380 : 250) : device.role === "ap" ? 340 : 200),
+    // Un switch PoE suma la línea de su consumo, para que no se achique el detalle.
+    height:
+      74 +
+      24 +
+      rows * PORT_PITCH +
+      (withDetail ? (withList ? 380 : 250) : device.role === "ap" ? 340 : 200) +
+      (device.poe ? POE_ROW : 0),
   };
 }
 
@@ -91,7 +98,13 @@ function summary(device: LiveDevice, endpointsByPort: Map<string, LiveEndpoint[]
   }
   const { up, total } = portStats(device);
   const endpoints = [...endpointsByPort.values()].reduce((sum, list) => sum + list.length, 0);
-  return `${up}/${total} puertos con enlace${endpoints ? ` · ${endpoints} equipo${endpoints === 1 ? "" : "s"}` : ""}`;
+  return [
+    `${up}/${total} puertos con enlace`,
+    endpoints ? `${endpoints} equipo${endpoints === 1 ? "" : "s"}` : null,
+    device.poe?.usedW != null ? `PoE ${formatWatts(device.poe.usedW)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlowNode>) {
@@ -231,6 +244,12 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
                 )}
               </dd>
             </div>
+            {device.poe ? (
+              <div className="netlive-node__meta-wide">
+                <dt>PoE</dt>
+                <dd>{poeUsage(device.poe)}</dd>
+              </div>
+            ) : null}
           </dl>
         </div>
       ) : null}
