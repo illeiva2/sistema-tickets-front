@@ -1,11 +1,12 @@
 import React from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type Row,
   type SortingState,
 } from "@tanstack/react-table";
 import {
@@ -27,6 +28,7 @@ import { exportarCsv, type ColumnaCsv } from "@/features/lab/export";
 import { fmtInt, toDateInput } from "@/features/lab/format";
 import { SITES, SITE_LABEL, camposFiltrables } from "@/features/lab/samples";
 import { ExportButton } from "@/features/lab/components/LabLayout";
+import { FiltroFecha } from "@/features/lab/components/FiltroFecha";
 import { LabFetchingHint, LabProgressBar, LabTableSkeleton } from "@/features/lab/components/Loading";
 import { AnalisisPorEquipo, SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
 import { GridColumnsPanel } from "@/features/lab/components/GridColumnsPanel";
@@ -40,6 +42,7 @@ import {
   sanearVista,
   type ColumnaGrid,
 } from "@/features/lab/grid";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSavedView } from "@/lib/uiPreferences";
 import type { GridFilters, GridSampleDto, LabSite } from "@/features/lab/types";
 
@@ -52,6 +55,10 @@ import type { GridFilters, GridSampleDto, LabSite } from "@/features/lab/types";
  * hasta un tope) y el ordenamiento es local: con decenas de muestras por día
  * es instantáneo y evita paginar por columnas calculadas en el servidor.
  *
+ * Lo que sí se acota es lo que se DIBUJA: de a 100 filas, solo la tabla o solo
+ * las tarjetas, y cada fila se redibuja únicamente si cambia ella. Con 500
+ * muestras, dibujar todo en cada cambio congelaba la página uno o dos segundos.
+ *
  * En pantallas angostas la tabla se vuelve tarjetas con las primeras columnas
  * elegidas: la configuración es la misma, cambia cuánto entra.
  */
@@ -63,6 +70,12 @@ const CLASE_CONTROL =
 const DIAS_INICIALES = 30;
 const desdeInicial = () => toDateInput(new Date(Date.now() - DIAS_INICIALES * 24 * 60 * 60 * 1000));
 
+/** Filas que se dibujan de entrada y en cada "Mostrar más". Ordenar y exportar usan todas. */
+const PASO_FILAS = 100;
+
+/** El `md` de Tailwind: de ahí para arriba, tabla; más angosto, tarjetas. */
+const PANTALLA_ANCHA = "(min-width: 768px)";
+
 export const LabAnalysisPage: React.FC = () => {
   const { levelOf } = useModules();
   const nivel = levelOf("glutenlab");
@@ -73,6 +86,8 @@ export const LabAnalysisPage: React.FC = () => {
   const [panelColumnas, setPanelColumnas] = React.useState(false);
   const [expandidas, setExpandidas] = React.useState<Set<string>>(new Set());
   const [ficha, setFicha] = React.useState<string | null>(null);
+  const [limite, setLimite] = React.useState(PASO_FILAS);
+  const pantallaAncha = useMediaQuery(PANTALLA_ANCHA, true);
 
   React.useEffect(() => {
     const t = window.setTimeout(() => {
@@ -82,12 +97,24 @@ export const LabAnalysisPage: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [texto]);
 
-  const [kindsQ, gridQ] = useQueries({
-    queries: [
-      { queryKey: labKeys.samplesKinds, queryFn: () => labApi.samples.kinds(), staleTime: 5 * 60_000 },
-      { queryKey: labKeys.samplesGrid(filtros), queryFn: () => labApi.samples.grid(filtros) },
-    ],
+  // Dos useQuery y no un useQueries: con useQueries (el arreglo de consultas se
+  // arma de nuevo en cada render) la página se redibujaba en bucle mientras la
+  // grilla esperaba respuesta. Se vio en los tests, con React en desarrollo.
+  const kindsQ = useQuery({
+    queryKey: labKeys.samplesKinds,
+    queryFn: () => labApi.samples.kinds(),
+    staleTime: 5 * 60_000,
   });
+  // Al cambiar el filtro queda la grilla anterior (atenuada) hasta que llega la
+  // nueva: vaciarla y volver a llenarla cuesta más que la consulta.
+  const gridQ = useQuery({
+    queryKey: labKeys.samplesGrid(filtros),
+    queryFn: () => labApi.samples.grid(filtros),
+    placeholderData: keepPreviousData,
+  });
+
+  // Un filtro nuevo vuelve a las primeras filas.
+  React.useEffect(() => setLimite(PASO_FILAS), [filtros]);
 
   const errores = [kindsQ.error, gridQ.error].filter(Boolean);
   React.useEffect(() => {
@@ -117,22 +144,27 @@ export const LabAnalysisPage: React.FC = () => {
   );
   const sorting: SortingState = vista.sort ?? [];
 
+  /** Las columnas elegidas, en orden: las usan la tabla, las tarjetas y el CSV. */
+  const columnasVisibles = React.useMemo(
+    () => vista.columns.map((id) => porId.get(id)).filter((c): c is ColumnaGrid => !!c),
+    [vista.columns, porId],
+  );
+
+  // No dependen de qué filas están abiertas: si dependieran, abrir una fila
+  // redibujaría la tabla entera. El chevrón de abrir lo pone la fila.
   const columnDefs = React.useMemo<ColumnDef<GridSampleDto>[]>(
     () =>
-      vista.columns
-        .map((id) => porId.get(id))
-        .filter((c): c is ColumnaGrid => !!c)
-        .map((c) => ({
-          id: c.id,
-          accessorFn: (r) => c.valor(r),
-          header: () => <Encabezado c={c} />,
-          cell: ({ row }) => <Celda c={c} r={row.original} expandida={expandidas.has(row.original.id)} />,
-          // "basic" compara con < y >: sirve para números y para fechas ISO. "text" ignora mayúsculas.
-          sortingFn: c.tipo === "texto" ? "text" : "basic",
-          sortUndefined: "last",
-          enableSorting: true,
-        })),
-    [vista.columns, porId, expandidas],
+      columnasVisibles.map((c) => ({
+        id: c.id,
+        accessorFn: (r) => c.valor(r),
+        header: () => <Encabezado c={c} />,
+        cell: ({ row }) => <Celda c={c} r={row.original} />,
+        // "basic" compara con < y >: sirve para números y para fechas ISO. "text" ignora mayúsculas.
+        sortingFn: c.tipo === "texto" ? "text" : "basic",
+        sortUndefined: "last",
+        enableSorting: true,
+      })),
+    [columnasVisibles],
   );
 
   const table = useReactTable({
@@ -150,14 +182,21 @@ export const LabAnalysisPage: React.FC = () => {
   });
 
   const filas = table.getRowModel().rows;
+  const visibles = filas.slice(0, limite);
   const cambiarColumnas = (ids: string[]) => vistaGuardada.guardar({ ...vista, columns: ids });
-  const alternar = (id: string) =>
-    setExpandidas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // Estables a propósito: las filas están memorizadas y una función nueva en
+  // cada render las volvería a dibujar todas.
+  const alternar = React.useCallback(
+    (id: string) =>
+      setExpandidas((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    [],
+  );
+  const abrirFicha = React.useCallback((accession: string) => setFicha(accession), []);
 
   // Listas marcadas como filtro en el catálogo ("Tipo de ingreso"): un desplegable cada una.
   const filtrables = React.useMemo(() => camposFiltrables(kinds, filtros.kindId), [kinds, filtros.kindId]);
@@ -184,14 +223,11 @@ export const LabAnalysisPage: React.FC = () => {
   };
 
   const exportar = () => {
-    const columnas: ColumnaCsv<GridSampleDto>[] = vista.columns
-      .map((id) => porId.get(id))
-      .filter((c): c is ColumnaGrid => !!c)
-      .map((c) => ({
-        header: c.unit ? `${c.label} (${c.unit})` : c.label,
-        value: (r) => (c.tipo === "numero" ? c.valor(r) : c.texto(r)),
-        decimals: c.decimals ?? 2,
-      }));
+    const columnas: ColumnaCsv<GridSampleDto>[] = columnasVisibles.map((c) => ({
+      header: c.unit ? `${c.label} (${c.unit})` : c.label,
+      value: (r) => (c.tipo === "numero" ? c.valor(r) : c.texto(r)),
+      decimals: c.decimals ?? 2,
+    }));
     exportarCsv(
       filas.map((f) => f.original),
       columnas,
@@ -309,20 +345,18 @@ export const LabAnalysisPage: React.FC = () => {
           </label>
           <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
             Desde
-            <input
-              type="date"
+            <FiltroFecha
               className={CLASE_CONTROL}
-              value={filtros.from ?? ""}
-              onChange={(e) => setFiltros((f) => ({ ...f, from: e.target.value || undefined }))}
+              value={filtros.from}
+              onChange={(from) => setFiltros((f) => ({ ...f, from }))}
             />
           </label>
           <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
             Hasta
-            <input
-              type="date"
+            <FiltroFecha
               className={CLASE_CONTROL}
-              value={filtros.to ?? ""}
-              onChange={(e) => setFiltros((f) => ({ ...f, to: e.target.value || undefined }))}
+              value={filtros.to}
+              onChange={(to) => setFiltros((f) => ({ ...f, to }))}
             />
           </label>
           {hayFiltros && (
@@ -371,90 +405,92 @@ export const LabAnalysisPage: React.FC = () => {
             {hayFiltros ? "Sin muestras para el filtro aplicado" : "Sin muestras en los últimos 30 días."}
           </div>
         ) : (
-          <>
-            {/* Tabla: de md en adelante. Scroll horizontal con la accesión fija a la izquierda. */}
-            <div className="hidden md:block overflow-x-auto max-h-[640px] overflow-y-auto">
-              <table className="w-full text-left border-separate border-spacing-0">
-                <thead className="sticky top-0 z-10">
-                  {table.getHeaderGroups().map((hg) => (
-                    <tr key={hg.id} className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
-                      {hg.headers.map((h, i) => {
-                        const orden = h.column.getIsSorted();
-                        return (
-                          <th
-                            key={h.id}
-                            className={`font-medium px-2 py-2 whitespace-nowrap border-b border-border bg-muted/40 backdrop-blur select-none ${
-                              i === 0 ? "sticky left-0 z-20 pl-4 bg-card border-r border-border/60" : ""
-                            } ${h.column.getCanSort() ? "cursor-pointer hover:text-foreground" : ""}`}
-                            onClick={h.column.getToggleSortingHandler()}
-                            title={h.column.getCanSort() ? "Clic para ordenar · Shift + clic para agregar criterio" : undefined}
-                            aria-sort={orden === "asc" ? "ascending" : orden === "desc" ? "descending" : "none"}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              {flexRender(h.column.columnDef.header, h.getContext())}
-                              {orden === "asc" ? (
-                                <ArrowUp size={11} className="text-foreground" />
-                              ) : orden === "desc" ? (
-                                <ArrowDown size={11} className="text-foreground" />
-                              ) : (
-                                <ArrowUpDown size={11} className="opacity-30" />
-                              )}
-                            </span>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {filas.map((row) => {
-                    const abierta = expandidas.has(row.original.id);
-                    return (
-                      <React.Fragment key={row.id}>
-                        <tr
-                          className="hover:bg-muted/40 transition-colors cursor-pointer"
-                          onClick={() => alternar(row.original.id)}
-                          aria-expanded={abierta}
-                        >
-                          {row.getVisibleCells().map((cell, i) => (
-                            <td
-                              key={cell.id}
-                              className={`px-2 py-2 text-[12.5px] whitespace-nowrap border-b border-border/60 align-top ${
-                                i === 0 ? "sticky left-0 z-[1] pl-4 bg-card border-r border-border/60" : ""
-                              }`}
+          // Mientras llega el filtro nuevo se ve el anterior, atenuado (y la barra de arriba avisa).
+          <div
+            className={`transition-opacity ${gridQ.isPlaceholderData ? "opacity-60" : ""}`}
+            aria-busy={gridQ.isPlaceholderData || undefined}
+          >
+            {pantallaAncha ? (
+              /* Tabla: de md en adelante. Scroll horizontal con la accesión fija a la izquierda. */
+              <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
+                <table className="w-full text-left border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-10">
+                    {table.getHeaderGroups().map((hg) => (
+                      <tr key={hg.id} className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                        {hg.headers.map((h, i) => {
+                          const orden = h.column.getIsSorted();
+                          return (
+                            <th
+                              key={h.id}
+                              className={`font-medium px-2 py-2 whitespace-nowrap border-b border-border bg-muted/40 backdrop-blur select-none ${
+                                i === 0 ? "sticky left-0 z-20 pl-4 bg-card border-r border-border/60" : ""
+                              } ${h.column.getCanSort() ? "cursor-pointer hover:text-foreground" : ""}`}
+                              onClick={h.column.getToggleSortingHandler()}
+                              title={h.column.getCanSort() ? "Clic para ordenar · Shift + clic para agregar criterio" : undefined}
+                              aria-sort={orden === "asc" ? "ascending" : orden === "desc" ? "descending" : "none"}
                             >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
-                          ))}
-                        </tr>
-                        {abierta && (
-                          <tr>
-                            <td colSpan={columnDefs.length} className="px-4 py-3 bg-muted/20 border-b border-border">
-                              <FilaExpandida accession={row.original.accession} onFicha={() => setFicha(row.original.accession)} />
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Tarjetas: pantallas angostas. Mismas columnas elegidas, las primeras que entran. */}
-            <ul className="md:hidden divide-y divide-border/60">
-              {filas.map((row) => (
-                <Tarjeta
-                  key={row.id}
-                  r={row.original}
-                  columnas={vista.columns.map((id) => porId.get(id)).filter((c): c is ColumnaGrid => !!c)}
-                  abierta={expandidas.has(row.original.id)}
-                  onToggle={() => alternar(row.original.id)}
-                  onFicha={() => setFicha(row.original.accession)}
-                />
-              ))}
-            </ul>
-          </>
+                              <span className="inline-flex items-center gap-1">
+                                {flexRender(h.column.columnDef.header, h.getContext())}
+                                {orden === "asc" ? (
+                                  <ArrowUp size={11} className="text-foreground" />
+                                ) : orden === "desc" ? (
+                                  <ArrowDown size={11} className="text-foreground" />
+                                ) : (
+                                  <ArrowUpDown size={11} className="opacity-30" />
+                                )}
+                              </span>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {visibles.map((row) => (
+                      <FilaGrilla
+                        key={row.id}
+                        row={row}
+                        abierta={expandidas.has(row.original.id)}
+                        columnas={columnDefs.length}
+                        onToggle={alternar}
+                        onFicha={abrirFicha}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Tarjetas: pantallas angostas. Mismas columnas elegidas, las primeras que entran. */
+              <ul className="divide-y divide-border/60">
+                {visibles.map((row) => (
+                  <Tarjeta
+                    key={row.id}
+                    r={row.original}
+                    columnas={columnasVisibles}
+                    abierta={expandidas.has(row.original.id)}
+                    onToggle={alternar}
+                    onFicha={abrirFicha}
+                  />
+                ))}
+              </ul>
+            )}
+            {/* Centrado: abajo a la derecha está el botón flotante del asistente y lo taparía. */}
+            {filas.length > visibles.length && (
+              <div className="flex flex-wrap items-center justify-center gap-3 px-3 py-2 border-t border-border">
+                <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                  Mostrando {fmtInt(visibles.length)} de {fmtInt(filas.length)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11.5px]"
+                  onClick={() => setLimite((l) => l + PASO_FILAS)}
+                >
+                  Mostrar {fmtInt(Math.min(PASO_FILAS, filas.length - visibles.length))} más
+                </Button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -489,16 +525,66 @@ const Encabezado: React.FC<{ c: ColumnaGrid }> = ({ c }) => (
   </span>
 );
 
-/** La accesión lleva el chevrón de expandir y la advertencia de alteración; los números, la marca de "dudoso". */
-const Celda: React.FC<{ c: ColumnaGrid; r: GridSampleDto; expandida: boolean }> = ({ c, r, expandida }) => {
+/**
+ * Una fila de la tabla y, si está abierta, sus análisis. Memorizada: abrir otra
+ * fila, tipear en el buscador o guardar la vista no la vuelve a dibujar. Por eso
+ * `onToggle` y `onFicha` reciben el dato en vez de cerrarlo en una función nueva.
+ */
+const FilaGrilla = React.memo(function FilaGrilla({
+  row,
+  abierta,
+  columnas,
+  onToggle,
+  onFicha,
+}: {
+  row: Row<GridSampleDto>;
+  abierta: boolean;
+  columnas: number;
+  onToggle: (id: string) => void;
+  onFicha: (accession: string) => void;
+}) {
+  const r = row.original;
+  return (
+    <>
+      <tr className="hover:bg-muted/40 transition-colors cursor-pointer" onClick={() => onToggle(r.id)} aria-expanded={abierta}>
+        {row.getVisibleCells().map((cell, i) => (
+          <td
+            key={cell.id}
+            className={`px-2 py-2 text-[12.5px] whitespace-nowrap border-b border-border/60 align-top ${
+              i === 0 ? "sticky left-0 z-[1] pl-4 bg-card border-r border-border/60" : ""
+            }`}
+          >
+            {cell.column.id === "accession" ? (
+              <span className="inline-flex items-center gap-1.5">
+                {abierta ? (
+                  <ChevronDown size={13} className="text-muted-foreground" />
+                ) : (
+                  <ChevronRight size={13} className="text-muted-foreground" />
+                )}
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </span>
+            ) : (
+              flexRender(cell.column.columnDef.cell, cell.getContext())
+            )}
+          </td>
+        ))}
+      </tr>
+      {abierta && (
+        <tr>
+          <td colSpan={columnas} className="px-4 py-3 bg-muted/20 border-b border-border">
+            <FilaExpandida accession={r.accession} onFicha={() => onFicha(r.accession)} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+});
+
+/** La accesión lleva la advertencia de alteración (el chevrón lo pone la fila); los números, la marca de "dudoso". */
+const Celda: React.FC<{ c: ColumnaGrid; r: GridSampleDto }> = ({ c, r }) => {
   if (c.id === "accession") {
     return (
       <span className="inline-flex items-center gap-1.5 font-mono font-semibold tracking-wide">
-        {expandida ? (
-          <ChevronDown size={13} className="text-muted-foreground" />
-        ) : (
-          <ChevronRight size={13} className="text-muted-foreground" />
-        )}
         {r.accession}
         {r.conditions && r.conditions.length > 0 && (
           <span
@@ -572,18 +658,27 @@ const FilaExpandida: React.FC<{ accession: string; onFicha: () => void }> = ({ a
   );
 };
 
-/** Versión angosta de la fila: accesión y nombre arriba, las primeras columnas elegidas abajo. */
-const Tarjeta: React.FC<{
+/**
+ * Versión angosta de la fila: accesión y nombre arriba, las primeras columnas
+ * elegidas abajo. Memorizada como `FilaGrilla`, por lo mismo.
+ */
+const Tarjeta = React.memo(function Tarjeta({
+  r,
+  columnas,
+  abierta,
+  onToggle,
+  onFicha,
+}: {
   r: GridSampleDto;
   columnas: ColumnaGrid[];
   abierta: boolean;
-  onToggle: () => void;
-  onFicha: () => void;
-}> = ({ r, columnas, abierta, onToggle, onFicha }) => {
+  onToggle: (id: string) => void;
+  onFicha: (accession: string) => void;
+}) {
   const datos = columnas.filter((c) => !["accession", "displayName", "conditions", "notes"].includes(c.id)).slice(0, 6);
   return (
     <li className="px-3 py-2.5">
-      <button type="button" className="w-full text-left" onClick={onToggle} aria-expanded={abierta}>
+      <button type="button" className="w-full text-left" onClick={() => onToggle(r.id)} aria-expanded={abierta}>
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 font-mono font-semibold tracking-wide text-[13px]">
             {abierta ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -603,7 +698,7 @@ const Tarjeta: React.FC<{
                 {c.unit ? ` (${c.unit})` : ""}
               </dt>
               <dd className={`text-[12.5px] ${c.tipo === "numero" ? "tabular-nums" : ""} truncate`}>
-                <Celda c={c} r={r} expandida={false} />
+                <Celda c={c} r={r} />
               </dd>
             </div>
           ))}
@@ -611,12 +706,12 @@ const Tarjeta: React.FC<{
       </button>
       {abierta && (
         <div className="mt-2 pt-2 border-t border-border/60">
-          <FilaExpandida accession={r.accession} onFicha={onFicha} />
+          <FilaExpandida accession={r.accession} onFicha={() => onFicha(r.accession)} />
         </div>
       )}
     </li>
   );
-};
+});
 
 /** Estado del guardado en el perfil. Chico y a un costado: informa, no interrumpe. */
 const EstadoVista: React.FC<{ estado: ReturnType<typeof useSavedView>["estado"]; personalizada: boolean }> = ({
