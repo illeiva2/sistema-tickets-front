@@ -474,8 +474,9 @@ export const LabAnalysisPage: React.FC = () => {
                 ))}
               </ul>
             )}
+            {/* Centrado: abajo a la derecha está el botón flotante del asistente y lo taparía. */}
             {filas.length > visibles.length && (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border">
+              <div className="flex flex-wrap items-center justify-center gap-3 px-3 py-2 border-t border-border">
                 <span className="text-[11.5px] text-muted-foreground tabular-nums">
                   Mostrando {fmtInt(visibles.length)} de {fmtInt(filas.length)}
                 </span>
