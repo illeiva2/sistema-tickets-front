@@ -366,13 +366,44 @@ export interface SampleMeasurementDto {
   analyzedAt: string;
   /** Solo en las cargadas a mano (origen MANUAL): quién las cargó. */
   createdBy?: { id: string; name: string } | null;
+  /** Solo en las cargadas a mano: lo que se tipeó, tal cual. Null en las anteriores al formulario por cápsulas. */
+  manualInput?: ManualInputDto | null;
   params: SampleMeasurementParamDto[];
 }
 
-/** Un análisis manual (termobalanza, estufa, colorímetro, PMG): valores por código; null = no se midió. */
+/** Una determinación por cápsula, como en la planilla. Pesos en gramos, como texto decimal con punto. */
+export interface ManualCapsulaDto {
+  /** Número o letra de la cápsula ("D", "101", "ISO"). */
+  capsula?: string;
+  vacia?: string;
+  muestra?: string;
+  /** Al salir de la estufa (con la muestra seca) o de la mufla (con las cenizas). */
+  final?: string;
+}
+
+export interface ManualCenizasDto extends ManualCapsulaDto {
+  /** % de humedad para la base seca, solo si no hubo estufa. */
+  humedad?: string;
+}
+
+/** Lo tipeado en un análisis manual: valores sueltos por código y las dos determinaciones por cápsula. */
+export interface ManualInputDto {
+  v: 1;
+  values: Record<string, string>;
+  humedad?: ManualCapsulaDto;
+  cenizas?: ManualCenizasDto;
+}
+
+/**
+ * Un análisis manual a guardar: los números como se tipearon ("14,30"), para no
+ * perder decimales; vacío o null = no se midió. Las cápsulas pueden ir a medio
+ * cargar (los pesos de la balanza primero, el final después).
+ */
 export interface ManualMeasurementInput {
   analyzedAt?: string;
-  values: Record<string, number | null>;
+  values: Record<string, string | null>;
+  humedad?: ManualCapsulaDto | null;
+  cenizas?: ManualCenizasDto | null;
 }
 
 export interface SampleDetailDto extends SampleDto {
