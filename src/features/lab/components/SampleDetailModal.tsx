@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui";
 import { labApi, labError, labKeys } from "../api";
 import { fmtDateTime, fmtNumber } from "../format";
+import { detalleCapsula, etiquetaManual, textoManual, ultimoManual } from "../manual";
 import {
   SITE_LABEL,
   SOURCE_LABEL,
@@ -31,9 +32,10 @@ import { imprimirEtiqueta } from "../etiqueta";
  * registra, tipea la accesión en el equipo y ve aparecer el resultado acá sin
  * cerrar y volver a abrir.
  *
- * Los análisis de equipos sin conexión (termobalanza, estufa, colorímetro,
- * PMG) se cargan desde acá con "Análisis manual": quedan como una medición
- * más, con quién la cargó, y solo esas se corrigen o borran.
+ * Los análisis de equipos sin conexión (termobalanza, estufa, mufla,
+ * colorímetro, PMG) se cargan desde acá con "Análisis manual": quedan como una
+ * medición más, con quién la cargó, y solo esas se corrigen o borran. Si la
+ * muestra ya tiene uno, el botón lo abre para completarlo o corregirlo.
  */
 
 const REFRESCO_MS = 30_000;
@@ -125,7 +127,7 @@ export const SampleDetailModal: React.FC<{
             </Button>
           )}
           {canEdit && data && (
-            <Button size="sm" variant="outline" onClick={() => setManual({ editing: null })}>
+            <Button size="sm" variant="outline" onClick={() => setManual({ editing: ultimoManual(data) })}>
               <FlaskConical size={13} className="mr-1.5" />
               Análisis manual
             </Button>
@@ -340,7 +342,7 @@ export const AnalisisPorEquipo: React.FC<{ sample: SampleDetailDto; acciones?: A
           Todavía no hay análisis enlazados. Tipeá{" "}
           <span className="font-mono font-medium text-foreground">{sample.accession}</span> como
           código de muestra en el equipo: apenas llegue la medición, aparece acá.
-          {acciones && " Lo de termobalanza, estufa o colorímetro se carga con “Análisis manual”."}
+          {acciones && " Lo de termobalanza, estufa, mufla o colorímetro se carga con “Análisis manual”."}
         </div>
       ) : (
         <div className="space-y-3">
@@ -388,7 +390,7 @@ const TarjetaEquipo: React.FC<{
       <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
         <span className="text-[12.5px] font-semibold">{SOURCE_LABEL[source]}</span>
         <span className="text-[11px] text-muted-foreground truncate">
-          {esManual ? "Termobalanza, estufa, colorímetro, PMG" : (instrumento ?? "")}
+          {esManual ? "Termobalanza, estufa, mufla, colorímetro, PMG" : (instrumento ?? "")}
           {mediciones.length > 1 && ` · ${mediciones.length} mediciones`}
         </span>
       </div>
@@ -440,15 +442,24 @@ const TarjetaEquipo: React.FC<{
                   }`}
                   title={p.isImplausible ? "Fuera del rango de calibración" : undefined}
                 >
-                  <span className="text-muted-foreground">{etiquetaParam(p.code)}</span>
+                  <span className="text-muted-foreground">
+                    {esManual ? etiquetaManual(p.code) : etiquetaParam(p.code)}
+                  </span>
                   <span className="font-semibold tabular-nums">
-                    {fmtNumber(p.value, decimalesParam(p.code))}
+                    {/* Lo manual, como se cargó: sin redondear a los decimales del catálogo. */}
+                    {esManual ? textoManual(m, p) : fmtNumber(p.value, decimalesParam(p.code))}
                   </span>
                   {p.unit && <span className="text-[10.5px] text-muted-foreground">{p.unit}</span>}
                   {p.isImplausible && <AlertTriangle size={11} className="text-amber-600 self-center" />}
                 </span>
               ))}
             </div>
+            {esManual && m.manualInput && (m.manualInput.humedad || m.manualInput.cenizas) && (
+              <div className="mt-1.5 space-y-0.5 text-[11.5px] text-muted-foreground tabular-nums">
+                {m.manualInput.humedad && <p>Estufa: {detalleCapsula(m.manualInput.humedad)}</p>}
+                {m.manualInput.cenizas && <p>Mufla: {detalleCapsula(m.manualInput.cenizas, true)}</p>}
+              </div>
+            )}
           </div>
         ))}
       </div>
