@@ -11,8 +11,10 @@ vi.mock("../src/hooks/useAuth", () => ({
   useAuth: () => ({ user: { id: "user-1", role: "USER" } }),
 }));
 
+// Nivel en el módulo: VIEWER salvo en los tests de edición, que usan QC.
+const modulo = vi.hoisted(() => ({ nivel: "VIEWER" }));
 vi.mock("../src/contexts/ModulesContext", () => ({
-  useModules: () => ({ levelOf: () => "VIEWER", has: () => true, modules: [], isLoading: false }),
+  useModules: () => ({ levelOf: () => modulo.nivel, has: () => true, modules: [], isLoading: false }),
 }));
 
 vi.mock("react-hot-toast", () => ({
@@ -198,5 +200,76 @@ describe("LabAnalysisPage: filtrar no cuelga la página", () => {
     // Solo se redibuja la fila abierta: una fecha de toma, no las treinta.
     expect(formatos.mock.calls.length).toBeLessThanOrEqual(2);
     expect(filasTabla()[0]).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+// Pedido de balanza: encuentran la muestra en Análisis (por la patente) y le
+// completan la carta de porte o el ticket sin anotar el número e ir a Muestras.
+describe("LabAnalysisPage: editar la ficha desde la grilla", () => {
+  const matchMediaOriginal = window.matchMedia;
+  const tipo = {
+    id: "lsk_interna",
+    code: "INTERNA",
+    name: "Muestra interna de proceso",
+    description: null,
+    defaultSite: "MOLINO",
+    lockSite: true,
+    sortOrder: 1,
+    isActive: true,
+    fields: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    modulo.nivel = "QC";
+    pantalla(true);
+    apiMock.get.mockImplementation((url: string) => {
+      if (url.endsWith("/samples/kinds")) return ok([tipo]);
+      if (url.endsWith("/samples/grid")) return ok(grilla(3));
+      if (url === "/api/me/ui-preferences") return ok({ theme: "quiet-pro", darkMode: null, savedViews: {} });
+      if (url.startsWith("/api/glutenlab/samples/")) return ok({ ...muestra(0), measurements: [] });
+      return ok([]);
+    });
+    apiMock.put.mockImplementation(() => ok({}));
+  });
+
+  afterEach(() => {
+    modulo.nivel = "VIEWER";
+    window.matchMedia = matchMediaOriginal;
+  });
+
+  it("con QC, el lápiz de la fila abre el formulario de la ficha sin abrir la fila", async () => {
+    renderPage();
+    await waitFor(() => expect(filasTabla()).toHaveLength(3));
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar ficha de M-0001-0" }));
+
+    expect(await screen.findByText("Editar M-0001-0")).toBeInTheDocument();
+    expect(filasTabla()[0]).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("con QC, la fila abierta y la ficha completa ofrecen editar", async () => {
+    renderPage();
+    await waitFor(() => expect(filasTabla()).toHaveLength(3));
+
+    fireEvent.click(filasTabla()[0]);
+    expect(await screen.findByRole("button", { name: "Editar ficha" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir ficha completa" }));
+    // La ficha abierta desde acá trae las acciones de quien puede editar, como en Muestras.
+    expect(await screen.findByRole("button", { name: /Análisis manual/ })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar ficha" }).at(-1)!);
+    expect(await screen.findByText("Editar M-0001-0")).toBeInTheDocument();
+  });
+
+  it("con VIEWER no hay lápiz ni botón de editar", async () => {
+    modulo.nivel = "VIEWER";
+    renderPage();
+    await waitFor(() => expect(filasTabla()).toHaveLength(3));
+
+    expect(screen.queryByRole("button", { name: /Editar ficha de/ })).not.toBeInTheDocument();
+    fireEvent.click(filasTabla()[0]);
+    await screen.findByRole("button", { name: "Abrir ficha completa" });
+    expect(screen.queryByRole("button", { name: "Editar ficha" })).not.toBeInTheDocument();
   });
 });
