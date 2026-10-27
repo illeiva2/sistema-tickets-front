@@ -202,7 +202,7 @@ export const LabSamplesPage: React.FC = () => {
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Accesión (M-0012-4) o texto: Tapera, empresa, silo…"
+              placeholder="Accesión, patente, CTG, ticket, chofer o texto: Tapera, empresa…"
               className={`${CLASE_CONTROL} w-full pl-8`}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}

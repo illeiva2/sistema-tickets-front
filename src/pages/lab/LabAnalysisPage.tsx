@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
   Columns3,
+  Pencil,
   Search,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import { ExportButton } from "@/features/lab/components/LabLayout";
 import { FiltroFecha } from "@/features/lab/components/FiltroFecha";
 import { LabFetchingHint, LabProgressBar, LabTableSkeleton } from "@/features/lab/components/Loading";
 import { AnalisisPorEquipo, SampleDetailModal } from "@/features/lab/components/SampleDetailModal";
+import { SampleFormModal } from "@/features/lab/components/SampleFormModal";
 import { GridColumnsPanel } from "@/features/lab/components/GridColumnsPanel";
 import { NoLigaBadge } from "@/features/lab/components/NoLigaBadge";
 import { RechazadoBadge } from "@/features/lab/components/RechazadoBadge";
@@ -44,7 +46,7 @@ import {
 } from "@/features/lab/grid";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useSavedView } from "@/lib/uiPreferences";
-import type { GridFilters, GridSampleDto, LabSite } from "@/features/lab/types";
+import type { GridFilters, GridSampleDto, LabSite, SampleDto } from "@/features/lab/types";
 
 /**
  * Análisis por muestra: la vista de consulta para comercio de granos.
@@ -86,6 +88,9 @@ export const LabAnalysisPage: React.FC = () => {
   const [panelColumnas, setPanelColumnas] = React.useState(false);
   const [expandidas, setExpandidas] = React.useState<Set<string>>(new Set());
   const [ficha, setFicha] = React.useState<string | null>(null);
+  // Edición de la ficha desde acá: en balanza encuentran la muestra en esta grilla (por la
+  // patente) y le completan la carta de porte o el ticket sin pasar por Muestras.
+  const [editando, setEditando] = React.useState<SampleDto | null>(null);
   const [limite, setLimite] = React.useState(PASO_FILAS);
   const pantallaAncha = useMediaQuery(PANTALLA_ANCHA, true);
 
@@ -197,6 +202,10 @@ export const LabAnalysisPage: React.FC = () => {
     [],
   );
   const abrirFicha = React.useCallback((accession: string) => setFicha(accession), []);
+  const editarFicha = React.useCallback((s: SampleDto) => {
+    setFicha(null);
+    setEditando(s);
+  }, []);
 
   // Listas marcadas como filtro en el catálogo ("Tipo de ingreso"): un desplegable cada una.
   const filtrables = React.useMemo(() => camposFiltrables(kinds, filtros.kindId), [kinds, filtros.kindId]);
@@ -285,7 +294,7 @@ export const LabAnalysisPage: React.FC = () => {
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Accesión (A-0012-2) o texto: empresa, patente, silo…"
+              placeholder="Accesión, patente, CTG, ticket, chofer o texto: empresa, silo…"
               className={`${CLASE_CONTROL} w-full pl-8`}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
@@ -454,6 +463,7 @@ export const LabAnalysisPage: React.FC = () => {
                         columnas={columnDefs.length}
                         onToggle={alternar}
                         onFicha={abrirFicha}
+                        onEditar={puedeEditar ? editarFicha : undefined}
                       />
                     ))}
                   </tbody>
@@ -470,6 +480,7 @@ export const LabAnalysisPage: React.FC = () => {
                     abierta={expandidas.has(row.original.id)}
                     onToggle={alternar}
                     onFicha={abrirFicha}
+                    onEditar={puedeEditar ? editarFicha : undefined}
                   />
                 ))}
               </ul>
@@ -494,17 +505,19 @@ export const LabAnalysisPage: React.FC = () => {
         )}
       </div>
 
-      {ficha && (
+      {ficha && !editando && (
         <SampleDetailModal
           accession={ficha}
           kinds={kinds}
-          canEdit={false}
-          onEdit={() => undefined}
+          canEdit={puedeEditar}
+          onEdit={editarFicha}
           onClose={() => setFicha(null)}
         />
       )}
-      {/* puedeEditar se reserva para cuando la grilla permita editar la ficha desde acá. */}
-      {puedeEditar && null}
+      {/* Al guardar, el formulario refresca todo lo de muestras: la fila de la grilla incluida. */}
+      {editando && kinds.length > 0 && (
+        <SampleFormModal kinds={kinds} editing={editando} onClose={() => setEditando(null)} />
+      )}
     </div>
   );
 };
@@ -528,7 +541,9 @@ const Encabezado: React.FC<{ c: ColumnaGrid }> = ({ c }) => (
 /**
  * Una fila de la tabla y, si está abierta, sus análisis. Memorizada: abrir otra
  * fila, tipear en el buscador o guardar la vista no la vuelve a dibujar. Por eso
- * `onToggle` y `onFicha` reciben el dato en vez de cerrarlo en una función nueva.
+ * `onToggle`, `onFicha` y `onEditar` reciben el dato en vez de cerrarlo en una
+ * función nueva. `onEditar` solo viene con nivel QC: el lápiz edita la ficha sin
+ * abrir la fila.
  */
 const FilaGrilla = React.memo(function FilaGrilla({
   row,
@@ -536,12 +551,14 @@ const FilaGrilla = React.memo(function FilaGrilla({
   columnas,
   onToggle,
   onFicha,
+  onEditar,
 }: {
   row: Row<GridSampleDto>;
   abierta: boolean;
   columnas: number;
   onToggle: (id: string) => void;
   onFicha: (accession: string) => void;
+  onEditar?: (s: GridSampleDto) => void;
 }) {
   const r = row.original;
   return (
@@ -562,6 +579,20 @@ const FilaGrilla = React.memo(function FilaGrilla({
                   <ChevronRight size={13} className="text-muted-foreground" />
                 )}
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                {onEditar && (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground p-0.5 -my-0.5"
+                    title="Editar ficha"
+                    aria-label={`Editar ficha de ${r.accession}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditar(r);
+                    }}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
               </span>
             ) : (
               flexRender(cell.column.columnDef.cell, cell.getContext())
@@ -572,7 +603,11 @@ const FilaGrilla = React.memo(function FilaGrilla({
       {abierta && (
         <tr>
           <td colSpan={columnas} className="px-4 py-3 bg-muted/20 border-b border-border">
-            <FilaExpandida accession={r.accession} onFicha={() => onFicha(r.accession)} />
+            <FilaExpandida
+              accession={r.accession}
+              onFicha={() => onFicha(r.accession)}
+              onEditar={onEditar ? () => onEditar(r) : undefined}
+            />
           </td>
         </tr>
       )}
@@ -642,14 +677,24 @@ const Celda: React.FC<{ c: ColumnaGrid; r: GridSampleDto }> = ({ c, r }) => {
 };
 
 /** Al expandir se piden los análisis crudos de esa muestra: la grilla solo trae el valor por columna. */
-const FilaExpandida: React.FC<{ accession: string; onFicha: () => void }> = ({ accession, onFicha }) => {
+const FilaExpandida: React.FC<{ accession: string; onFicha: () => void; onEditar?: () => void }> = ({
+  accession,
+  onFicha,
+  onEditar,
+}) => {
   const q = useQuery({ queryKey: labKeys.sample(accession), queryFn: () => labApi.samples.get(accession) });
   return (
     <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
       {q.isPending && <LabTableSkeleton rows={2} cols={3} />}
       {q.error && <p className="text-[12.5px] text-red-700 dark:text-red-300">{labError(q.error)}</p>}
       {q.data && <AnalisisPorEquipo sample={q.data} />}
-      <div className="text-right">
+      <div className="flex justify-end gap-1">
+        {onEditar && (
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-[11.5px]" onClick={onEditar}>
+            <Pencil size={12} className="mr-1" />
+            Editar ficha
+          </Button>
+        )}
         <Button variant="ghost" size="sm" className="h-7 px-2 text-[11.5px]" onClick={onFicha}>
           Abrir ficha completa
         </Button>
@@ -668,12 +713,15 @@ const Tarjeta = React.memo(function Tarjeta({
   abierta,
   onToggle,
   onFicha,
+  onEditar,
 }: {
   r: GridSampleDto;
   columnas: ColumnaGrid[];
   abierta: boolean;
   onToggle: (id: string) => void;
   onFicha: (accession: string) => void;
+  /** Con QC: "Editar ficha" al abrir la tarjeta (un botón dentro de otro botón no vale). */
+  onEditar?: (s: GridSampleDto) => void;
 }) {
   const datos = columnas.filter((c) => !["accession", "displayName", "conditions", "notes"].includes(c.id)).slice(0, 6);
   return (
@@ -706,7 +754,11 @@ const Tarjeta = React.memo(function Tarjeta({
       </button>
       {abierta && (
         <div className="mt-2 pt-2 border-t border-border/60">
-          <FilaExpandida accession={r.accession} onFicha={() => onFicha(r.accession)} />
+          <FilaExpandida
+            accession={r.accession}
+            onFicha={() => onFicha(r.accession)}
+            onEditar={onEditar ? () => onEditar(r) : undefined}
+          />
         </div>
       )}
     </li>
