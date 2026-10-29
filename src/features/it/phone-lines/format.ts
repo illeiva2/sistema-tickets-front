@@ -2,6 +2,7 @@ import {
   PHONE_CARRIER_LABELS,
   type PhoneLine,
   type PhoneLineAsset,
+  type PhoneLineDepartment,
   type PhoneLinePerson,
 } from "./types";
 
@@ -14,6 +15,34 @@ export function phoneLineCarrier(line: PhoneLine): string {
 export function phoneLinePersonName(person?: PhoneLinePerson | null): string {
   if (!person) return "Sin asignar";
   return `${person.firstName} ${person.lastName}`.trim();
+}
+
+/**
+ * A quién está asignada una línea, como en el inventario: la persona con el
+ * sector de la línea (o el suyo), o el sector solo.
+ */
+export function phoneLineHolder(
+  person?: PhoneLinePerson | null,
+  department?: PhoneLineDepartment | null,
+): { name: string; detail: string | null } | null {
+  if (person) {
+    return {
+      name: phoneLinePersonName(person),
+      detail: (department ?? person.department)?.name ?? null,
+    };
+  }
+  if (department) return { name: department.name, detail: "Sector" };
+  return null;
+}
+
+export function phoneLineHolderText(
+  person?: PhoneLinePerson | null,
+  department?: PhoneLineDepartment | null,
+  empty = "Sin asignar",
+): string {
+  const holder = phoneLineHolder(person, department);
+  if (!holder) return empty;
+  return holder.detail ? `${holder.name} · ${holder.detail}` : holder.name;
 }
 
 export function phoneLineAssetName(asset?: PhoneLineAsset | null): string {

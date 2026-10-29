@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useStaffDepartments } from "../staff/useStaff";
 import { fetchPhoneLine, getPhoneLineErrorInfo } from "./api";
 import { PhoneLineDetailPanel } from "./components/PhoneLineDetailPanel";
 import { PhoneLineEditorPanel } from "./components/PhoneLineEditorPanel";
@@ -45,6 +46,7 @@ const INITIAL_FILTERS: PhoneLineListQuery = {
   q: "",
   status: "",
   carrier: "",
+  holderDepartmentId: "",
   page: 1,
   pageSize: 10,
 };
@@ -56,14 +58,20 @@ export function PhoneLinesPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorState>(null);
   const linesQuery = usePhoneLines(filters);
+  const departmentsQuery = useStaffDepartments();
   const saveLine = useSavePhoneLine();
   const lines = linesQuery.data?.items ?? [];
   const pagination = linesQuery.data?.pagination;
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
   const hasActiveFilters = Boolean(
-    filters.q || filters.status || filters.carrier,
+    filters.q ||
+    filters.status ||
+    filters.carrier ||
+    filters.holderDepartmentId,
   );
-  const assignedVisible = lines.filter((line) => Boolean(line.holder)).length;
+  const assignedVisible = lines.filter((line) =>
+    Boolean(line.holder || line.holderDepartment),
+  ).length;
   const availableVisible = lines.filter(
     (line) => line.status === "AVAILABLE",
   ).length;
@@ -234,7 +242,7 @@ export function PhoneLinesPanel() {
               id="phone-lines-search"
               type="search"
               value={searchDraft}
-              placeholder="Número, ICCID, plan o titular"
+              placeholder="Número, ICCID, plan, persona o sector"
               onChange={(event) => setSearchDraft(event.target.value)}
             />
             <button type="submit">Buscar</button>
@@ -272,6 +280,28 @@ export function PhoneLinesPanel() {
             {PHONE_CARRIERS.map((carrier) => (
               <option key={carrier} value={carrier}>
                 {PHONE_CARRIER_LABELS[carrier]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="phone-lines-filter-field">
+          <label htmlFor="phone-lines-department">Sector</label>
+          <select
+            id="phone-lines-department"
+            value={filters.holderDepartmentId}
+            disabled={departmentsQuery.isError}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                holderDepartmentId: event.target.value,
+                page: 1,
+              }))
+            }
+          >
+            <option value="">Todos</option>
+            {(departmentsQuery.data ?? []).map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
               </option>
             ))}
           </select>
