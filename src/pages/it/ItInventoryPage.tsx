@@ -22,7 +22,6 @@ import {
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useAuth } from "@/hooks";
 import {
   getInventoryErrorCode,
   getInventoryErrorMessage,
@@ -71,6 +70,8 @@ const INITIAL_FILTERS: AssetListQuery = {
   q: "",
   type: "",
   status: "",
+  assignedDepartmentId: "",
+  assignedPersonId: "",
   page: 1,
   pageSize: 10,
 };
@@ -83,7 +84,6 @@ const CUSTODY_ASSET_CONFLICT_CODES = new Set([
 ]);
 
 function ItInventoryPage() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<AssetListQuery>(INITIAL_FILTERS);
@@ -101,8 +101,17 @@ function ItInventoryPage() {
     originPurchaseId && originPurchaseItemId ? originPurchaseId : null,
   );
   const custodyDetail = useAssetDetail(custodyAssetId);
-  const custodyLookups = useCustodyLookups(
-    Boolean(custodyAssetId && custodyDetail.data?.status === "IN_STOCK"),
+  // Personas y sectores: los usan los filtros de la lista y la custodia.
+  const custodyLookups = useCustodyLookups(true);
+  const filterDepartments = [...(custodyLookups.departments.data ?? [])].sort(
+    (a, b) => a.name.localeCompare(b.name, "es"),
+  );
+  const filterPeople = [...(custodyLookups.people.data?.items ?? [])].sort(
+    (a, b) =>
+      `${a.lastName} ${a.firstName}`.localeCompare(
+        `${b.lastName} ${b.firstName}`,
+        "es",
+      ),
   );
   const saveAsset = useSaveAsset();
   const assignCustody = useAssignAssetCustody();
@@ -294,6 +303,22 @@ function ItInventoryPage() {
     }));
   };
 
+  const handleDepartmentChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setFilters((current) => ({
+      ...current,
+      assignedDepartmentId: event.target.value,
+      page: 1,
+    }));
+  };
+
+  const handlePersonChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setFilters((current) => ({
+      ...current,
+      assignedPersonId: event.target.value,
+      page: 1,
+    }));
+  };
+
   const clearFilters = () => {
     setSearchDraft("");
     setFilters(INITIAL_FILTERS);
@@ -331,7 +356,13 @@ function ItInventoryPage() {
     }
   };
 
-  const hasActiveFilters = Boolean(filters.q || filters.type || filters.status);
+  const hasActiveFilters = Boolean(
+    filters.q ||
+      filters.type ||
+      filters.status ||
+      filters.assignedDepartmentId ||
+      filters.assignedPersonId,
+  );
   const assets = assetsQuery.data?.items ?? [];
   const pagination = assetsQuery.data?.pagination;
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
@@ -356,9 +387,8 @@ function ItInventoryPage() {
           <p className="inventory-eyebrow">Registro patrimonial / Control 01</p>
           <h1 id="inventory-title">Inventario de activos</h1>
           <p>
-            Equipamiento físico, estado, ubicación y especificaciones técnicas.
-            Las asignaciones se administran por su flujo de custodia y no desde
-            esta ficha.
+            Qué equipos hay, quién los tiene y en qué estado están. Para
+            asignar o devolver un equipo, usá Custodia.
           </p>
         </div>
         <div className="inventory-header__actions">
@@ -413,7 +443,7 @@ function ItInventoryPage() {
                 id="inventory-search"
                 type="search"
                 value={searchDraft}
-                placeholder="Etiqueta, serie, marca o modelo"
+                placeholder="Etiqueta, persona, sector o modelo"
                 onChange={(event) => setSearchDraft(event.target.value)}
               />
               <button type="submit">Buscar</button>
@@ -447,6 +477,38 @@ function ItInventoryPage() {
               {ASSET_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {ASSET_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="inventory-filter-field">
+            <label htmlFor="inventory-department">Sector</label>
+            <select
+              id="inventory-department"
+              value={filters.assignedDepartmentId}
+              onChange={handleDepartmentChange}
+            >
+              <option value="">Todos los sectores</option>
+              {filterDepartments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="inventory-filter-field">
+            <label htmlFor="inventory-person">Persona</label>
+            <select
+              id="inventory-person"
+              value={filters.assignedPersonId}
+              onChange={handlePersonChange}
+            >
+              <option value="">Todas las personas</option>
+              {filterPeople.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.lastName}, {person.firstName}
                 </option>
               ))}
             </select>
@@ -602,7 +664,6 @@ function ItInventoryPage() {
           }
           mode={editor.mode}
           asset={editor.mode === "edit" ? (assetDetail.data ?? null) : null}
-          canEditAssetTag={user?.role === "ADMIN"}
           isLoading={editor.mode === "edit" && assetDetail.isPending}
           isSaving={saveAsset.isPending}
           loadError={

@@ -586,7 +586,6 @@ function ItLiveDevicesPage() {
           latestSnapshotPayload={snapshotsQuery.data?.items[0]?.payload ?? null}
           people={custodyLookups.people.data?.items ?? []}
           departments={custodyLookups.departments.data ?? []}
-          canSetAssetTag={user?.role === "ADMIN"}
           isLoading={
             snapshotsQuery.isLoading ||
             custodyLookups.people.isLoading ||

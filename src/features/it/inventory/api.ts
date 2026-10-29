@@ -30,6 +30,8 @@ export async function fetchAssets(
         q: query.q || undefined,
         type: query.type || undefined,
         status: query.status || undefined,
+        assignedDepartmentId: query.assignedDepartmentId || undefined,
+        assignedPersonId: query.assignedPersonId || undefined,
         page: query.page,
         pageSize: query.pageSize,
       },

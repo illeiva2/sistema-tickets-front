@@ -155,6 +155,12 @@ describe("ItInventoryPage", () => {
     await user.type(screen.getByLabelText("Buscar activo"), "Dell");
     await user.selectOptions(screen.getByLabelText("Tipo"), "NOTEBOOK");
     await user.selectOptions(screen.getByLabelText("Estado"), "IN_STOCK");
+    const sectorFilter = screen.getByLabelText("Sector");
+    await within(sectorFilter).findByRole("option", { name: "Administración" });
+    await user.selectOptions(sectorFilter, "department-1");
+    const personFilter = screen.getByLabelText("Persona");
+    await within(personFilter).findByRole("option", { name: "Lovelace, Ada" });
+    await user.selectOptions(personFilter, "person-1");
     await user.click(screen.getByRole("button", { name: "Buscar" }));
 
     await waitFor(() => {
@@ -163,11 +169,51 @@ describe("ItInventoryPage", () => {
           q: "Dell",
           type: "NOTEBOOK",
           status: "IN_STOCK",
+          assignedDepartmentId: "department-1",
+          assignedPersonId: "person-1",
           page: 1,
           pageSize: 10,
         },
       });
     });
+  });
+
+  it("muestra a quién está asignado cada equipo", async () => {
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/api/it/assets") {
+        return Promise.resolve(
+          listResponse([
+            {
+              ...baseAsset,
+              status: "ASSIGNED",
+              assignedPerson: activePerson,
+              assignedDepartment: null,
+            },
+            {
+              ...baseAsset,
+              id: "asset-2",
+              assetTag: "PH-0003",
+              type: "PHONE",
+              status: "ASSIGNED",
+              assignedPerson: null,
+              assignedDepartment: { id: "department-2", name: "Balanza" },
+            },
+            { ...baseAsset, id: "asset-3", assetTag: "NB-0002" },
+          ]),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    renderInventory();
+
+    const table = await screen.findByRole("table");
+    const rows = within(table).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Ada Lovelace");
+    expect(rows[1]).toHaveTextContent("Administración");
+    expect(rows[2]).toHaveTextContent("PH-0003");
+    expect(rows[2]).toHaveTextContent("BalanzaSector");
+    expect(rows[3]).toHaveTextContent("Sin asignar");
+    expect(within(table).queryByText("Casa central / IT")).toBeNull();
   });
 
   it("da de alta sin enviar assetTag cuando queda vacío", async () => {
@@ -189,12 +235,12 @@ describe("ItInventoryPage", () => {
         .getByLabelText("Estado")
         .querySelector('option[value="IN_REPAIR"]'),
     ).toBeNull();
-    expect(within(dialog).getByLabelText(/Etiqueta interna/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Nombre de host/)).toBeEnabled();
+    // Lo técnico no se carga a mano.
+    expect(within(dialog).queryByLabelText(/CPU|RAM|IMEI/)).toBeNull();
 
     await user.type(within(dialog).getByLabelText("Marca"), "Lenovo");
     await user.type(within(dialog).getByLabelText("Modelo"), "ThinkPad T14");
-    await user.type(within(dialog).getByLabelText(/CPU/), "Ryzen 7");
-    await user.type(within(dialog).getByLabelText(/RAM/), "32");
     await user.click(
       within(dialog).getByRole("button", { name: "Registrar activo" }),
     );
@@ -207,11 +253,105 @@ describe("ItInventoryPage", () => {
       status: "IN_STOCK",
       brand: "Lenovo",
       model: "ThinkPad T14",
-      specs: { cpu: "Ryzen 7", ramGb: 32 },
+      specs: null,
     });
     expect(JSON.stringify(payload)).not.toMatch(
       /password|credential|phoneNumber|iccid/i,
     );
+  });
+
+  it("da de alta con el nombre de host como etiqueta, en mayúsculas", async () => {
+    authMock.role = "AGENT";
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+
+    await user.click(screen.getByRole("button", { name: "Nuevo activo" }));
+    const dialog = screen.getByRole("dialog", { name: "Registrar activo" });
+    const tagInput = within(dialog).getByLabelText(/Nombre de host/);
+
+    await user.type(tagInput, "pc 01");
+    await user.type(within(dialog).getByLabelText("Marca"), "HP");
+    await user.type(within(dialog).getByLabelText("Modelo"), "ProDesk 400");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar activo" }),
+    );
+    expect(
+      await within(dialog).findByText(/solo puede tener letras, números y guiones/),
+    ).toBeInTheDocument();
+    expect(apiMock.post).not.toHaveBeenCalled();
+
+    await user.clear(tagInput);
+    await user.type(tagInput, "desktop-4k2m1qf");
+    expect(tagInput).toHaveValue("DESKTOP-4K2M1QF");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar activo" }),
+    );
+
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+    expect(apiMock.post.mock.calls[0][1]).toMatchObject({
+      assetTag: "DESKTOP-4K2M1QF",
+      brand: "HP",
+      model: "ProDesk 400",
+    });
+  });
+
+  it("en celulares pide etiqueta e IMEI, no nombre de host", async () => {
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+
+    await user.click(screen.getByRole("button", { name: "Nuevo activo" }));
+    const dialog = screen.getByRole("dialog", { name: "Registrar activo" });
+    await user.selectOptions(within(dialog).getByLabelText("Tipo"), "PHONE");
+
+    expect(within(dialog).queryByLabelText(/Nombre de host/)).toBeNull();
+    await user.type(within(dialog).getByLabelText(/^Etiqueta/), "cel-balanza");
+    await user.type(within(dialog).getByLabelText("Marca"), "Samsung");
+    await user.type(within(dialog).getByLabelText("Modelo"), "A15");
+    await user.type(within(dialog).getByLabelText(/IMEI/), "356789012345678");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Registrar activo" }),
+    );
+
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+    expect(apiMock.post.mock.calls[0][1]).toMatchObject({
+      type: "PHONE",
+      assetTag: "CEL-BALANZA",
+      specs: { imei: "356789012345678" },
+    });
+  });
+
+  it("cambia la etiqueta de un equipo existente y no la deja vacía", async () => {
+    authMock.role = "AGENT";
+    const user = userEvent.setup();
+    renderInventory();
+    await screen.findAllByText("NB-0001");
+    await user.click(
+      screen.getAllByRole("button", { name: "Editar NB-0001" })[0],
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "Editar activo" });
+    const tagInput = await within(dialog).findByLabelText(/Nombre de host/);
+    await user.clear(tagInput);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+    expect(
+      await within(dialog).findByText(/La etiqueta no puede quedar vacía/),
+    ).toBeInTheDocument();
+    expect(apiMock.patch).not.toHaveBeenCalled();
+
+    await user.type(tagInput, "nb-ivan");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
+
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+    expect(apiMock.patch.mock.calls[0][1]).toMatchObject({
+      assetTag: "NB-IVAN",
+      expectedUpdatedAt: "2026-07-12T12:00:00.000Z",
+    });
   });
 
   it("valida una compra recibida y vincula el activo al renglón", async () => {
@@ -332,7 +472,13 @@ describe("ItInventoryPage", () => {
     const statusField = await within(dialog).findByLabelText("Estado");
     expect(statusField).toBeDisabled();
     expect(statusField).toHaveValue("Asignado");
-    expect(within(dialog).getByLabelText(/Etiqueta interna/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Nombre de host/)).toHaveValue(
+      "NB-0001",
+    );
+    // Lo que informó el agente se ve, pero no se edita.
+    expect(within(dialog).getByText("Intel Core i5")).toBeInTheDocument();
+    expect(within(dialog).getByText("16 GB")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/CPU|RAM/)).toBeNull();
 
     const modelInput = within(dialog).getByLabelText("Modelo");
     await user.clear(modelInput);
@@ -933,7 +1079,12 @@ describe("ItInventoryPage", () => {
   });
 
   it("muestra el estado vacío sin inventar datos", async () => {
-    apiMock.get.mockResolvedValue(listResponse([]));
+    const defaultGet = apiMock.get.getMockImplementation()!;
+    apiMock.get.mockImplementation((url: string) =>
+      url === "/api/it/assets"
+        ? Promise.resolve(listResponse([]))
+        : defaultGet(url),
+    );
     renderInventory();
 
     expect(

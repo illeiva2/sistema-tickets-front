@@ -34,7 +34,6 @@ export interface AgentAssetOnboardingPanelProps {
   departments: CustodyDepartment[];
   isLoading: boolean;
   isSaving: boolean;
-  canSetAssetTag?: boolean;
   loadError?: string;
   lookupsError?: string;
   saveError?: string;
@@ -60,7 +59,6 @@ export function AgentAssetOnboardingPanel({
   departments,
   isLoading,
   isSaving,
-  canSetAssetTag = false,
   loadError,
   lookupsError,
   saveError,
@@ -110,12 +108,7 @@ export function AgentAssetOnboardingPanel({
     event.preventDefault();
     setLocalError(undefined);
     try {
-      await onSubmit(
-        buildAgentAssetOnboardingSubmission({
-          ...form,
-          assetTag: canSetAssetTag ? form.assetTag : "",
-        }),
-      );
+      await onSubmit(buildAgentAssetOnboardingSubmission(form));
     } catch (error) {
       setLocalError(errorMessage(error));
     }
@@ -243,19 +236,21 @@ export function AgentAssetOnboardingPanel({
                     }
                   />
                 </label>
-                {canSetAssetTag ? (
-                  <label>
-                    Etiqueta interna <span>Opcional · Administrador</span>
-                    <input
-                      autoComplete="off"
-                      placeholder="Se genera si queda vacía"
-                      value={form.assetTag}
-                      onChange={(event) =>
-                        updateField("assetTag", event.target.value)
-                      }
-                    />
-                  </label>
-                ) : null}
+                <label>
+                  Nombre de host <span>Etiqueta del equipo</span>
+                  <input
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Se genera si queda vacía"
+                    value={form.assetTag}
+                    onChange={(event) =>
+                      updateField("assetTag", event.target.value.toUpperCase())
+                    }
+                  />
+                  <small>
+                    Viene del agente: es la etiqueta que se pega en el equipo.
+                  </small>
+                </label>
                 <label>
                   Ubicación <span>Opcional</span>
                   <input
