@@ -35,6 +35,11 @@ export const PHONE_CARRIER_LABELS: Record<PhoneCarrier, string> = {
 export const PHONE_LINE_CURRENCIES = ["ARS", "USD"] as const;
 export type PhoneLineCurrency = (typeof PHONE_LINE_CURRENCIES)[number];
 
+export interface PhoneLineDepartment {
+  id: string;
+  name: string;
+}
+
 export interface PhoneLinePerson {
   id: string;
   employeeNumber?: string | null;
@@ -42,6 +47,8 @@ export interface PhoneLinePerson {
   lastName: string;
   jobTitle?: string | null;
   status?: string;
+  departmentId?: string | null;
+  department?: PhoneLineDepartment | null;
 }
 
 export interface PhoneLineAsset {
@@ -53,15 +60,18 @@ export interface PhoneLineAsset {
   assetTag?: string | null;
   serialNumber?: string | null;
   assignedPersonId?: string | null;
+  assignedDepartmentId?: string | null;
 }
 
+/** Una asignación es de una persona, de un sector o de los dos. */
 export interface PhoneLineAssignment {
   id: string;
   assignedAt: string;
   returnedAt?: string | null;
   note?: string | null;
   returnNote?: string | null;
-  person: PhoneLinePerson;
+  person?: PhoneLinePerson | null;
+  department?: PhoneLineDepartment | null;
   asset?: PhoneLineAsset | null;
   assignedBy?: { id: string; name?: string | null; email?: string | null };
 }
@@ -93,6 +103,8 @@ export interface PhoneLine {
   isActive: boolean;
   holderId?: string | null;
   holder?: PhoneLinePerson | null;
+  holderDepartmentId?: string | null;
+  holderDepartment?: PhoneLineDepartment | null;
   assetId?: string | null;
   asset?: PhoneLineAsset | null;
   assignments?: PhoneLineAssignment[];
@@ -117,6 +129,7 @@ export interface PhoneLineListQuery {
   q: string;
   status: PhoneLineStatus | "";
   carrier: PhoneCarrier | "";
+  holderDepartmentId: string;
   page: number;
   pageSize: number;
 }
@@ -143,9 +156,11 @@ export type PhoneLineSaveCommand =
   | { mode: "create"; payload: PhoneLineCreatePayload }
   | { mode: "edit"; id: string; payload: PhoneLineUpdatePayload };
 
+/** Persona y/o sector: al menos uno de los dos. */
 export interface PhoneLineAssignPayload {
   expectedUpdatedAt: string;
-  personId: string;
+  personId: string | null;
+  departmentId: string | null;
   assetId?: string | null;
   note?: string | null;
 }

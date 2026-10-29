@@ -116,6 +116,7 @@ let phoneAssets: Array<{
   assetTag: string;
   serialNumber: null;
   assignedPersonId: string | null;
+  assignedDepartmentId?: string | null;
 }>;
 let phoneAssetsError: Error | null;
 let simHistoryPages: Record<number, PhoneSimChange[]>;
@@ -718,7 +719,7 @@ describe("ItStaffPage", () => {
       within(dialog).getByRole("button", { name: "Reintentar celulares" }),
     ).toBeEnabled();
     await user.selectOptions(
-      within(dialog).getByLabelText("Persona activa"),
+      within(dialog).getByLabelText(/Persona activa/),
       basePerson.id,
     );
     const assignButton = within(dialog).getByRole("button", {
@@ -733,10 +734,119 @@ describe("ItStaffPage", () => {
         {
           expectedUpdatedAt: availableLine.updatedAt,
           personId: basePerson.id,
+          departmentId: null,
           assetId: null,
           note: null,
         },
       ),
+    );
+  });
+
+  it("asigna una línea a un sector sin persona", async () => {
+    const user = userEvent.setup();
+    const sectorLine: PhoneLine = {
+      ...availableLine,
+      status: "ACTIVE",
+      holderDepartmentId: department.id,
+      holderDepartment: department,
+    };
+    listedLines = [availableLine];
+    detailLine = availableLine;
+    apiMock.post.mockImplementation((url: string) => {
+      if (url === `/api/it/phone-lines/${availableLine.id}/assign`) {
+        // Las consultas que se recargan después ya ven la línea asignada.
+        detailLine = sectorLine;
+        listedLines = [sectorLine];
+        return Promise.resolve({
+          data: { success: true, data: { phoneLine: sectorLine } },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(availableLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${availableLine.phoneNumber}`,
+      })[0],
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: availableLine.phoneNumber,
+    });
+    const assignButton = within(dialog).getByRole("button", {
+      name: "Confirmar asignación",
+    });
+    expect(assignButton).toBeDisabled();
+    expect(
+      within(dialog).getByText("Indicá una persona, un sector o ambos."),
+    ).toBeInTheDocument();
+
+    await user.selectOptions(
+      await within(dialog).findByLabelText(/Sector/),
+      department.id,
+    );
+    expect(assignButton).toBeEnabled();
+    await user.click(assignButton);
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        `/api/it/phone-lines/${availableLine.id}/assign`,
+        {
+          expectedUpdatedAt: availableLine.updatedAt,
+          personId: null,
+          departmentId: department.id,
+          assetId: null,
+          note: null,
+        },
+      ),
+    );
+    expect(await within(dialog).findByText("Línea del sector")).toBeVisible();
+    expect(
+      within(dialog).getByRole("button", { name: "Registrar devolución" }),
+    ).toBeEnabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Dar de baja" }),
+    ).toBeDisabled();
+  });
+
+  it("muestra a quién está asignada cada línea y filtra por sector", async () => {
+    const user = userEvent.setup();
+    const sectorLine: PhoneLine = {
+      ...availableLine,
+      id: "line-sector",
+      phoneNumber: "+5493415550000",
+      status: "ACTIVE",
+      holderDepartmentId: department.id,
+      holderDepartment: department,
+    };
+    listedLines = [baseLine, sectorLine];
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(sectorLine.phoneNumber);
+
+    const table = screen.getByRole("table");
+    expect(
+      within(table).getByRole("columnheader", { name: "Asignada a" }),
+    ).toBeInTheDocument();
+    const personRow = within(table)
+      .getByText(baseLine.phoneNumber)
+      .closest("tr") as HTMLElement;
+    expect(personRow).toHaveTextContent("Ana Pérez");
+    expect(personRow).toHaveTextContent(department.name);
+    const sectorRow = within(table)
+      .getByText(sectorLine.phoneNumber)
+      .closest("tr") as HTMLElement;
+    expect(sectorRow).toHaveTextContent(`${department.name}Sector`);
+
+    await user.selectOptions(
+      await screen.findByLabelText("Sector"),
+      department.id,
+    );
+    await waitFor(() =>
+      expect(apiMock.get).toHaveBeenCalledWith("/api/it/phone-lines", {
+        params: expect.objectContaining({ holderDepartmentId: department.id }),
+      }),
     );
   });
 
@@ -798,7 +908,7 @@ describe("ItStaffPage", () => {
       name: availableLine.phoneNumber,
     });
     await user.selectOptions(
-      within(dialog).getByLabelText("Persona activa"),
+      within(dialog).getByLabelText(/Persona activa/),
       basePerson.id,
     );
     const assetSelect = within(dialog).getByLabelText(/Celular/);
@@ -811,6 +921,87 @@ describe("ItStaffPage", () => {
       }),
     ).toBeInTheDocument();
     expect(within(assetSelect).queryByText(/Ajeno|Taller/)).toBeNull();
+  });
+
+  it("para un sector ofrece su celular y no el de una persona u otro sector", async () => {
+    const user = userEvent.setup();
+    listedLines = [availableLine];
+    detailLine = availableLine;
+    phoneAssets = [
+      {
+        id: "asset-stock",
+        type: "PHONE",
+        status: "IN_STOCK",
+        brand: "Samsung",
+        model: "Stock",
+        assetTag: "CEL-01",
+        serialNumber: null,
+        assignedPersonId: null,
+      },
+      {
+        id: "asset-sector",
+        type: "PHONE",
+        status: "ASSIGNED",
+        brand: "Motorola",
+        model: "Guardia",
+        assetTag: "CEL-05",
+        serialNumber: null,
+        assignedPersonId: null,
+        assignedDepartmentId: department.id,
+      },
+      {
+        id: "asset-own",
+        type: "PHONE",
+        status: "ASSIGNED",
+        brand: "Motorola",
+        model: "Propio",
+        assetTag: "CEL-02",
+        serialNumber: null,
+        assignedPersonId: basePerson.id,
+      },
+      {
+        id: "asset-other-sector",
+        type: "PHONE",
+        status: "ASSIGNED",
+        brand: "Nokia",
+        model: "Otro sector",
+        assetTag: "CEL-06",
+        serialNumber: null,
+        assignedPersonId: null,
+        assignedDepartmentId: "department-other",
+      },
+    ];
+
+    renderStaff("/it/staff?tab=lines");
+    await screen.findAllByText(availableLine.phoneNumber);
+    await user.click(
+      screen.getAllByRole("button", {
+        name: `Ver línea ${availableLine.phoneNumber}`,
+      })[0],
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: availableLine.phoneNumber,
+    });
+    const assetSelect = within(dialog).getByLabelText(/Celular/);
+    expect(assetSelect).toBeDisabled();
+    expect(
+      within(assetSelect).getByRole("option", {
+        name: "Elegí primero una persona o un sector",
+      }),
+    ).toBeInTheDocument();
+
+    await user.selectOptions(
+      await within(dialog).findByLabelText(/Sector/),
+      department.id,
+    );
+    expect(assetSelect).toBeEnabled();
+    expect(
+      within(assetSelect).getByRole("option", { name: /Stock.*En depósito/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(assetSelect).getByRole("option", { name: /Guardia.*del sector/ }),
+    ).toBeInTheDocument();
+    expect(within(assetSelect).queryByText(/Propio|Otro sector/)).toBeNull();
   });
 
   it("recarga una edición en conflicto y reintenta con el updatedAt nuevo", async () => {

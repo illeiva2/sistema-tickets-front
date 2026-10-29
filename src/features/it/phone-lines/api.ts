@@ -73,6 +73,7 @@ export async function fetchPhoneLines(
         q: query.q || undefined,
         status: query.status || undefined,
         carrier: query.carrier || undefined,
+        holderDepartmentId: query.holderDepartmentId || undefined,
         page: query.page,
         pageSize: query.pageSize,
       },

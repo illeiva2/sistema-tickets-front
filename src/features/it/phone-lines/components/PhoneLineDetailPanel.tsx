@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
+  Building2,
   History,
   Loader2,
   Pencil,
@@ -15,6 +16,7 @@ import {
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useStaffDepartments } from "../../staff/useStaff";
 import { getPhoneLineErrorInfo } from "../api";
 import {
   formatDataAllowance,
@@ -24,9 +26,14 @@ import {
   phoneLineAssetCode,
   phoneLineAssetName,
   phoneLineCarrier,
+  phoneLineHolderText,
   phoneLinePersonName,
 } from "../format";
-import { PHONE_LINE_STATUS_LABELS, type PhoneLine } from "../types";
+import {
+  PHONE_LINE_STATUS_LABELS,
+  type PhoneLine,
+  type PhoneLineAsset,
+} from "../types";
 import { usePhoneLineDialogFocus } from "../usePhoneLineDialogFocus";
 import {
   phoneLineKeys,
@@ -73,8 +80,11 @@ export function PhoneLineDetailPanel({
   const detail = usePhoneLineDetail(lineId);
   const simChanges = usePhoneLineSimChanges(lineId);
   const line = detail.data;
-  const canAssign = line?.status === "AVAILABLE" && !line.holder;
+  // La línea está asignada si la tiene una persona, un sector o los dos.
+  const isAssigned = Boolean(line?.holder || line?.holderDepartment);
+  const canAssign = line?.status === "AVAILABLE" && !isAssigned;
   const people = usePhoneLinePeople(Boolean(canAssign));
+  const departments = useStaffDepartments();
   const assets = usePhoneAssets(Boolean(canAssign));
   const assignLine = useAssignPhoneLine(lineId);
   const returnLine = useReturnPhoneLine(lineId);
@@ -82,6 +92,7 @@ export function PhoneLineDetailPanel({
   const deleteLine = useDeletePhoneLine();
 
   const [personId, setPersonId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [assetId, setAssetId] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
   const [returnNote, setReturnNote] = useState("");
@@ -92,14 +103,32 @@ export function PhoneLineDetailPanel({
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [conflictReloaded, setConflictReloaded] = useState(false);
+  const hasHolderChoice = Boolean(personId || departmentId);
+  const isSectorAsset = (asset: PhoneLineAsset) =>
+    !asset.assignedPersonId &&
+    Boolean(departmentId) &&
+    asset.assignedDepartmentId === departmentId;
+  // Igual que valida el back: el celular de una persona solo lleva una línea
+  // de esa persona, y el de un sector, una línea de ese sector.
   const eligibleAssets = (assets.data ?? []).filter((asset) => {
-    if (!personId || INELIGIBLE_ASSET_STATUSES.has(asset.status ?? "")) {
+    if (!hasHolderChoice || INELIGIBLE_ASSET_STATUSES.has(asset.status ?? "")) {
       return false;
     }
     if (asset.assignedPersonId && asset.assignedPersonId !== personId) {
       return false;
     }
-    return asset.status !== "ASSIGNED" || asset.assignedPersonId === personId;
+    if (
+      departmentId &&
+      asset.assignedDepartmentId &&
+      asset.assignedDepartmentId !== departmentId
+    ) {
+      return false;
+    }
+    return (
+      asset.status !== "ASSIGNED" ||
+      Boolean(asset.assignedPersonId) ||
+      isSectorAsset(asset)
+    );
   });
   const simChangeItems =
     simChanges.data?.pages.flatMap((page) => page.items) ?? [];
@@ -141,11 +170,13 @@ export function PhoneLineDetailPanel({
     try {
       await assignLine.mutateAsync({
         expectedUpdatedAt: line.updatedAt,
-        personId,
+        personId: personId || null,
+        departmentId: departmentId || null,
         assetId: assets.isError ? null : optional(assetId),
         note: optional(assignmentNote),
       });
       setPersonId("");
+      setDepartmentId("");
       setAssetId("");
       setAssignmentNote("");
       toast.success("Línea asignada");
@@ -350,7 +381,21 @@ export function PhoneLineDetailPanel({
                       {line.holder.jobTitle ||
                         line.holder.employeeNumber ||
                         "Persona activa"}
+                      {line.holderDepartment &&
+                        ` · Sector ${line.holderDepartment.name}`}
                     </p>
+                    <small>
+                      {phoneLineAssetName(line.asset)} ·{" "}
+                      {phoneLineAssetCode(line.asset)}
+                    </small>
+                  </div>
+                </div>
+              ) : line.holderDepartment ? (
+                <div className="phone-lines-custody-card">
+                  <Building2 size={22} aria-hidden="true" />
+                  <div>
+                    <strong>{line.holderDepartment.name}</strong>
+                    <p>Línea del sector</p>
                     <small>
                       {phoneLineAssetName(line.asset)} ·{" "}
                       {phoneLineAssetCode(line.asset)}
@@ -361,8 +406,10 @@ export function PhoneLineDetailPanel({
                 <div className="phone-lines-custody-card phone-lines-custody-card--empty">
                   <Smartphone size={22} aria-hidden="true" />
                   <div>
-                    <strong>Sin titular</strong>
-                    <p>La línea no está bajo custodia de una persona.</p>
+                    <strong>Sin asignar</strong>
+                    <p>
+                      La línea no está asignada a una persona ni a un sector.
+                    </p>
                   </div>
                 </div>
               )}
@@ -373,11 +420,13 @@ export function PhoneLineDetailPanel({
                   onSubmit={handleAssign}
                 >
                   <h4>Asignar línea</h4>
+                  <p className="phone-lines-action-form__hint">
+                    Indicá una persona, un sector o ambos.
+                  </p>
                   <div className="phone-lines-action-grid">
                     <label>
-                      Persona activa
+                      Persona activa <span>Opcional</span>
                       <select
-                        required
                         value={personId}
                         disabled={
                           people.isLoading ||
@@ -392,7 +441,7 @@ export function PhoneLineDetailPanel({
                         <option value="">
                           {people.isLoading
                             ? "Cargando personas"
-                            : "Seleccionar persona"}
+                            : "Sin persona"}
                         </option>
                         {(people.data ?? []).map((person) => (
                           <option key={person.id} value={person.id}>
@@ -405,11 +454,37 @@ export function PhoneLineDetailPanel({
                       </select>
                     </label>
                     <label>
+                      Sector <span>Opcional</span>
+                      <select
+                        value={departmentId}
+                        disabled={
+                          departments.isLoading ||
+                          departments.isError ||
+                          assignLine.isPending
+                        }
+                        onChange={(event) => {
+                          setDepartmentId(event.target.value);
+                          setAssetId("");
+                        }}
+                      >
+                        <option value="">
+                          {departments.isLoading
+                            ? "Cargando sectores"
+                            : "Sin sector"}
+                        </option>
+                        {(departments.data ?? []).map((department) => (
+                          <option key={department.id} value={department.id}>
+                            {department.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
                       Celular <span>Opcional</span>
                       <select
                         value={assetId}
                         disabled={
-                          !personId ||
+                          !hasHolderChoice ||
                           assets.isLoading ||
                           assets.isError ||
                           assignLine.isPending
@@ -417,8 +492,8 @@ export function PhoneLineDetailPanel({
                         onChange={(event) => setAssetId(event.target.value)}
                       >
                         <option value="">
-                          {!personId
-                            ? "Elegí primero una persona"
+                          {!hasHolderChoice
+                            ? "Elegí primero una persona o un sector"
                             : assets.isLoading
                               ? "Cargando celulares"
                               : "Sin equipo vinculado"}
@@ -429,9 +504,12 @@ export function PhoneLineDetailPanel({
                             {phoneLineAssetCode(asset)} ·{" "}
                             {ASSET_STATUS_LABELS[asset.status ?? ""] ||
                               "Estado no informado"}
-                            {asset.assignedPersonId === personId
+                            {asset.assignedPersonId &&
+                            asset.assignedPersonId === personId
                               ? " · asignado a esta persona"
-                              : ""}
+                              : isSectorAsset(asset)
+                                ? " · del sector"
+                                : ""}
                           </option>
                         ))}
                       </select>
@@ -457,6 +535,17 @@ export function PhoneLineDetailPanel({
                       </button>
                     </div>
                   )}
+                  {departments.isError && (
+                    <div className="phone-lines-inline-error" role="alert">
+                      No se pudieron cargar los sectores.
+                      <button
+                        type="button"
+                        onClick={() => void departments.refetch()}
+                      >
+                        Reintentar sectores
+                      </button>
+                    </div>
+                  )}
                   {assets.isError && (
                     <div className="phone-lines-inline-error" role="alert">
                       No se cargaron los celulares. Podés asignar la línea sin
@@ -472,9 +561,7 @@ export function PhoneLineDetailPanel({
                   <button
                     type="submit"
                     className="staff-button staff-button--primary"
-                    disabled={
-                      !personId || assignLine.isPending || people.isError
-                    }
+                    disabled={!hasHolderChoice || assignLine.isPending}
                   >
                     {assignLine.isPending && (
                       <Loader2
@@ -489,7 +576,7 @@ export function PhoneLineDetailPanel({
                 </form>
               )}
 
-              {line.holder && (
+              {isAssigned && (
                 <form
                   className="phone-lines-action-form"
                   onSubmit={handleReturn}
@@ -530,7 +617,11 @@ export function PhoneLineDetailPanel({
                     {line.assignments.map((assignment) => (
                       <li key={assignment.id}>
                         <strong>
-                          {phoneLinePersonName(assignment.person)}
+                          {phoneLineHolderText(
+                            assignment.person,
+                            assignment.department,
+                            "Sector eliminado",
+                          )}
                         </strong>
                         <span>
                           {formatPhoneLineDateTime(assignment.assignedAt)} →{" "}
@@ -700,7 +791,7 @@ export function PhoneLineDetailPanel({
                   Confirmar número {line.phoneNumber}
                   <input
                     value={deleteConfirmation}
-                    disabled={Boolean(line.holder) || deleteLine.isPending}
+                    disabled={isAssigned || deleteLine.isPending}
                     onChange={(event) =>
                       setDeleteConfirmation(event.target.value)
                     }
@@ -710,7 +801,7 @@ export function PhoneLineDetailPanel({
                   type="button"
                   className="phone-lines-danger-button"
                   disabled={
-                    Boolean(line.holder) ||
+                    isAssigned ||
                     deleteConfirmation !== line.phoneNumber ||
                     deleteLine.isPending
                   }

@@ -4,9 +4,21 @@ import {
   formatPhoneLineCost,
   phoneLineAssetName,
   phoneLineCarrier,
-  phoneLinePersonName,
+  phoneLineHolder,
+  phoneLineHolderText,
 } from "../format";
 import { PHONE_LINE_STATUS_LABELS, type PhoneLine } from "../types";
+
+function HolderCell({ line }: { line: PhoneLine }) {
+  const holder = phoneLineHolder(line.holder, line.holderDepartment);
+  if (!holder) return <>Sin asignar</>;
+  return (
+    <>
+      <strong>{holder.name}</strong>
+      <small>{holder.detail ?? "Sin sector"}</small>
+    </>
+  );
+}
 
 interface PhoneLineTableProps {
   lines: PhoneLine[];
@@ -28,7 +40,7 @@ export function PhoneLineTable({
               <th>Número</th>
               <th>Operadora / plan</th>
               <th>Estado</th>
-              <th>Titular</th>
+              <th>Asignada a</th>
               <th>Equipo</th>
               <th>Costo mensual</th>
               <th aria-label="Acciones" />
@@ -58,7 +70,9 @@ export function PhoneLineTable({
                     {PHONE_LINE_STATUS_LABELS[line.status]}
                   </span>
                 </td>
-                <td>{phoneLinePersonName(line.holder)}</td>
+                <td>
+                  <HolderCell line={line} />
+                </td>
                 <td>{phoneLineAssetName(line.asset)}</td>
                 <td>{formatPhoneLineCost(line)}</td>
                 <td className="phone-lines-table__action">
@@ -98,8 +112,10 @@ export function PhoneLineTable({
                   <dd>{formatDataAllowance(line.dataAllowanceGb)}</dd>
                 </div>
                 <div>
-                  <dt>Titular</dt>
-                  <dd>{phoneLinePersonName(line.holder)}</dd>
+                  <dt>Asignada a</dt>
+                  <dd>
+                    {phoneLineHolderText(line.holder, line.holderDepartment)}
+                  </dd>
                 </div>
                 <div>
                   <dt>Equipo</dt>
