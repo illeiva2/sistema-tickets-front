@@ -50,6 +50,24 @@ export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {
   LOST: "Extraviado",
 };
 
+/** En estos equipos la etiqueta que se pega es el nombre de host. */
+export const HOSTNAME_ASSET_TYPES: ReadonlySet<AssetType> = new Set([
+  "DESKTOP",
+  "NOTEBOOK",
+  "SERVER",
+]);
+
+/** Equipos que tienen IMEI (lo único técnico que se carga a mano). */
+export const IMEI_ASSET_TYPES: ReadonlySet<AssetType> = new Set([
+  "PHONE",
+  "TABLET",
+]);
+
+/** Mismo formato que valida el back (que además la guarda en mayúsculas). */
+export const ASSET_TAG_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
+export const ASSET_TAG_FORMAT_MESSAGE =
+  "La etiqueta solo puede tener letras, números y guiones (de 3 a 32).";
+
 export interface AssetSpecs {
   [key: string]: unknown;
   cpu?: string;
@@ -95,6 +113,8 @@ export interface AssetListQuery {
   q: string;
   type: AssetType | "";
   status: AssetStatus | "";
+  assignedDepartmentId: string;
+  assignedPersonId: string;
   page: number;
   pageSize: number;
 }

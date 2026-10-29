@@ -1,8 +1,10 @@
 import type { AssignAssetPayload } from "../inventory/custody/types";
-import type {
-  AssetCreatePayload,
-  AssetSpecs,
-  AssetType,
+import {
+  ASSET_TAG_FORMAT_MESSAGE,
+  ASSET_TAG_PATTERN,
+  type AssetCreatePayload,
+  type AssetSpecs,
+  type AssetType,
 } from "../inventory/types";
 import { assetTypeFromChassis, diskKindLabel } from "./inventoryLabels";
 import type { AgentDevice } from "./types";
@@ -195,6 +197,16 @@ function inferredType(
   return hasBattery ? "NOTEBOOK" : "DESKTOP";
 }
 
+/**
+ * El nombre de host es la etiqueta que se pega en PCs y notebooks: se propone tal cual lo
+ * informa el agente (sin el dominio). Si no cumple el formato de etiqueta, queda vacía y se
+ * genera un código al crear.
+ */
+export function tagFromHostname(hostname: string): string {
+  const tag = (hostname.trim().split(".")[0] ?? "").toUpperCase();
+  return ASSET_TAG_PATTERN.test(tag) ? tag : "";
+}
+
 export function mapAgentToAssetOnboardingForm(
   device: AgentDevice,
   latestSnapshotPayload?: UnknownRecord | null,
@@ -222,14 +234,14 @@ export function mapAgentToAssetOnboardingForm(
       hardware.serial,
       hardware.baseboardSerial,
     ),
-    assetTag: "",
+    assetTag: tagFromHostname(device.hostname),
     location: "",
     cpu: firstText(cpu?.model, cpu?.name, inventory.cpu),
     ramGb: ramGbFromInventory(device, inventory),
     storage: storageFromInventory(inventory, latestSnapshotPayload),
     os: osFromDevice(device, inventory),
     mac: macFromInventory(device, inventory),
-    notes: `Hostname reportado por agente: ${device.hostname}`,
+    notes: "",
     personId: "",
     departmentId: "",
     custodyNote: "",
@@ -276,7 +288,9 @@ export function buildAgentAssetOnboardingSubmission(
     notes: optionalText(form.notes),
     specs: Object.keys(specs).length ? specs : null,
   };
-  const assetTag = form.assetTag.trim();
+  const assetTag = form.assetTag.trim().toUpperCase();
+  if (assetTag && !ASSET_TAG_PATTERN.test(assetTag))
+    throw new Error(ASSET_TAG_FORMAT_MESSAGE);
   if (assetTag) asset.assetTag = assetTag;
 
   const personId = form.personId.trim();

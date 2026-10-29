@@ -10,8 +10,12 @@ import { getInventoryErrorMessage } from "../api";
 import {
   ASSET_STATUSES,
   ASSET_STATUS_LABELS,
+  ASSET_TAG_FORMAT_MESSAGE,
+  ASSET_TAG_PATTERN,
   ASSET_TYPES,
   ASSET_TYPE_LABELS,
+  HOSTNAME_ASSET_TYPES,
+  IMEI_ASSET_TYPES,
   type AssetCreatePayload,
   type AssetSaveCommand,
   type AssetSpecs,
@@ -31,7 +35,6 @@ export interface AssetPurchaseOrigin {
 interface AssetEditorPanelProps {
   mode: "create" | "edit";
   asset: ItAsset | null;
-  canEditAssetTag: boolean;
   isLoading: boolean;
   isSaving: boolean;
   loadError?: string;
@@ -51,12 +54,26 @@ interface AssetFormState {
   location: string;
   warrantyUntil: string;
   notes: string;
-  cpu: string;
-  ramGb: string;
-  storage: string;
-  os: string;
   imei: string;
-  mac: string;
+}
+
+// Lo técnico no se carga a mano: si el equipo se dio de alta desde Equipos en vivo, lo
+// completó el agente, y si no, se busca por el modelo. Se muestra de solo lectura.
+const TECHNICAL_SPECS: Array<[keyof AssetSpecs, string]> = [
+  ["cpu", "Procesador"],
+  ["ramGb", "RAM"],
+  ["storage", "Almacenamiento"],
+  ["os", "Sistema operativo"],
+  ["mac", "MAC"],
+];
+
+function technicalSpecRows(specs?: AssetSpecs | null): Array<[string, string]> {
+  if (!specs) return [];
+  return TECHNICAL_SPECS.flatMap(([key, label]): Array<[string, string]> => {
+    const value = specs[key];
+    if (value === undefined || value === null || value === "") return [];
+    return [[label, key === "ramGb" ? `${String(value)} GB` : String(value)]];
+  });
 }
 
 function toDateInput(value?: string | null): string {
@@ -77,12 +94,7 @@ function formStateFromAsset(asset: ItAsset | null): AssetFormState {
     location: asset?.location ?? "",
     warrantyUntil: toDateInput(asset?.warrantyUntil),
     notes: asset?.notes ?? "",
-    cpu: asset?.specs?.cpu ?? "",
-    ramGb: asset?.specs?.ramGb?.toString() ?? "",
-    storage: asset?.specs?.storage ?? "",
-    os: asset?.specs?.os ?? "",
     imei: asset?.specs?.imei ?? "",
-    mac: asset?.specs?.mac ?? "",
   };
 }
 
@@ -98,7 +110,6 @@ const MANUAL_ASSET_STATUSES = ASSET_STATUSES.filter(
 export function AssetEditorPanel({
   mode,
   asset,
-  canEditAssetTag,
   isLoading,
   isSaving,
   loadError,
@@ -119,6 +130,8 @@ export function AssetEditorPanel({
     mode === "edit"
       ? "inventory-editor-title-edit"
       : "inventory-editor-title-new";
+  const usesHostname = HOSTNAME_ASSET_TYPES.has(form.type);
+  const technicalSpecs = technicalSpecRows(asset?.specs);
 
   useEffect(() => {
     isSavingRef.current = isSaving;
@@ -188,35 +201,28 @@ export function AssetEditorPanel({
     event.preventDefault();
     setSubmitError(null);
 
-    const ramGb = form.ramGb.trim() ? Number(form.ramGb) : undefined;
-    if (ramGb !== undefined && (!Number.isFinite(ramGb) || ramGb < 0)) {
+    const assetTag = form.assetTag.trim().toUpperCase();
+    if (mode === "edit" && !assetTag) {
       setSubmitError(
-        "La memoria RAM debe ser un número igual o mayor que cero.",
+        "La etiqueta no puede quedar vacía: poné el nombre de host o el código del equipo.",
       );
       return;
     }
+    if (assetTag && !ASSET_TAG_PATTERN.test(assetTag)) {
+      setSubmitError(ASSET_TAG_FORMAT_MESSAGE);
+      return;
+    }
 
+    // Se conserva lo técnico que ya tenga la ficha; a mano solo se toca el IMEI.
     const specs: AssetSpecs = { ...(asset?.specs ?? {}) };
-    const updateSpec = (
-      key: "cpu" | "ramGb" | "storage" | "os" | "imei" | "mac",
-      value: string | number | undefined,
-    ) => {
-      if (value === undefined || value === "") delete specs[key];
-      else (specs as Record<string, unknown>)[key] = value;
-    };
-    updateSpec("cpu", form.cpu.trim());
-    updateSpec("ramGb", ramGb);
-    updateSpec("storage", form.storage.trim());
-    updateSpec("os", form.os.trim());
-    updateSpec("imei", form.imei.trim());
-    updateSpec("mac", form.mac.trim());
+    if (IMEI_ASSET_TYPES.has(form.type)) {
+      const imei = form.imei.trim();
+      if (imei) specs.imei = imei;
+      else delete specs.imei;
+    }
 
-    const assetTag = form.assetTag.trim();
-    const shouldSendAssetTag = asset
-      ? canEditAssetTag &&
-        assetTag !== (asset.assetTag ?? "") &&
-        Boolean(assetTag)
-      : canEditAssetTag && Boolean(assetTag);
+    const shouldSendAssetTag =
+      Boolean(assetTag) && assetTag !== (asset?.assetTag ?? "").toUpperCase();
 
     const payload: AssetWritablePayload = {
       type: form.type,
@@ -337,6 +343,86 @@ export function AssetEditorPanel({
                   </select>
                 </label>
 
+                <div className="inventory-form__field">
+                  <label htmlFor="asset-tag">
+                    {usesHostname ? "Nombre de host" : "Etiqueta"}{" "}
+                    <span>{mode === "edit" ? "Obligatoria" : "Opcional"}</span>
+                  </label>
+                  <input
+                    ref={firstInputRef}
+                    id="asset-tag"
+                    value={form.assetTag}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={
+                      usesHostname
+                        ? "Ej. DESKTOP-4K2M1QF"
+                        : "Se genera si la dejás vacía"
+                    }
+                    aria-describedby="asset-tag-help"
+                    onChange={(event) =>
+                      updateField("assetTag", event.target.value.toUpperCase())
+                    }
+                  />
+                  <small id="asset-tag-help">
+                    {usesHostname
+                      ? "Es la etiqueta que se pega en el equipo. En Windows: Configuración → Sistema → Información → Nombre del dispositivo."
+                      : "Es la etiqueta que se pega en el equipo."}
+                    {mode === "create"
+                      ? " Si la dejás vacía, se genera un código provisorio para cambiarlo después."
+                      : null}
+                  </small>
+                </div>
+
+                <label>
+                  Marca
+                  <input
+                    required
+                    value={form.brand}
+                    autoComplete="off"
+                    onChange={(event) =>
+                      updateField("brand", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label>
+                  Modelo
+                  <input
+                    required
+                    value={form.model}
+                    autoComplete="off"
+                    onChange={(event) =>
+                      updateField("model", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label>
+                  Número de serie <span>Opcional</span>
+                  <input
+                    value={form.serialNumber}
+                    autoComplete="off"
+                    onChange={(event) =>
+                      updateField("serialNumber", event.target.value)
+                    }
+                  />
+                </label>
+
+                {IMEI_ASSET_TYPES.has(form.type) ? (
+                  <label>
+                    IMEI <span>Opcional</span>
+                    <input
+                      value={form.imei}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      onChange={(event) =>
+                        updateField("imei", event.target.value)
+                      }
+                    />
+                  </label>
+                ) : null}
+
                 {asset?.status === "ASSIGNED" ||
                 asset?.status === "IN_REPAIR" ? (
                   <div className="inventory-form__field">
@@ -378,64 +464,6 @@ export function AssetEditorPanel({
                 )}
 
                 <label>
-                  Marca
-                  <input
-                    ref={firstInputRef}
-                    required
-                    value={form.brand}
-                    autoComplete="off"
-                    onChange={(event) =>
-                      updateField("brand", event.target.value)
-                    }
-                  />
-                </label>
-
-                <label>
-                  Modelo
-                  <input
-                    required
-                    value={form.model}
-                    autoComplete="off"
-                    onChange={(event) =>
-                      updateField("model", event.target.value)
-                    }
-                  />
-                </label>
-
-                <label>
-                  Número de serie <span>Opcional</span>
-                  <input
-                    value={form.serialNumber}
-                    autoComplete="off"
-                    onChange={(event) =>
-                      updateField("serialNumber", event.target.value)
-                    }
-                  />
-                </label>
-
-                <div className="inventory-form__field">
-                  <label htmlFor="asset-tag">
-                    Etiqueta interna <span>Opcional</span>
-                  </label>
-                  <input
-                    id="asset-tag"
-                    value={form.assetTag}
-                    autoComplete="off"
-                    placeholder="Se genera si se deja vacía"
-                    disabled={!canEditAssetTag}
-                    aria-describedby="asset-tag-help"
-                    onChange={(event) =>
-                      updateField("assetTag", event.target.value)
-                    }
-                  />
-                  <small id="asset-tag-help">
-                    {!canEditAssetTag
-                      ? "Solo un administrador puede definir o cambiar la etiqueta."
-                      : "Si queda vacía, el servidor genera una etiqueta al crear."}
-                  </small>
-                </div>
-
-                <label>
                   Ubicación <span>Opcional</span>
                   <input
                     value={form.location}
@@ -459,69 +487,23 @@ export function AssetEditorPanel({
               </div>
             </fieldset>
 
-            <fieldset>
-              <legend>Especificaciones básicas</legend>
-              <div className="inventory-form__grid inventory-form__grid--specs">
-                <label>
-                  CPU <span>Opcional</span>
-                  <input
-                    value={form.cpu}
-                    autoComplete="off"
-                    onChange={(event) => updateField("cpu", event.target.value)}
-                  />
-                </label>
-                <label>
-                  RAM (GB) <span>Opcional</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={form.ramGb}
-                    onChange={(event) =>
-                      updateField("ramGb", event.target.value)
-                    }
-                  />
-                </label>
-                <label>
-                  Almacenamiento <span>Opcional</span>
-                  <input
-                    value={form.storage}
-                    autoComplete="off"
-                    placeholder="Ej. 512 GB SSD"
-                    onChange={(event) =>
-                      updateField("storage", event.target.value)
-                    }
-                  />
-                </label>
-                <label>
-                  Sistema operativo <span>Opcional</span>
-                  <input
-                    value={form.os}
-                    autoComplete="off"
-                    onChange={(event) => updateField("os", event.target.value)}
-                  />
-                </label>
-                <label>
-                  IMEI <span>Opcional</span>
-                  <input
-                    value={form.imei}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    onChange={(event) =>
-                      updateField("imei", event.target.value)
-                    }
-                  />
-                </label>
-                <label>
-                  Dirección MAC <span>Opcional</span>
-                  <input
-                    value={form.mac}
-                    autoComplete="off"
-                    onChange={(event) => updateField("mac", event.target.value)}
-                  />
-                </label>
-              </div>
-            </fieldset>
+            {technicalSpecs.length > 0 ? (
+              <fieldset>
+                <legend>Datos técnicos</legend>
+                <dl className="inventory-form__readonly">
+                  {technicalSpecs.map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <small className="inventory-form__readonly-note">
+                  Los informa el agente cuando el equipo se da de alta desde
+                  Equipos en vivo; acá no se editan.
+                </small>
+              </fieldset>
+            ) : null}
 
             <label className="inventory-form__notes">
               Notas <span>Opcional</span>

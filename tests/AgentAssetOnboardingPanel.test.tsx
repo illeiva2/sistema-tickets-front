@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildAgentAssetOnboardingSubmission,
   mapAgentToAssetOnboardingForm,
+  tagFromHostname,
 } from "../src/features/it/live/agentAssetOnboarding";
 import { AgentAssetOnboardingPanel } from "../src/features/it/live/components/AgentAssetOnboardingPanel";
 import type { AgentDevice } from "../src/features/it/live/types";
@@ -59,10 +60,18 @@ describe("mapeo de agente a alta patrimonial", () => {
       storage: "C: · Samsung PM9B1 · NVMe · 512 GB",
       os: "Windows 11 Pro · 10.0.26100",
       mac: "AA:BB:CC:DD:EE:FF",
-      notes: "Hostname reportado por agente: NB-CONTABLE-07",
+      assetTag: "NB-CONTABLE-07",
+      notes: "",
       personId: "",
       departmentId: "",
     });
+  });
+
+  it("propone el nombre de host como etiqueta cuando tiene formato de etiqueta", () => {
+    expect(tagFromHostname("NB-CONTABLE-07")).toBe("NB-CONTABLE-07");
+    expect(tagFromHostname("pc-ivan.grf.local")).toBe("PC-IVAN");
+    expect(tagFromHostname("Notebook de Ana")).toBe("");
+    expect(tagFromHostname("PC")).toBe("");
   });
 
   it("prioriza servidor por sistema operativo y usa desktop sin batería", () => {
@@ -139,7 +148,7 @@ describe("mapeo de agente a alta patrimonial", () => {
 
     const withCustody = buildAgentAssetOnboardingSubmission({
       ...form,
-      assetTag: "NB-107",
+      assetTag: "nb-107",
       location: "Administración",
       personId: "person-1",
       departmentId: "department-1",
@@ -154,7 +163,7 @@ describe("mapeo de agente a alta patrimonial", () => {
         serialNumber: "PF-123456",
         assetTag: "NB-107",
         location: "Administración",
-        notes: "Hostname reportado por agente: NB-CONTABLE-07",
+        notes: null,
         specs: {
           cpu: "Intel Core i7-1365U",
           ramGb: 32,
@@ -169,6 +178,9 @@ describe("mapeo de agente a alta patrimonial", () => {
         note: "Entrega inicial",
       },
     });
+    expect(() =>
+      buildAgentAssetOnboardingSubmission({ ...form, assetTag: "PC 01" }),
+    ).toThrow("La etiqueta solo puede tener letras, números y guiones");
   });
 });
 
@@ -211,9 +223,9 @@ describe("AgentAssetOnboardingPanel", () => {
       "",
     );
     expect(within(dialog).getByLabelText("Sector de custodia")).toHaveValue("");
-    expect(
-      within(dialog).queryByLabelText(/Etiqueta interna/),
-    ).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Nombre de host/)).toHaveValue(
+      "NB-CONTABLE-07",
+    );
     expect(dialog).toHaveTextContent(
       "No se asignará al usuario conectado automáticamente",
     );
@@ -250,6 +262,9 @@ describe("AgentAssetOnboardingPanel", () => {
         note: "Entrega inicial",
       },
     });
-    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("asset.assetTag");
+    expect(onSubmit.mock.calls[0][0]).toHaveProperty(
+      "asset.assetTag",
+      "NB-CONTABLE-07",
+    );
   });
 });
