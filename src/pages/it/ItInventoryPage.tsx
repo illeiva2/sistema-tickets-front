@@ -1,5 +1,12 @@
-import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -112,6 +119,24 @@ function ItInventoryPage() {
     saveAsset.reset();
     setEditor({ mode: "edit", assetId: asset.id });
   };
+
+  // Desde Red en vivo se llega con ?activo=<id>: abre la ficha de ese equipo y se saca de la
+  // URL para que cerrar la ficha no la vuelva a abrir.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedAssetId = searchParams.get("activo");
+  useEffect(() => {
+    if (!linkedAssetId) return;
+    saveAsset.reset();
+    setEditor({ mode: "edit", assetId: linkedAssetId });
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("activo");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedAssetId, saveAsset.reset, setSearchParams]);
 
   const closeCustody = useCallback(() => {
     setCustodyAssetId(null);

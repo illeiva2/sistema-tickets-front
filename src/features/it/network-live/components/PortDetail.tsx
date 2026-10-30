@@ -4,6 +4,7 @@ import { endpointTitle } from "../endpoints";
 import type { TreeEdge } from "../topology";
 import type { LiveDevice, LiveEndpoint, LivePort, LiveWifiClient } from "../types";
 import { wifiNetwork } from "../wifi";
+import { AssetLink } from "./AssetLink";
 import { RecentEvents } from "./RecentEvents";
 import { SignalBars } from "./WifiClients";
 import {
@@ -134,6 +135,7 @@ export function PortDetail({ device, port, edge, endpoints, wifiByMac, highlight
                     .filter(Boolean)
                     .join(" · ")}
                 </small>
+                {endpoint.asset ? <AssetLink asset={endpoint.asset} /> : null}
               </li>
             ))}
           </ul>

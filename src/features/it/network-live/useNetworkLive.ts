@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchNetworkEvents, fetchNetworkLive, searchNetworkLive, setDeviceAlertsMuted } from "./api";
+import {
+  fetchAssetNetworkLocation,
+  fetchNetworkEvents,
+  fetchNetworkLive,
+  searchNetworkLive,
+  setDeviceAlertsMuted,
+} from "./api";
 import type { LiveEventsQuery } from "./types";
 
 // El colector envía cada minuto: leer cada 30 s alcanza para ver el cambio a lo sumo
@@ -12,6 +18,7 @@ export const networkLiveKeys = {
   all: ["it", "network-live"] as const,
   search: (query: string) => ["it", "network-live", "search", query] as const,
   events: (query: LiveEventsQuery) => ["it", "network-live", "events", query] as const,
+  asset: (assetId: string) => ["it", "network-live", "asset", assetId] as const,
 };
 
 export function useNetworkLive(paused: boolean) {
@@ -33,6 +40,18 @@ export function useNetworkLiveSearch(query: string | null) {
     queryFn: () => searchNetworkLive(query ?? ""),
     enabled: query !== null && query.length >= 2,
     staleTime: 30_000,
+  });
+}
+
+/** Ficha del inventario: dónde está conectado el equipo. Se relee como la vista (cada 30 s). */
+export function useAssetNetworkLocation(assetId: string | null) {
+  return useQuery({
+    queryKey: networkLiveKeys.asset(assetId ?? "pending"),
+    queryFn: () => fetchAssetNetworkLocation(assetId ?? ""),
+    enabled: Boolean(assetId),
+    staleTime: 10_000,
+    refetchInterval: POLL_INTERVAL,
+    refetchIntervalInBackground: false,
   });
 }
 

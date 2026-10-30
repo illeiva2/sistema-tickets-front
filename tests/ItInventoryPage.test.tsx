@@ -354,6 +354,99 @@ describe("ItInventoryPage", () => {
     });
   });
 
+  it("abre la ficha que llega desde Red en vivo y dice dónde está conectado", async () => {
+    const fallback = apiMock.get.getMockImplementation()!;
+    apiMock.get.mockImplementation((url: string, config?: unknown) => {
+      if (url === `/api/it/network/live/assets/${baseAsset.id}`) {
+        return Promise.resolve({
+          data: {
+            success: true,
+            data: {
+              asset: { id: baseAsset.id, assetTag: baseAsset.assetTag },
+              sightings: [
+                {
+                  mac: "AA:BB:CC:00:00:01",
+                  ip: "192.168.100.45",
+                  vlan: 200,
+                  portKey: "ether12",
+                  shared: false,
+                  device: { id: "dev-s1", name: "SWT-013", role: "access" },
+                  via: null,
+                  wifi: null,
+                  lastSeenAt: new Date().toISOString(),
+                  online: true,
+                  matchedBy: "agent",
+                },
+                {
+                  mac: "AA:BB:CC:00:00:02",
+                  ip: "192.168.110.20",
+                  vlan: 300,
+                  portKey: "ether3",
+                  shared: false,
+                  device: { id: "dev-s2", name: "SWT-002", role: "access" },
+                  via: { id: "dev-ap", name: "AP-OFICINAS" },
+                  wifi: { ssid: "GRF_Privado", band: "5", signal: -60 },
+                  lastSeenAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+                  online: false,
+                  matchedBy: "hostname",
+                },
+              ],
+            },
+          },
+        });
+      }
+      return fallback(url, config);
+    });
+    renderInventory(`/it/inventory?activo=${baseAsset.id}`);
+
+    // La ficha se vuelve a montar cuando termina de cargar: se busca el bloque ya cargado.
+    const network = await screen.findByRole("group", { name: "En la red" });
+    expect(
+      screen.getByRole("dialog", { name: "Editar activo" }),
+    ).toContainElement(network);
+    expect(
+      await within(network).findByText("SWT-013 · puerto ether12"),
+    ).toBeInTheDocument();
+    expect(network).toHaveTextContent("Conectado ahora");
+    expect(network).toHaveTextContent("En línea");
+    expect(network).toHaveTextContent("192.168.100.45 · VLAN 200");
+    expect(network).toHaveTextContent(
+      "También se lo vio en Wi-Fi por AP-OFICINAS (GRF_Privado).",
+    );
+    expect(network).toHaveTextContent("Reconocido por su agente.");
+    expect(
+      within(network).getByRole("link", { name: /Ver en Red en vivo/ }),
+    ).toHaveAttribute("href", "/it/network-live?buscar=AA%3ABB%3ACC%3A00%3A00%3A01");
+  });
+
+  it("avisa cuando el equipo no aparece en Red en vivo", async () => {
+    const fallback = apiMock.get.getMockImplementation()!;
+    apiMock.get.mockImplementation((url: string, config?: unknown) =>
+      url === `/api/it/network/live/assets/${baseAsset.id}`
+        ? Promise.resolve({
+            data: {
+              success: true,
+              data: {
+                asset: { id: baseAsset.id, assetTag: baseAsset.assetTag },
+                sightings: [],
+              },
+            },
+          })
+        : fallback(url, config),
+    );
+    const user = userEvent.setup();
+    renderInventory();
+    await user.click(
+      await screen.findByRole("button", { name: `Editar ${baseAsset.assetTag}` }),
+    );
+
+    const network = await screen.findByRole("group", { name: "En la red" });
+    expect(
+      await within(network).findByText(/No aparece en Red en vivo/),
+    ).toBeInTheDocument();
+    expect(within(network).queryByRole("link")).toBeNull();
+  });
+
   it("ignora los enlaces viejos de alta desde una compra", async () => {
     // Compras y proveedores se sacó: un enlace guardado con el origen de
     // compra abre el inventario normal, sin consultar la orden.

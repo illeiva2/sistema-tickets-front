@@ -1,5 +1,6 @@
 import type { LiveWifiClient } from "../types";
 import { connectedFor, rateLabel, signalQuality, wifiNetwork, wifiTitle } from "../wifi";
+import { AssetLink } from "./AssetLink";
 
 /** Barras de señal (1 a 4) con su calidad en texto para lectores de pantalla. */
 export function SignalBars({ dbm }: { dbm: number | null }) {
@@ -61,6 +62,7 @@ export function WifiClients({ clients, total, highlightMac }: WifiClientsProps) 
                 .filter(Boolean)
                 .join(" · ")}
             </small>
+            {client.asset ? <AssetLink asset={client.asset} /> : null}
           </li>
         ))}
       </ul>

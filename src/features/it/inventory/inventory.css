@@ -747,6 +747,24 @@
   line-height: 1.45;
 }
 
+/* "En la red": de dónde sale el dato y el enlace a Red en vivo. */
+.inventory-network__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.inventory-network__footer .inventory-form__readonly-note {
+  margin-top: 0;
+}
+
+a.inventory-button {
+  text-decoration: none;
+}
+
 .inventory-form__error {
   display: flex;
   gap: 9px;
