@@ -24,7 +24,6 @@ type LookupsResultData =
   | {
       users?: MaintenanceLookups["performers"];
       performers?: MaintenanceLookups["performers"];
-      suppliers?: MaintenanceLookups["suppliers"];
       tickets?: MaintenanceLookups["tickets"];
     };
 
@@ -45,7 +44,6 @@ export async function fetchMaintenances(
         type: query.type || undefined,
         status: query.status || undefined,
         assetId: query.assetId || undefined,
-        supplierId: query.supplierId || undefined,
         scheduledFrom: query.scheduledFrom || undefined,
         scheduledTo: query.scheduledTo || undefined,
         page: query.page,
@@ -91,7 +89,6 @@ export async function fetchMaintenanceLookups(): Promise<MaintenanceLookups> {
   const data = response.data.data;
   return {
     performers: data.performers ?? ("users" in data ? data.users : []) ?? [],
-    suppliers: data.suppliers ?? [],
     tickets: data.tickets ?? [],
   };
 }

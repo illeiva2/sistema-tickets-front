@@ -354,90 +354,20 @@ describe("ItInventoryPage", () => {
     });
   });
 
-  it("valida una compra recibida y vincula el activo al renglón", async () => {
-    const purchaseId = "purchase-1";
-    const purchaseItemId = "purchase-item-1";
-    apiMock.get.mockImplementation((url: string) => {
-      if (url === "/api/it/assets")
-        return Promise.resolve(listResponse([baseAsset]));
-      if (url === `/api/it/purchases/${purchaseId}`) {
-        return Promise.resolve({
-          data: {
-            success: true,
-            data: {
-              purchase: {
-                id: purchaseId,
-                purchaseNumber: 42,
-                status: "RECEIVED",
-                supplierId: null,
-                supplier: null,
-                currency: "ARS",
-                totalAmount: "950000.00",
-                exchangeRate: null,
-                justification: "Renovación",
-                requestedById: "admin-1",
-                requestedBy: { id: "admin-1", name: "Admin IT" },
-                items: [
-                  {
-                    id: purchaseItemId,
-                    description: "Notebook Lenovo T14",
-                    quantity: 2,
-                    unitPrice: "475000.00",
-                    linkedAssetsCount: 1,
-                    linkedAssets: [],
-                  },
-                ],
-                createdAt: "2026-07-12T10:00:00.000Z",
-                updatedAt: "2026-07-13T12:00:00.000Z",
-              },
-            },
-          },
-        });
-      }
-      return Promise.reject(new Error(`Unexpected GET ${url}`));
-    });
-    const user = userEvent.setup();
+  it("ignora los enlaces viejos de alta desde una compra", async () => {
+    // Compras y proveedores se sacó: un enlace guardado con el origen de
+    // compra abre el inventario normal, sin consultar la orden.
     renderInventory(
-      `/it/inventory?purchaseId=${purchaseId}&purchaseItemId=${purchaseItemId}`,
+      "/it/inventory?purchaseId=purchase-1&purchaseItemId=purchase-item-1",
     );
-
-    const dialog = await screen.findByRole("dialog", {
-      name: "Registrar activo",
-    });
-    expect(
-      within(dialog).getByText("Alta vinculada a OC-0042"),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByText("Notebook Lenovo T14")).toBeInTheDocument();
-
-    await user.type(within(dialog).getByLabelText("Marca"), "Lenovo");
-    await user.type(within(dialog).getByLabelText("Modelo"), "ThinkPad T14");
-    await user.click(
-      within(dialog).getByRole("button", { name: "Registrar activo" }),
-    );
-
-    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
-    expect(apiMock.post).toHaveBeenCalledWith(
-      "/api/it/assets",
-      expect.objectContaining({
-        brand: "Lenovo",
-        model: "ThinkPad T14",
-        purchaseItemId,
-      }),
-    );
-  });
-
-  it("no consulta compras cuando falta un parámetro de origen", async () => {
-    renderInventory("/it/inventory?purchaseId=purchase-1");
     await screen.findAllByText("NB-0001");
 
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(
-      apiMock.get.mock.calls.some(
-        ([url]: [string]) => url === "/api/it/purchases/purchase-1",
+      apiMock.get.mock.calls.some(([url]: [string]) =>
+        url.startsWith("/api/it/purchases"),
       ),
     ).toBe(false);
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("origen de compra está incompleto"),
-    );
   });
 
   it("preserva ASSIGNED y no reenvía assetTag cuando edita un AGENT", async () => {

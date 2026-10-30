@@ -80,7 +80,7 @@ describe("ItOpsDashboardPage", () => {
     vi.clearAllMocks();
   });
 
-  it("usa los conteos persistidos como fuente principal y muestra categorías disjuntas", async () => {
+  it("usa los conteos persistidos y suma solo puestos y celulares", async () => {
     apiMock.get.mockResolvedValueOnce(overviewResponse);
 
     renderDashboard();
@@ -89,27 +89,22 @@ describe("ItOpsDashboardPage", () => {
     expect(screen.queryByText("Superficie declarada")).not.toBeInTheDocument();
     expect(screen.queryByText("225")).not.toBeInTheDocument();
 
+    // Sin Red y topología, la red y las cámaras cargadas a mano quedan
+    // afuera: el total es 48 puestos + 22 celulares.
     const totalCard = (await screen.findByText("Dispositivos gestionados"))
       .parentElement;
     expect(totalCard).not.toBeNull();
-    expect(within(totalCard!).getByText("133")).toBeInTheDocument();
+    expect(within(totalCard!).getByText("70")).toBeInTheDocument();
+    expect(screen.queryByText("133")).toBeNull();
 
     const workstationsCard =
       screen.getByText("Puestos de trabajo").parentElement;
     expect(workstationsCard).not.toBeNull();
     expect(within(workstationsCard!).getByText("48")).toBeInTheDocument();
 
-    const networkCard = screen.getByText(
-      "Infraestructura de red",
-    ).parentElement;
-    expect(networkCard).not.toBeNull();
-    expect(within(networkCard!).getByText("23")).toBeInTheDocument();
-
-    const camerasCard = screen.getByText(
-      "Inventario CCTV con cobertura básica",
-    ).parentElement;
-    expect(camerasCard).not.toBeNull();
-    expect(within(camerasCard!).getByText("40")).toBeInTheDocument();
+    expect(screen.queryByText("Infraestructura de red")).toBeNull();
+    expect(screen.queryByText("Cámaras")).toBeNull();
+    expect(screen.queryByText("Compras pendientes")).toBeNull();
 
     expect(apiMock.get).toHaveBeenCalledWith("/api/it/overview");
     const phoneLinesCard = screen.getByText("Líneas asignadas").parentElement;
@@ -125,24 +120,24 @@ describe("ItOpsDashboardPage", () => {
     const inventoryLink = screen.getByRole("link", { name: "Activos" });
     expect(inventoryLink).toHaveAttribute("href", "/it/inventory");
     expect(inventoryLink).toHaveAttribute("data-status", "available");
-    expect(screen.getAllByText(/Abrir módulo · Disponible/i)).toHaveLength(8);
+    expect(screen.getAllByText(/Abrir módulo · Disponible/i)).toHaveLength(6);
 
     const peopleLink = screen.getByRole("link", { name: "Personas" });
     expect(peopleLink).toHaveAttribute("data-status", "available");
     expect(peopleLink).toHaveAttribute("href", "/it/staff");
 
-    for (const moduleName of ["Mantenimiento", "Compras", "Red", "Monitoreo"]) {
+    for (const moduleName of ["Mantenimiento", "Monitoreo", "Red en vivo"]) {
       expect(screen.getByRole("link", { name: moduleName })).toHaveAttribute(
         "data-status",
         "available",
       );
     }
 
-    const camerasLink = screen.getByRole("link", { name: "Cámaras" });
-    expect(camerasLink).toHaveAttribute("data-status", "limited");
-    expect(
-      screen.getByText(/Abrir módulo · Cobertura básica/i),
-    ).toBeInTheDocument();
+    // Compras y proveedores y Red y topología (con sus cámaras) se sacaron.
+    for (const removed of ["Compras", "Red", "Cámaras"]) {
+      expect(screen.queryByRole("link", { name: removed })).toBeNull();
+    }
+    expect(screen.queryByText(/Abrir módulo · Cobertura básica/i)).toBeNull();
 
     const phoneLinesLink = screen.getByRole("link", { name: "Líneas" });
     expect(phoneLinesLink).toHaveAttribute("data-status", "available");

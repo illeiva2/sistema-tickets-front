@@ -1,0 +1,221 @@
+/* Base de la página de Red en vivo (marco, encabezado, botones y estados).
+ * Viene de network.css de Red y topología, que se sacó en oct-2026: quedan solo
+ * las reglas de las clases que usa esta página. */
+.it-network {
+  --net-bg: #030709;
+  --net-panel: #071014;
+  --net-raised: #0b171c;
+  --net-line: #1c343b;
+  --net-line2: #31525b;
+  --net-text: #e9f7f7;
+  --net-muted: #86a1a8;
+  --net-accent: #5dffcf;
+  --net-cyan: #54d8ff;
+  --net-red: #ff667d;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--net-text);
+  border: 1px solid var(--net-line2);
+  border-radius: 2px;
+  background:
+    radial-gradient(
+      circle at 83% 0,
+      rgba(84, 216, 255, 0.12),
+      transparent 28rem
+    ),
+    linear-gradient(145deg, #071014, var(--net-bg) 66%, #07070b);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+.it-network:before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(93, 255, 207, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(93, 255, 207, 0.12) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(to bottom, #000, transparent 54%);
+}
+.network-commandbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  min-height: 46px;
+  border-bottom: 1px solid var(--net-line);
+  background: rgba(2, 6, 8, 0.88);
+  font:
+    700 0.62rem/1 Consolas,
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.network-commandbar > span:first-child {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  color: #00130e;
+  background: var(--net-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+.network-commandbar > span:nth-child(2) {
+  padding: 0 16px;
+  color: var(--net-muted);
+}
+.network-commandbar > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 16px;
+  color: var(--net-cyan);
+}
+.network-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 30px;
+  padding: clamp(28px, 5vw, 50px);
+  border-bottom: 1px solid var(--net-line);
+}
+.network-header > div:first-child {
+  max-width: 760px;
+}
+.network-header p {
+  margin: 0 0 10px;
+  color: var(--net-accent);
+  font:
+    700 0.64rem Consolas,
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.network-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+.network-header > div:first-child > span {
+  display: block;
+  max-width: 700px;
+  margin-top: 16px;
+  color: #a7bcc1;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+.network-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.network-button,
+.network-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  color: var(--net-text);
+  border: 1px solid var(--net-line2);
+  border-radius: 2px;
+  background: var(--net-raised);
+  font:
+    700 0.68rem Consolas,
+    monospace;
+  letter-spacing: 0.02em;
+}
+.network-button:hover:not(:disabled),
+.network-icon-button:hover:not(:disabled) {
+  border-color: var(--net-accent);
+  color: var(--net-accent);
+}
+.network-button:focus-visible,
+.network-icon-button:focus-visible {
+  outline: 2px solid var(--net-accent);
+  outline-offset: 2px;
+}
+.network-button:disabled,
+.network-icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.network-button--ghost {
+  background: transparent;
+}
+.network-icon-button {
+  width: 38px;
+  padding: 0;
+}
+.network-content {
+  padding: clamp(22px, 4vw, 42px);
+}
+.network-state,
+.network-empty {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  min-height: 250px;
+  place-content: center;
+  padding: 30px;
+  color: var(--net-muted);
+  border: 1px dashed var(--net-line2);
+  text-align: center;
+}
+.network-state strong,
+.network-empty strong {
+  color: var(--net-text);
+}
+.network-state p,
+.network-empty p {
+  max-width: 500px;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.network-state--error {
+  color: var(--net-red);
+}
+.network-spin {
+  animation: network-spin 0.8s linear infinite;
+}
+@keyframes network-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 900px) {
+  .network-commandbar {
+    grid-template-columns: auto 1fr;
+  }
+  .network-commandbar > span:nth-child(2) {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .network-commandbar > span:last-child {
+    margin-right: 8px;
+  }
+  .network-header {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 26px 20px;
+  }
+  .network-header__actions {
+    justify-content: flex-end;
+  }
+  .network-content {
+    padding: 18px 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .network-spin {
+    animation: none;
+  }
+}

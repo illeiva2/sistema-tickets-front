@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
@@ -16,7 +15,7 @@ import {
   Siren,
   X,
 } from "lucide-react";
-import "@/features/it/network/network.css";
+import "@/features/it/network-live/networkBase.css";
 import "@/features/it/network-live/networkLive.css";
 import { useAuth } from "@/hooks/useAuth";
 import { formatHeartbeat } from "@/features/it/live/format";
@@ -306,9 +305,6 @@ export default function ItNetworkLivePage() {
           </span>
         </div>
         <div className="network-header__actions">
-          <Link className="network-button network-button--ghost" to="/it/network">
-            Inventario manual
-          </Link>
           <button
             type="button"
             className="network-button network-button--ghost"

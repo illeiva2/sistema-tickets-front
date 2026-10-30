@@ -1,10 +1,8 @@
 import {
   Activity,
   AlertTriangle,
-  Camera,
   HardDrive,
   Monitor,
-  Network,
   RefreshCw,
   Smartphone,
   Users,
@@ -22,7 +20,7 @@ interface PersistedMetric {
   tone: "cyan" | "amber" | "neutral";
 }
 
-const LOADING_CARDS = Array.from({ length: 10 }, (_, index) => index);
+const LOADING_CARDS = Array.from({ length: 7 }, (_, index) => index);
 
 const formatCount = (value: number) => value.toLocaleString("es-AR");
 
@@ -40,8 +38,13 @@ export function PersistedOverviewPanel() {
         {
           id: "managed-total",
           label: "Dispositivos gestionados",
-          value: formatCount(data.counts.managedDevices.total),
-          note: "Suma disjunta de puestos, celulares, red y cámaras",
+          // Sin Red y topología, la red y las cámaras cargadas a mano ya no
+          // se mantienen: el total es de puestos y celulares del inventario.
+          value: formatCount(
+            data.counts.managedDevices.workstations +
+              data.counts.managedDevices.phones,
+          ),
+          note: "Puestos de trabajo y celulares del inventario",
           icon: HardDrive,
           tone: "cyan",
         },
@@ -60,22 +63,6 @@ export function PersistedOverviewPanel() {
           note: "Terminales PHONE del inventario",
           icon: Smartphone,
           tone: "cyan",
-        },
-        {
-          id: "network-infrastructure",
-          label: "Infraestructura de red",
-          value: formatCount(data.counts.managedDevices.networkInfrastructure),
-          note: "Dispositivos operativos, sin incluir cámaras",
-          icon: Network,
-          tone: "cyan",
-        },
-        {
-          id: "cameras",
-          label: "Cámaras",
-          value: formatCount(data.counts.managedDevices.cameras),
-          note: "Inventario CCTV con cobertura básica",
-          icon: Camera,
-          tone: "amber",
         },
         {
           id: "people-active",
@@ -109,14 +96,6 @@ export function PersistedOverviewPanel() {
           icon: Wrench,
           tone: "amber",
         },
-        {
-          id: "purchases-pending",
-          label: "Compras pendientes",
-          value: formatCount(data.counts.purchases.pendingApproval),
-          note: "Solicitudes a la espera de autorización",
-          icon: HardDrive,
-          tone: "amber",
-        },
       ]
     : [];
 
@@ -127,8 +106,8 @@ export function PersistedOverviewPanel() {
           <span className="ops-section__index">01 / ESTADO REAL</span>
           <h2 id="ops-live-title">Lectura operativa real</h2>
           <p>
-            Conteos actuales del sistema. El total suma categorías disjuntas: un
-            activo patrimonial vinculado a red no se vuelve a contar.
+            Conteos actuales del sistema: inventario, personas, agentes, líneas
+            y mantenimientos.
           </p>
         </div>
 

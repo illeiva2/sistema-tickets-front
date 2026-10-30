@@ -62,7 +62,7 @@ interface MaintenanceFormState {
   performedAt: string;
   description: string;
   performedById: string;
-  supplierId: string;
+  supplierName: string;
   costAmount: string;
   currency: MaintenanceCurrency;
   parts: PartFormState[];
@@ -110,7 +110,7 @@ function formStateFromMaintenance(
     description: maintenance?.description ?? "",
     performedById:
       maintenance?.performedById ?? maintenance?.performedBy?.id ?? "",
-    supplierId: maintenance?.supplierId ?? maintenance?.supplier?.id ?? "",
+    supplierName: maintenance?.supplierName ?? "",
     costAmount:
       maintenance?.costAmount === null || maintenance?.costAmount === undefined
         ? ""
@@ -187,13 +187,6 @@ export function MaintenanceEditorPanel({
     )
       ? [baseMaintenance.performedBy, ...lookups.performers]
       : lookups.performers;
-  const supplierOptions =
-    baseMaintenance?.supplier &&
-    !lookups.suppliers.some(
-      (supplier) => supplier.id === baseMaintenance.supplier?.id,
-    )
-      ? [baseMaintenance.supplier, ...lookups.suppliers]
-      : lookups.suppliers;
 
   useEffect(() => {
     isSavingRef.current = isSaving;
@@ -338,7 +331,7 @@ export function MaintenanceEditorPanel({
     if (
       form.status === "COMPLETED" &&
       !form.performedById &&
-      !form.supplierId
+      !form.supplierName.trim()
     ) {
       setSubmitError(
         "Indicá el responsable interno o el proveedor que realizó el mantenimiento.",
@@ -383,7 +376,7 @@ export function MaintenanceEditorPanel({
       performedAt: form.status === "COMPLETED" ? toIso(form.performedAt) : null,
       description: form.description.trim(),
       performedById: optionalId(form.performedById),
-      supplierId: optionalId(form.supplierId),
+      supplierName: form.supplierName.trim() || null,
       costAmount,
       currency: form.currency,
       parts,
@@ -671,7 +664,7 @@ export function MaintenanceEditorPanel({
                   <AlertTriangle size={16} aria-hidden="true" />
                   <div>
                     <strong>
-                      No se pudieron cargar responsables y proveedores
+                      No se pudieron cargar responsables y tickets
                     </strong>
                     <p>{lookupsError}</p>
                     <button type="button" onClick={onRetryLookups}>
@@ -700,20 +693,14 @@ export function MaintenanceEditorPanel({
                 </label>
                 <label>
                   Proveedor <span>Opcional</span>
-                  <select
-                    value={form.supplierId}
-                    disabled={lookupsLoading || Boolean(lookupsError)}
+                  <input
+                    value={form.supplierName}
+                    maxLength={200}
+                    placeholder="Empresa o técnico externo"
                     onChange={(event) =>
-                      updateField("supplierId", event.target.value)
+                      updateField("supplierName", event.target.value)
                     }
-                  >
-                    <option value="">Sin proveedor externo</option>
-                    {supplierOptions.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
                 <label>
                   Ticket vinculado <span>Opcional</span>
