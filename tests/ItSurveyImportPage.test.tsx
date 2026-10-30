@@ -17,7 +17,10 @@ import api from "../src/lib/api";
 import ItSurveyImportPage from "../src/pages/it/ItSurveyImportPage";
 import type { SurveyItem, SurveyPreview } from "../src/features/it/survey-import/types";
 
-const apiMock = api as unknown as { post: ReturnType<typeof vi.fn> };
+const apiMock = api as unknown as {
+  post: ReturnType<typeof vi.fn>;
+  put: ReturnType<typeof vi.fn>;
+};
 const CSV = "Marca temporal,Dirección de correo electrónico,Nombre y apellido\n29/10/2026,aperez@empresa.test,Ana Pérez\n";
 const HASH = "a".repeat(64);
 
@@ -39,8 +42,14 @@ const preview = (overrides: Partial<SurveyPreview> = {}): SurveyPreview => ({
   responses: 3,
   counts: { create: 2, assign: 1, update: 0, unchanged: 1, conflict: 1 },
   sectors: [
-    { value: "Compras", responses: 2, departmentId: "dep-compras", source: "auto" },
-    { value: "Taller (Maquinarias)", responses: 1, departmentId: null, source: null },
+    { key: "compras", value: "Compras", responses: 2, departmentId: "dep-compras", source: "auto" },
+    {
+      key: "taller (maquinarias)",
+      value: "Taller (Maquinarias)",
+      responses: 1,
+      departmentId: null,
+      source: null,
+    },
   ],
   departments: [
     { id: "dep-compras", name: "Compras" },
@@ -88,6 +97,7 @@ const preview = (overrides: Partial<SurveyPreview> = {}): SurveyPreview => ({
   notes: [
     { row: 4, name: "Bruno Díaz", otherEquipment: "Un monitor de 24 pulgadas", comments: null },
   ],
+  corrections: [],
   ...overrides,
 });
 
@@ -129,7 +139,7 @@ describe("Importar relevamiento", () => {
 
     expect(await screen.findByText("Relevamiento de equipos (respuestas).csv")).toBeInTheDocument();
     expect(apiMock.post).toHaveBeenCalledTimes(1);
-    expect(apiMock.post).toHaveBeenCalledWith("/api/it/survey-import/preview", { csv: CSV, sectorMap: {} });
+    expect(apiMock.post).toHaveBeenCalledWith("/api/it/survey-import/preview", { csv: CSV });
 
     const summary = screen.getByRole("region", { name: "Resumen" });
     expect(within(summary).getByText("Para crear").closest("article")).toHaveTextContent("2");
@@ -166,8 +176,23 @@ describe("Importar relevamiento", () => {
     expect(within(people).getByText("Ana Pérez").closest("li")).toHaveTextContent("Sin cambios");
   });
 
-  it("al elegir el sector de uno que no coincide, vuelve a pedir la vista previa", async () => {
+  it("al elegir el sector de uno que no coincide, lo guarda y muestra la vista previa con él", async () => {
     apiMock.post.mockImplementation(() => ok(preview()));
+    apiMock.put.mockImplementation(() =>
+      ok(
+        preview({
+          sectors: [
+            {
+              key: "taller (maquinarias)",
+              value: "Taller (Maquinarias)",
+              responses: 1,
+              departmentId: "dep-taller",
+              source: "manual",
+            },
+          ],
+        }),
+      ),
+    );
     renderPage();
     const user = await chooseCsv();
 
@@ -175,11 +200,13 @@ describe("Importar relevamiento", () => {
     expect(sectors).toHaveTextContent("No coincide con ningún sector del sistema");
     await user.selectOptions(within(sectors).getByLabelText(/Taller \(Maquinarias\)/), "dep-taller");
 
-    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
-    expect(apiMock.post).toHaveBeenLastCalledWith("/api/it/survey-import/preview", {
+    await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(1));
+    expect(apiMock.put).toHaveBeenCalledWith("/api/it/survey-import/corrections", {
       csv: CSV,
-      sectorMap: { "Taller (Maquinarias)": "dep-taller" },
+      corrections: [{ scope: "sector", key: "taller (maquinarias)", value: { departmentId: "dep-taller" } }],
     });
+    await waitFor(() => expect(sectors).not.toHaveTextContent("No coincide con ningún sector del sistema"));
+    expect(apiMock.post).toHaveBeenCalledTimes(1);
   });
 
   it("importa con el plan que se vio y muestra lo que se guardó", async () => {
@@ -203,7 +230,6 @@ describe("Importar relevamiento", () => {
 
     expect(apiMock.post).toHaveBeenLastCalledWith("/api/it/survey-import/apply", {
       csv: CSV,
-      sectorMap: {},
       expectedPlanHash: HASH,
     });
     const done = await screen.findByText("Relevamiento importado");
@@ -273,5 +299,217 @@ describe("Importar relevamiento", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("El archivo es demasiado grande");
     expect(apiMock.post).not.toHaveBeenCalled();
+  });
+
+  it("corrige un nombre a mano y muestra la vista previa con la corrección", async () => {
+    const conflict = item({
+      key: "82YU",
+      title: "82YU",
+      action: "conflict",
+      holder: "Darío Ruiz",
+      notes: ["82YU no sigue el estándar PUESTO###: corregilo o confirmá que está bien así."],
+      confirmName: true,
+      edits: [
+        { scope: "hostname", key: "82YU", from: "82YU", responses: 1, tag: "82YU" },
+        {
+          scope: "computer",
+          key: "hp|prodesk400",
+          from: "HP prodesk 400",
+          responses: 2,
+          brand: "HP",
+          model: "ProDesk 400",
+        },
+      ],
+    });
+    const corrected = item({
+      key: "PUESTO021",
+      title: "PUESTO021",
+      action: "create",
+      fixes: [{ field: "hostname", from: "82YU", to: "PUESTO021", source: "manual" }],
+      edits: [{ scope: "hostname", key: "82YU", from: "82YU", responses: 1, tag: "PUESTO021" }],
+    });
+    apiMock.post.mockImplementation(() => ok(preview({ items: [conflict] })));
+    apiMock.put.mockImplementation(() => ok(preview({ items: [corrected] })));
+    renderPage();
+    const user = await chooseCsv();
+
+    await user.click(await screen.findByRole("button", { name: "Corregir 82YU" }));
+    const form = screen.getByRole("form", { name: "Corregir" });
+    expect(form).toHaveTextContent("Cambia las 2 respuestas con «HP ProDesk 400».");
+    const name = within(form).getByLabelText("Nombre de la PC");
+    await user.clear(name);
+    await user.type(name, "puesto 21");
+    await user.click(within(form).getByRole("button", { name: "Guardar" }));
+    expect(await within(form).findByRole("alert")).toHaveTextContent("letras, números y guiones");
+    expect(apiMock.put).not.toHaveBeenCalled();
+
+    await user.clear(name);
+    await user.type(name, "puesto021");
+    await user.click(within(form).getByRole("button", { name: "Guardar" }));
+
+    // Solo lo que cambió: la marca y el modelo quedan como estaban.
+    expect(apiMock.put).toHaveBeenCalledWith("/api/it/survey-import/corrections", {
+      csv: CSV,
+      corrections: [{ scope: "hostname", key: "82YU", value: { tag: "PUESTO021" } }],
+    });
+    const computers = screen.getByRole("region", { name: /Computadoras/ });
+    const fixed = await within(computers).findByText("PUESTO021");
+    expect(fixed.closest("li")).toHaveTextContent("A mano«82YU» → PUESTO021");
+    expect(screen.queryByRole("form", { name: "Corregir" })).not.toBeInTheDocument();
+  });
+
+  it("confirma un nombre fuera del estándar o usa la computadora que ya tiene", async () => {
+    const conflict = item({
+      key: "82YU",
+      title: "82YU",
+      action: "conflict",
+      suggestions: ["PUESTO020"],
+      confirmName: true,
+      edits: [{ scope: "hostname", key: "82YU", from: "82YU", responses: 1, tag: "82YU" }],
+    });
+    apiMock.post.mockImplementation(() => ok(preview({ items: [conflict] })));
+    apiMock.put.mockImplementation(() => ok(preview({ items: [conflict] })));
+    renderPage();
+    const user = await chooseCsv();
+
+    await user.click(await screen.findByRole("button", { name: "Usar PUESTO020" }));
+    expect(apiMock.put).toHaveBeenLastCalledWith("/api/it/survey-import/corrections", {
+      csv: CSV,
+      corrections: [{ scope: "hostname", key: "82YU", value: { tag: "PUESTO020" } }],
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Es correcto así" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Es correcto así" }));
+    expect(apiMock.put).toHaveBeenLastCalledWith("/api/it/survey-import/corrections", {
+      csv: CSV,
+      corrections: [{ scope: "hostname", key: "82YU", value: { tag: "82YU" } }],
+    });
+  });
+
+  it("muestra en el formulario lo que el back no acepta", async () => {
+    const phone = item({
+      kind: "phone",
+      key: "phone:2:1",
+      title: "Samsung Galaxy A14",
+      detail: "Número no reconocido: 4555",
+      edits: [
+        {
+          scope: "phone",
+          key: "samsung|galaxya14",
+          from: "Samsung Galaxy A14",
+          responses: 1,
+          brand: "Samsung",
+          model: "Galaxy A14",
+        },
+        { scope: "number", key: "4555", from: "4555", responses: 1, number: "4555" },
+      ],
+    });
+    apiMock.post.mockImplementation(() => ok(preview({ items: [phone] })));
+    apiMock.put.mockImplementation(() =>
+      fail(400, {
+        code: "VALIDATION_ERROR",
+        message: "Datos de entrada inválidos",
+        details: [{ field: "body.corrections.0.value.number", message: "No parece un número de celular" }],
+      }),
+    );
+    renderPage();
+    const user = await chooseCsv();
+
+    await user.click(await screen.findByRole("button", { name: "Corregir Samsung Galaxy A14" }));
+    const form = screen.getByRole("form", { name: "Corregir" });
+    const number = within(form).getByLabelText("Número");
+    await user.clear(number);
+    await user.type(number, "12345");
+    await user.click(within(form).getByRole("button", { name: "Guardar" }));
+
+    expect(await within(form).findByRole("alert")).toHaveTextContent("No parece un número de celular");
+    expect(apiMock.put).toHaveBeenCalledWith("/api/it/survey-import/corrections", {
+      csv: CSV,
+      corrections: [{ scope: "number", key: "4555", value: { number: "12345" } }],
+    });
+    // Queda abierto para corregirlo.
+    expect(within(form).getByLabelText("Número")).toHaveValue("12345");
+  });
+
+  it("lista las correcciones y deja deshacerlas", async () => {
+    const corrections: SurveyPreview["corrections"] = [
+      {
+        scope: "hostname",
+        key: "PUERTO058",
+        from: "PUERTO058",
+        to: "PUESTO058",
+        source: "auto",
+        responses: 1,
+        undo: { tag: "PUERTO058" },
+      },
+      { scope: "hostname", key: "82YU", from: "82YU", to: "PUESTO020", source: "manual", responses: 1 },
+      {
+        scope: "phone",
+        key: "samsung|galaxya032m",
+        from: "Motorola galaxy a032m",
+        to: "Samsung Galaxy A032M",
+        source: "auto",
+        responses: 2,
+      },
+    ];
+    apiMock.post.mockImplementation(() => ok(preview({ corrections })));
+    apiMock.put.mockImplementation(() => ok(preview({ corrections })));
+    renderPage();
+    const user = await chooseCsv();
+
+    const panel = await screen.findByRole("region", { name: /Correcciones/ });
+    const phones = within(panel).getByText("Marca y modelo de celulares").nextElementSibling;
+    expect(phones).toHaveTextContent("Automática«Motorola galaxy a032m» → Samsung Galaxy A032M");
+    expect(phones).toHaveTextContent("2 respuestas");
+    // La de marca y modelo se cambia con el lápiz del ítem: no tiene botón.
+    expect(within(panel).getAllByRole("button")).toHaveLength(2);
+
+    await user.click(within(panel).getByRole("button", { name: "Deshacer «82YU» → PUESTO020" }));
+    expect(apiMock.put).toHaveBeenLastCalledWith("/api/it/survey-import/corrections", {
+      csv: CSV,
+      corrections: [{ scope: "hostname", key: "82YU", value: null }],
+    });
+    const keep = within(panel).getByRole("button", { name: "Dejar «PUERTO058» como estaba" });
+    await waitFor(() => expect(keep).toBeEnabled());
+    await user.click(keep);
+    expect(apiMock.put).toHaveBeenLastCalledWith("/api/it/survey-import/corrections", {
+      csv: CSV,
+      corrections: [{ scope: "hostname", key: "PUERTO058", value: { tag: "PUERTO058" } }],
+    });
+  });
+
+  it("después de importar, las correcciones solo se muestran", async () => {
+    const shown = preview({
+      items: [
+        item({
+          fixes: [{ field: "hostname", from: "nb ana", to: "NB-ANA", source: "manual" }],
+          edits: [{ scope: "hostname", key: "NB ANA", from: "nb ana", responses: 1, tag: "NB-ANA" }],
+        }),
+      ],
+      corrections: [
+        { scope: "hostname", key: "NB ANA", from: "nb ana", to: "NB-ANA", source: "manual", responses: 1 },
+      ],
+    });
+    apiMock.post.mockImplementation((url: string) =>
+      url.endsWith("/preview")
+        ? ok(shown)
+        : ok({
+            applied: {
+              people: { created: 0, updated: 0 },
+              assets: { created: 1, assigned: 0, updated: 0 },
+              lines: { created: 0, assigned: 0, updated: 0 },
+            },
+            preview: shown,
+          }),
+    );
+    renderPage();
+    const user = await chooseCsv();
+
+    expect(await screen.findByRole("button", { name: "Corregir NB-ANA" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+
+    await screen.findByText("Relevamiento importado");
+    expect(screen.queryByRole("button", { name: /Corregir/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Deshacer/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /Correcciones/ })).toHaveTextContent("«nb ana» → NB-ANA");
   });
 });

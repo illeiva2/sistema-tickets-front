@@ -290,6 +290,189 @@
   color: #ffd49a;
 }
 
+/* Correcciones: lo que cambió el autocorrector o IT, y el lápiz para corregir. */
+.survey-item__fixes {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  color: #bccbce;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  list-style: none;
+}
+
+.survey-item__fixes li {
+  overflow-wrap: anywhere;
+}
+
+.survey-fix-source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  margin-right: 8px;
+  padding: 0 6px;
+  color: var(--inventory-cyan);
+  border: 1px solid rgba(84, 230, 239, 0.3);
+  background: var(--inventory-cyan-soft);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
+.survey-fix-source[data-source="manual"] {
+  color: #d4c4ff;
+  border-color: rgba(212, 196, 255, 0.34);
+  background: rgba(212, 196, 255, 0.08);
+}
+
+.survey-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.survey-item__actions .inventory-button,
+.survey-corrections .inventory-button,
+.survey-editor .inventory-button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.survey-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--inventory-line-strong);
+  background: rgba(4, 10, 12, 0.94);
+}
+
+.survey-editor__field {
+  display: grid;
+  gap: 6px;
+}
+
+.survey-editor label {
+  display: grid;
+  gap: 6px;
+  color: var(--inventory-muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.survey-editor label em {
+  font-style: normal;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.survey-editor input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--inventory-text);
+  border: 1px solid var(--inventory-line-strong);
+  border-radius: 1px;
+  background: #070d10;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.survey-editor__field > small {
+  color: #7f9398;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.survey-editor__device {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.survey-editor__error {
+  margin: 0;
+  color: var(--inventory-amber);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.survey-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.survey-corrections__group + .survey-corrections__group {
+  margin-top: 14px;
+}
+
+.survey-corrections h3 {
+  margin: 0 0 8px;
+  color: var(--inventory-muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.survey-corrections ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--inventory-line);
+  background: var(--inventory-line);
+}
+
+.survey-corrections li {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  background: rgba(7, 13, 16, 0.96);
+}
+
+.survey-corrections li .survey-fix-source {
+  justify-self: start;
+  margin: 0;
+}
+
+.survey-corrections__change {
+  min-width: 0;
+  color: #bccbce;
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.survey-corrections__change strong {
+  color: var(--inventory-text);
+  font-weight: 600;
+}
+
+.survey-corrections li > small {
+  color: var(--inventory-muted);
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
 .survey-item__holder {
   display: grid;
   gap: 2px;
@@ -407,5 +590,23 @@
   .survey-confirm {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .survey-editor__device {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .survey-corrections li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    padding: 10px 12px;
+  }
+
+  .survey-corrections__change {
+    grid-column: 1 / -1;
+  }
+
+  .survey-corrections li .inventory-button {
+    justify-self: end;
   }
 }

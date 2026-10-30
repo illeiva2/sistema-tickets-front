@@ -7,6 +7,25 @@ export type SurveyAction =
 
 export type SurveyItemKind = "person" | "computer" | "phone" | "line";
 
+/** Una corrección aplicada a lo que escribieron. */
+export interface SurveyFix {
+  field: "hostname" | "device" | "number";
+  from: string;
+  to: string;
+  // auto: el autocorrector; manual: la corrigió IT.
+  source: "auto" | "manual";
+}
+
+/**
+ * Lo que se puede corregir a mano en un ítem: una corrección por clave, que vale
+ * para todas las respuestas que dicen lo mismo (responses).
+ */
+export type SurveyEdit = { key: string; from: string; responses: number } & (
+  | { scope: "hostname"; tag: string }
+  | { scope: "phone" | "computer"; brand: string; model: string }
+  | { scope: "number"; number: string }
+);
+
 export interface SurveyItem {
   kind: SurveyItemKind;
   key: string;
@@ -17,9 +36,17 @@ export interface SurveyItem {
   notes: string[];
   // Filas de la planilla (la 1 es la de los títulos).
   rows: number[];
+  fixes?: SurveyFix[];
+  edits?: SurveyEdit[];
+  // Nombres para elegir: las computadoras que la persona ya tiene asignadas.
+  suggestions?: string[];
+  // El nombre sirve de etiqueta pero no sigue el estándar: se puede confirmar.
+  confirmName?: boolean;
 }
 
 export interface SurveySector {
+  // Clave de la corrección del sector.
+  key: string;
   value: string;
   responses: number;
   departmentId: string | null;
@@ -47,7 +74,36 @@ export interface SurveyPreview {
   items: SurveyItem[];
   issues: SurveyIssue[];
   notes: SurveyNote[];
+  corrections: SurveyCorrection[];
 }
+
+/** Resumen de las correcciones de la vista previa. */
+export interface SurveyCorrection {
+  scope: "hostname" | "phone" | "computer" | "number";
+  key: string;
+  from: string;
+  to: string;
+  source: "auto" | "manual";
+  // En cuántas respuestas se aplica.
+  responses: number;
+  // Autocorrector de nombres: el valor que lo deja como lo escribieron.
+  undo?: { tag: string };
+}
+
+/** Lo que se guarda: null deshace la corrección. */
+export type SurveyCorrectionInput =
+  | { scope: "hostname"; key: string; value: { tag: string } | null }
+  | {
+      scope: "phone" | "computer";
+      key: string;
+      value: { brand: string; model: string } | null;
+    }
+  | { scope: "number"; key: string; value: { number: string } | null }
+  | {
+      scope: "sector";
+      key: string;
+      value: { departmentId: string | null } | null;
+    };
 
 export interface SurveyApplied {
   people: { created: number; updated: number };
@@ -59,9 +115,6 @@ export interface SurveyApplyResult {
   applied: SurveyApplied;
   preview: SurveyPreview;
 }
-
-// Sector del formulario → sector del sistema (null: sin sector).
-export type SurveySectorMap = Record<string, string | null>;
 
 export const SURVEY_ACTION_LABELS: Record<SurveyAction, string> = {
   create: "Se crea",

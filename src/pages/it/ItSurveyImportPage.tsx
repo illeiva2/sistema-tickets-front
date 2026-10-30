@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   ListChecks,
   Loader2,
+  Pencil,
   ShieldCheck,
   Upload,
 } from "lucide-react";
@@ -21,15 +22,21 @@ import {
   applySurveyImport,
   getSurveyError,
   previewSurveyImport,
+  saveSurveyCorrections,
 } from "@/features/it/survey-import/api";
+import {
+  FIX_SOURCE_LABELS,
+  SurveyCorrections,
+} from "@/features/it/survey-import/components/SurveyCorrections";
+import { SurveyItemEditor } from "@/features/it/survey-import/components/SurveyItemEditor";
 import {
   SURVEY_ACTION_LABELS,
   SURVEY_APPLIED_LABELS,
   SURVEY_KINDS,
   type SurveyApplied,
+  type SurveyCorrectionInput,
   type SurveyItem,
   type SurveyPreview,
-  type SurveySectorMap,
 } from "@/features/it/survey-import/types";
 import "@/features/it/inventory/inventory.css";
 import "@/features/it/survey-import/survey-import.css";
@@ -88,16 +95,40 @@ function appliedLines(applied: SurveyApplied): string[] {
     .map(([label, detail]) => `${label}: ${detail}.`);
 }
 
+/** Corrige el nombre de todas las respuestas del ítem (con el que ya tiene, lo confirma). */
+const hostnameCorrections = (
+  item: SurveyItem,
+  tag?: string,
+): SurveyCorrectionInput[] =>
+  (item.edits ?? []).flatMap((edit) =>
+    edit.scope === "hostname"
+      ? [{ scope: "hostname", key: edit.key, value: { tag: tag ?? edit.tag } }]
+      : [],
+  );
+
+interface ItemCorrections {
+  editing: string | null;
+  saving: boolean;
+  setEditing: (id: string | null) => void;
+  // Desde el formulario: el error se muestra ahí.
+  save: (corrections: SurveyCorrectionInput[]) => Promise<void>;
+  // Desde un botón: el error va a un aviso.
+  quickSave: (corrections: SurveyCorrectionInput[]) => void;
+}
+
 function ItemsGroup({
   label,
   items,
   total,
   applied,
+  corrections,
 }: {
   label: string;
   items: SurveyItem[];
   total: number;
   applied: boolean;
+  // Sin esto (después de importar) no se corrige.
+  corrections?: ItemCorrections;
 }) {
   if (total === 0) return null;
   const actionLabels = applied ? SURVEY_APPLIED_LABELS : SURVEY_ACTION_LABELS;
@@ -111,37 +142,102 @@ function ItemsGroup({
         <p className="survey-group__help">Nada cambia.</p>
       ) : (
         <ul className="survey-items">
-          {items.map((item) => (
-            <li
-              key={`${item.kind}:${item.key}`}
-              className="survey-item"
-              data-action={item.action}
-            >
-              <span className="survey-action" data-action={item.action}>
-                {actionLabels[item.action]}
-              </span>
-              <div className="survey-item__main">
-                <strong>{item.title}</strong>
-                {item.detail && <small>{item.detail}</small>}
-                {item.notes.length > 0 && (
-                  <ul className="survey-item__notes">
-                    {item.notes.map((note) => (
-                      <li key={note}>{note}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="survey-item__holder">
-                {item.holder && (
-                  <>
-                    <small>Asignado a</small>
-                    <span>{item.holder}</span>
-                  </>
-                )}
-                <small>{rowsLabel(item.rows)}</small>
-              </div>
-            </li>
-          ))}
+          {items.map((item) => {
+            const id = `${item.kind}:${item.key}`;
+            const editable = Boolean(corrections && item.edits?.length);
+            const editing = editable && corrections?.editing === id;
+            return (
+              <li key={id} className="survey-item" data-action={item.action}>
+                <span className="survey-action" data-action={item.action}>
+                  {actionLabels[item.action]}
+                </span>
+                <div className="survey-item__main">
+                  <strong>{item.title}</strong>
+                  {item.detail && <small>{item.detail}</small>}
+                  {item.notes.length > 0 && (
+                    <ul className="survey-item__notes">
+                      {item.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {item.fixes && item.fixes.length > 0 && (
+                    <ul className="survey-item__fixes" aria-label="Corregido">
+                      {item.fixes.map((fix) => (
+                        <li key={`${fix.source}:${fix.from}:${fix.to}`}>
+                          <span
+                            className="survey-fix-source"
+                            data-source={fix.source}
+                          >
+                            {FIX_SOURCE_LABELS[fix.source]}
+                          </span>
+                          «{fix.from}» → {fix.to}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {editable && corrections && !editing && (
+                    <div className="survey-item__actions">
+                      {item.suggestions?.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className="inventory-button inventory-button--ghost"
+                          disabled={corrections.saving}
+                          onClick={() =>
+                            corrections.quickSave(
+                              hostnameCorrections(item, tag),
+                            )
+                          }
+                        >
+                          Usar {tag}
+                        </button>
+                      ))}
+                      {item.confirmName && (
+                        <button
+                          type="button"
+                          className="inventory-button inventory-button--ghost"
+                          disabled={corrections.saving}
+                          onClick={() =>
+                            corrections.quickSave(hostnameCorrections(item))
+                          }
+                        >
+                          Es correcto así
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="inventory-button inventory-button--ghost"
+                        disabled={corrections.saving}
+                        aria-label={`Corregir ${item.title}`}
+                        onClick={() => corrections.setEditing(id)}
+                      >
+                        <Pencil size={14} aria-hidden="true" />
+                        Corregir
+                      </button>
+                    </div>
+                  )}
+                  {editing && corrections && item.edits && (
+                    <SurveyItemEditor
+                      edits={item.edits}
+                      saving={corrections.saving}
+                      onSave={corrections.save}
+                      onCancel={() => corrections.setEditing(null)}
+                    />
+                  )}
+                </div>
+                <div className="survey-item__holder">
+                  {item.holder && (
+                    <>
+                      <small>Asignado a</small>
+                      <span>{item.holder}</span>
+                    </>
+                  )}
+                  <small>{rowsLabel(item.rows)}</small>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
@@ -151,42 +247,62 @@ function ItemsGroup({
 export default function ItSurveyImportPage() {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<{ name: string; csv: string } | null>(null);
-  const [sectorMap, setSectorMap] = useState<SurveySectorMap>({});
   const [preview, setPreview] = useState<SurveyPreview | null>(null);
   const [applied, setApplied] = useState<SurveyApplied | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showUnchanged, setShowUnchanged] = useState(false);
+  // Ítem que se está corrigiendo ("kind:key").
+  const [editing, setEditing] = useState<string | null>(null);
 
   const previewMutation = useMutation({
-    mutationFn: (variables: { csv: string; sectorMap: SurveySectorMap }) =>
-      previewSurveyImport(variables.csv, variables.sectorMap),
+    mutationFn: (csv: string) => previewSurveyImport(csv),
   });
-  const applyMutation = useMutation({
+  const correctionMutation = useMutation({
     mutationFn: (variables: {
       csv: string;
-      sectorMap: SurveySectorMap;
-      planHash: string;
-    }) =>
-      applySurveyImport(variables.csv, variables.sectorMap, variables.planHash),
+      corrections: SurveyCorrectionInput[];
+    }) => saveSurveyCorrections(variables.csv, variables.corrections),
   });
-  const busy = previewMutation.isPending || applyMutation.isPending;
+  const applyMutation = useMutation({
+    mutationFn: (variables: { csv: string; planHash: string }) =>
+      applySurveyImport(variables.csv, variables.planHash),
+  });
+  const busy =
+    previewMutation.isPending ||
+    correctionMutation.isPending ||
+    applyMutation.isPending;
+
+  // Guarda correcciones (también el sector elegido) y muestra la vista previa
+  // con ellas. Quedan guardadas para la próxima importación.
+  const saveCorrections = async (corrections: SurveyCorrectionInput[]) => {
+    if (!file) return;
+    const updated = await correctionMutation.mutateAsync({
+      csv: file.csv,
+      corrections,
+    });
+    setPreview(updated);
+    setEditing(null);
+    setError(null);
+  };
+  const quickSave = (corrections: SurveyCorrectionInput[]) => {
+    saveCorrections(corrections).catch((saveError: unknown) =>
+      toast.error(getSurveyError(saveError).message),
+    );
+  };
 
   // Los callbacks van en cada mutate: si se piden dos vistas previas seguidas,
   // solo cuenta la última.
-  const requestPreview = (csv: string, map: SurveySectorMap) =>
-    previewMutation.mutate(
-      { csv, sectorMap: map },
-      {
-        onSuccess: (data) => {
-          setPreview(data);
-          setError(null);
-        },
-        onError: (requestError) => {
-          setPreview(null);
-          setError(getSurveyError(requestError).message);
-        },
+  const requestPreview = (csv: string) =>
+    previewMutation.mutate(csv, {
+      onSuccess: (data) => {
+        setPreview(data);
+        setError(null);
       },
-    );
+      onError: (requestError) => {
+        setPreview(null);
+        setError(getSurveyError(requestError).message);
+      },
+    });
 
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const chosen = event.target.files?.[0];
@@ -196,7 +312,7 @@ export default function ItSurveyImportPage() {
     setPreview(null);
     setApplied(null);
     setError(null);
-    setSectorMap({});
+    setEditing(null);
     if (chosen.size > MAX_CSV_BYTES) {
       setFile(null);
       setError(
@@ -207,28 +323,27 @@ export default function ItSurveyImportPage() {
     try {
       const csv = await readText(chosen);
       setFile({ name: chosen.name, csv });
-      requestPreview(csv, {});
+      requestPreview(csv);
     } catch (readError) {
       setFile(null);
       setError(getSurveyError(readError).message);
     }
   };
 
-  const changeSector = (value: string, departmentId: string) => {
-    if (!file) return;
-    const map = { ...sectorMap, [value]: departmentId || null };
-    setSectorMap(map);
-    requestPreview(file.csv, map);
-  };
+  const changeSector = (key: string, departmentId: string) =>
+    quickSave([
+      { scope: "sector", key, value: { departmentId: departmentId || null } },
+    ]);
 
   const confirmImport = () => {
     if (!file || !preview) return;
     applyMutation.mutate(
-      { csv: file.csv, sectorMap, planHash: preview.planHash },
+      { csv: file.csv, planHash: preview.planHash },
       {
         onSuccess: (result) => {
           setPreview(result.preview);
           setApplied(result.applied);
+          setEditing(null);
           toast.success("Relevamiento importado");
           for (const queryKey of [
             assetKeys.all,
@@ -294,7 +409,8 @@ export default function ItSurveyImportPage() {
             <p>
               En la planilla «Relevamiento de equipos (respuestas)»: Archivo →
               Descargar → Valores separados por comas (.csv). Se puede importar
-              las veces que haga falta: lo que ya está cargado queda igual.
+              las veces que haga falta: lo que ya está cargado queda igual, y lo
+              que corregís acá queda guardado para la próxima vez.
             </p>
           </div>
           <div className="survey-source__file">
@@ -401,7 +517,7 @@ export default function ItSurveyImportPage() {
                 {
                   label: "Para revisar",
                   value: counts.conflict,
-                  detail: "No se tocan: resolvelos a mano",
+                  detail: "Corregilos acá; si no, no se tocan",
                   tone: "amber",
                 },
               ].map((metric) => (
@@ -443,7 +559,7 @@ export default function ItSurveyImportPage() {
                         value={sector.departmentId ?? ""}
                         disabled={busy || Boolean(applied)}
                         onChange={(event) =>
-                          changeSector(sector.value, event.target.value)
+                          changeSector(sector.key, event.target.value)
                         }
                       >
                         <option value="">Sin sector</option>
@@ -464,6 +580,15 @@ export default function ItSurveyImportPage() {
               </section>
             )}
 
+            {preview.corrections.length > 0 && (
+              <SurveyCorrections
+                corrections={preview.corrections}
+                disabled={busy}
+                readOnly={Boolean(applied)}
+                onSave={quickSave}
+              />
+            )}
+
             <label className="survey-toggle">
               <input
                 type="checkbox"
@@ -481,6 +606,17 @@ export default function ItSurveyImportPage() {
                   label={label}
                   total={ofKind.length}
                   applied={Boolean(applied)}
+                  corrections={
+                    applied
+                      ? undefined
+                      : {
+                          editing,
+                          saving: busy,
+                          setEditing,
+                          save: saveCorrections,
+                          quickSave,
+                        }
+                  }
                   items={ofKind.filter(
                     (item) => showUnchanged || item.action !== "unchanged",
                   )}
