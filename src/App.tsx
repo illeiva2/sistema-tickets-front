@@ -59,6 +59,7 @@ const ItMaintenancePage = lazyConReintento(() => import("./pages/it/ItMaintenanc
 const ItStaffPage = lazyConReintento(() => import("./pages/it/ItStaffPage"));
 const ItLiveDevicesPage = lazyConReintento(() => import("./pages/it/ItLiveDevicesPage"));
 const ItNetworkLivePage = lazyConReintento(() => import("./pages/it/ItNetworkLivePage"));
+const ItSurveyImportPage = lazyConReintento(() => import("./pages/it/ItSurveyImportPage"));
 
 // Fallback mientras carga el chunk de la pagina. Mantiene el layout estable
 // (sin flash blanco) usando un mini skeleton.
@@ -112,6 +113,7 @@ function App() {
                 >
                   <Route index element={<ItDashboardPage />} />
                   <Route path="inventory" element={<ItInventoryPage />} />
+                  <Route path="relevamiento" element={<ItSurveyImportPage />} />
                   <Route path="maintenance" element={<ItMaintenancePage />} />
                   <Route path="staff" element={<ItStaffPage />} />
                   {/* Compras y proveedores y Red y topología se sacaron

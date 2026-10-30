@@ -6,7 +6,7 @@ import {
   type FormEvent,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Upload,
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -325,6 +326,13 @@ function ItInventoryPage() {
               aria-hidden="true"
             />
           </button>
+          <Link
+            className="inventory-button inventory-button--ghost"
+            to="/it/relevamiento"
+          >
+            <Upload size={16} aria-hidden="true" />
+            Importar relevamiento
+          </Link>
           <button
             type="button"
             className="inventory-button inventory-button--primary"
