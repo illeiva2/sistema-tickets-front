@@ -47,11 +47,6 @@ export interface MaintenancePerformer {
   email?: string | null;
 }
 
-export interface MaintenanceSupplier {
-  id: string;
-  name: string;
-}
-
 export interface MaintenanceTicket {
   id: string;
   title: string;
@@ -82,8 +77,8 @@ export interface ItMaintenance {
   description: string;
   performedById?: string | null;
   performedBy?: MaintenancePerformer | null;
-  supplierId?: string | null;
-  supplier?: MaintenanceSupplier | null;
+  /** Proveedor externo, escrito a mano. */
+  supplierName?: string | null;
   costAmount?: string | number | null;
   currency: MaintenanceCurrency;
   parts?: MaintenancePart[] | null;
@@ -110,7 +105,6 @@ export interface MaintenanceListQuery {
   type: MaintenanceType | "";
   status: MaintenanceStatus | "";
   assetId: string;
-  supplierId: string;
   scheduledFrom: string;
   scheduledTo: string;
   page: number;
@@ -119,7 +113,6 @@ export interface MaintenanceListQuery {
 
 export interface MaintenanceLookups {
   performers: MaintenancePerformer[];
-  suppliers: MaintenanceSupplier[];
   tickets: MaintenanceTicket[];
 }
 
@@ -131,7 +124,7 @@ export interface MaintenancePayload {
   performedAt?: string | null;
   description: string;
   performedById?: string | null;
-  supplierId?: string | null;
+  supplierName?: string | null;
   costAmount?: string | null;
   currency: MaintenanceCurrency;
   parts: MaintenancePartPayload[];

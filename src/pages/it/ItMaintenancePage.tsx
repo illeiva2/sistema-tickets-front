@@ -59,7 +59,6 @@ const INITIAL_FILTERS: MaintenanceListQuery = {
   type: "",
   status: "",
   assetId: "",
-  supplierId: "",
   scheduledFrom: "",
   scheduledTo: "",
   page: 1,
@@ -200,7 +199,6 @@ function ItMaintenancePage() {
     filters.q ||
     filters.type ||
     filters.status ||
-    filters.supplierId ||
     filters.scheduledFrom ||
     filters.scheduledTo,
   );
@@ -209,7 +207,6 @@ function ItMaintenancePage() {
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
   const lookups = lookupsQuery.data ?? {
     performers: [],
-    suppliers: [],
     tickets: [],
   };
   const lookupsError = lookupsQuery.isError
@@ -334,7 +331,7 @@ function ItMaintenancePage() {
                 id="maintenance-search"
                 type="search"
                 value={searchDraft}
-                placeholder="Activo, descripción o ticket"
+                placeholder="Activo, descripción, proveedor o ticket"
                 onChange={(event) => setSearchDraft(event.target.value)}
               />
               <button type="submit">Buscar</button>
@@ -366,34 +363,6 @@ function ItMaintenancePage() {
               {MAINTENANCE_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {MAINTENANCE_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="maintenance-filter-field">
-            <label htmlFor="maintenance-supplier">Proveedor</label>
-            <select
-              id="maintenance-supplier"
-              value={filters.supplierId}
-              disabled={lookupsQuery.isLoading || lookupsQuery.isError}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  supplierId: event.target.value,
-                  page: 1,
-                }))
-              }
-            >
-              <option value="">
-                {lookupsQuery.isLoading
-                  ? "Cargando"
-                  : lookupsQuery.isError
-                    ? "No disponible"
-                    : "Todos"}
-              </option>
-              {lookups.suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
                 </option>
               ))}
             </select>

@@ -45,7 +45,6 @@ const asset: MaintenanceAsset = {
 
 const lookups: MaintenanceLookups = {
   performers: [{ id: "user-it-1", name: "Ana IT", email: "ana@empresa.test" }],
-  suppliers: [{ id: "supplier-1", name: "Servicio Norte" }],
   tickets: [
     {
       id: "ticket-7",
@@ -67,8 +66,7 @@ const baseMaintenance: ItMaintenance = {
   description: "Limpieza interna y control de batería",
   performedById: null,
   performedBy: null,
-  supplierId: null,
-  supplier: null,
+  supplierName: null,
   costAmount: null,
   currency: "ARS",
   parts: [],
@@ -177,7 +175,8 @@ describe("ItMaintenancePage", () => {
     await user.type(screen.getByLabelText("Buscar"), "batería");
     await user.selectOptions(screen.getByLabelText("Tipo"), "PREVENTIVE");
     await user.selectOptions(screen.getByLabelText("Estado"), "SCHEDULED");
-    await user.selectOptions(screen.getByLabelText("Proveedor"), "supplier-1");
+    // El proveedor es texto libre: se busca con el buscador, no hay filtro.
+    expect(screen.queryByLabelText("Proveedor")).toBeNull();
     await user.type(screen.getByLabelText("Programado desde"), "2026-07-01");
     await user.type(screen.getByLabelText("Hasta"), "2026-07-31");
     await user.click(screen.getByRole("button", { name: "Buscar" }));
@@ -189,7 +188,6 @@ describe("ItMaintenancePage", () => {
           type: "PREVENTIVE",
           status: "SCHEDULED",
           assetId: undefined,
-          supplierId: "supplier-1",
           scheduledFrom: "2026-07-01",
           scheduledTo: "2026-07-31",
           page: 1,
@@ -339,6 +337,48 @@ describe("ItMaintenancePage", () => {
       performedById: "user-it-1",
       performedAt: new Date("2026-07-12T15:45").toISOString(),
     });
+  });
+
+  it("completa con un proveedor escrito a mano, sin responsable interno", async () => {
+    const user = userEvent.setup();
+    renderMaintenance();
+    const dialog = await openCreateDialog();
+    await user.type(within(dialog).getByLabelText("Activo"), "NB");
+    await user.click(within(dialog).getByRole("button", { name: "Buscar" }));
+    await user.click(
+      await within(dialog).findByRole("button", {
+        name: /NB-0042 Lenovo ThinkPad T14 ASSIGNED/,
+      }),
+    );
+    await user.type(
+      within(dialog).getByLabelText("Descripción"),
+      "Cambio de pantalla",
+    );
+    await user.selectOptions(
+      within(dialog).getByLabelText("Estado"),
+      "COMPLETED",
+    );
+    await user.type(
+      within(dialog).getByLabelText(/Fecha de ejecución/),
+      "2026-07-12T15:45",
+    );
+    const supplier = within(dialog).getByLabelText(/Proveedor/);
+    expect(supplier.tagName).toBe("INPUT");
+    await user.type(supplier, "  Servicio Norte ");
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: "Registrar mantenimiento",
+      }),
+    );
+
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+    const payload = apiMock.post.mock.calls[0][1];
+    expect(payload).toMatchObject({
+      status: "COMPLETED",
+      performedById: null,
+      supplierName: "Servicio Norte",
+    });
+    expect(payload).not.toHaveProperty("supplierId");
   });
 
   it("mantiene terminales cerrados y edita con expectedUpdatedAt", async () => {
@@ -620,7 +660,6 @@ describe("ItMaintenancePage", () => {
     expect(
       screen.getByText("Referencias parcialmente fuera de línea"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Proveedor")).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Reintentar" }));
     await waitFor(() =>
       expect(

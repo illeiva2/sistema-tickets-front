@@ -69,7 +69,7 @@ export function MaintenanceTable({
                 <td>{formatMaintenanceDate(relevantDate(maintenance))}</td>
                 <td>
                   {maintenance.performedBy?.name ||
-                    maintenance.supplier?.name ||
+                    maintenance.supplierName ||
                     "Sin asignar"}
                 </td>
                 <td>
@@ -128,7 +128,7 @@ export function MaintenanceTable({
                   <dt>Responsable</dt>
                   <dd>
                     {maintenance.performedBy?.name ||
-                      maintenance.supplier?.name ||
+                      maintenance.supplierName ||
                       "Sin asignar"}
                   </dd>
                 </div>
