@@ -1,11 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import {
-  AlertTriangle,
-  Loader2,
-  PackageCheck,
-  RotateCcw,
-  X,
-} from "lucide-react";
+import { AlertTriangle, Loader2, RotateCcw, X } from "lucide-react";
 import { getInventoryErrorMessage } from "../api";
 import {
   ASSET_STATUSES,
@@ -16,7 +10,6 @@ import {
   ASSET_TYPE_LABELS,
   HOSTNAME_ASSET_TYPES,
   IMEI_ASSET_TYPES,
-  type AssetCreatePayload,
   type AssetSaveCommand,
   type AssetSpecs,
   type AssetStatus,
@@ -25,20 +18,12 @@ import {
   type AssetWritablePayload,
 } from "../types";
 
-export interface AssetPurchaseOrigin {
-  purchaseId: string;
-  purchaseItemId: string;
-  purchaseCode: string;
-  itemDescription: string;
-}
-
 interface AssetEditorPanelProps {
   mode: "create" | "edit";
   asset: ItAsset | null;
   isLoading: boolean;
   isSaving: boolean;
   loadError?: string;
-  purchaseOrigin?: AssetPurchaseOrigin | null;
   onClose: () => void;
   onRetry: () => void;
   onSave: (command: AssetSaveCommand) => Promise<void>;
@@ -113,7 +98,6 @@ export function AssetEditorPanel({
   isLoading,
   isSaving,
   loadError,
-  purchaseOrigin,
   onClose,
   onRetry,
   onSave,
@@ -247,10 +231,7 @@ export function AssetEditorPanel({
           payload: { ...payload, expectedUpdatedAt: asset.updatedAt },
         });
       } else {
-        const createPayload: AssetCreatePayload = purchaseOrigin
-          ? { ...payload, purchaseItemId: purchaseOrigin.purchaseItemId }
-          : payload;
-        await onSave({ mode: "create", payload: createPayload });
+        await onSave({ mode: "create", payload });
       }
     } catch (error) {
       setSubmitError(getInventoryErrorMessage(error));
@@ -309,21 +290,6 @@ export function AssetEditorPanel({
           </div>
         ) : (
           <form className="inventory-form" onSubmit={handleSubmit}>
-            {mode === "create" && purchaseOrigin ? (
-              <div className="inventory-purchase-origin" role="note">
-                <PackageCheck size={18} aria-hidden="true" />
-                <div>
-                  <strong>
-                    Alta vinculada a {purchaseOrigin.purchaseCode}
-                  </strong>
-                  <p>{purchaseOrigin.itemDescription}</p>
-                  <small>
-                    El activo quedará asociado al renglón recibido para medir el
-                    avance de inventariado.
-                  </small>
-                </div>
-              </div>
-            ) : null}
             <fieldset>
               <legend>Identificación y estado</legend>
               <div className="inventory-form__grid">

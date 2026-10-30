@@ -663,7 +663,9 @@ export function MaintenanceEditorPanel({
                 <div className="maintenance-reference-error" role="alert">
                   <AlertTriangle size={16} aria-hidden="true" />
                   <div>
-                    <strong>No se pudieron cargar responsables y tickets</strong>
+                    <strong>
+                      No se pudieron cargar responsables y tickets
+                    </strong>
                     <p>{lookupsError}</p>
                     <button type="button" onClick={onRetryLookups}>
                       Reintentar referencias

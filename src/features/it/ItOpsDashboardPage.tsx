@@ -1,11 +1,8 @@
 import {
   Activity,
   AlertTriangle,
-  Camera,
   Database,
   HardDrive,
-  Network,
-  ShoppingCart,
   Smartphone,
   Users,
   Waypoints,
@@ -44,32 +41,6 @@ const MODULES = [
   },
   {
     code: "MOD-04",
-    title: "Compras",
-    description:
-      "Proveedores, precios, autorizaciones y motivo de cada decisión.",
-    icon: ShoppingCart,
-    href: "/it/purchases",
-    status: "available",
-  },
-  {
-    code: "MOD-05",
-    title: "Red",
-    description:
-      "Nodos, enlaces, direccionamiento y representación de topología.",
-    icon: Network,
-    href: "/it/network",
-    status: "available",
-  },
-  {
-    code: "MOD-06",
-    title: "Cámaras",
-    description: "Inventario CCTV, ubicación, grabación y cobertura declarada.",
-    icon: Camera,
-    href: "/it/network",
-    status: "limited",
-  },
-  {
-    code: "MOD-07",
     title: "Monitoreo",
     description: "Salud, batería, uptime, IP y hostname cuando exista agente.",
     icon: Activity,
@@ -77,7 +48,7 @@ const MODULES = [
     status: "available",
   },
   {
-    code: "MOD-08",
+    code: "MOD-05",
     title: "Líneas",
     description:
       "Números, operadoras, planes y trazabilidad de asignaciones de SIM.",
@@ -86,7 +57,7 @@ const MODULES = [
     status: "available",
   },
   {
-    code: "MOD-09",
+    code: "MOD-06",
     title: "Red en vivo",
     description:
       "Router, switches y APs como los informan los propios equipos: enlaces y estado de cada puerto.",
@@ -184,10 +155,7 @@ export function ItOpsDashboardPage() {
             <span className="ops-section__index">03 / MÓDULOS</span>
             <h2 id="ops-modules-title">Superficie de módulos</h2>
           </div>
-          <p>
-            Accesos a cada dominio. Cámaras mantiene cobertura básica dentro de
-            Red; el resto de la superficie está operativo.
-          </p>
+          <p>Accesos a cada dominio operativo.</p>
         </div>
         <div className="ops-modules">
           {MODULES.map((module) => (

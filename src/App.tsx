@@ -56,9 +56,7 @@ const ItDashboardPage = lazyConReintento(() =>
 );
 const ItInventoryPage = lazyConReintento(() => import("./pages/it/ItInventoryPage"));
 const ItMaintenancePage = lazyConReintento(() => import("./pages/it/ItMaintenancePage"));
-const ItPurchasesPage = lazyConReintento(() => import("./pages/it/ItPurchasesPage"));
 const ItStaffPage = lazyConReintento(() => import("./pages/it/ItStaffPage"));
-const ItNetworkPage = lazyConReintento(() => import("./pages/it/ItNetworkPage"));
 const ItLiveDevicesPage = lazyConReintento(() => import("./pages/it/ItLiveDevicesPage"));
 const ItNetworkLivePage = lazyConReintento(() => import("./pages/it/ItNetworkLivePage"));
 
@@ -115,9 +113,15 @@ function App() {
                   <Route index element={<ItDashboardPage />} />
                   <Route path="inventory" element={<ItInventoryPage />} />
                   <Route path="maintenance" element={<ItMaintenancePage />} />
-                  <Route path="purchases" element={<ItPurchasesPage />} />
                   <Route path="staff" element={<ItStaffPage />} />
-                  <Route path="network" element={<ItNetworkPage />} />
+                  {/* Compras y proveedores y Red y topología se sacaron
+                      (oct-2026; los datos quedan en la base): los enlaces
+                      viejos llevan al panel y a Red en vivo. */}
+                  <Route path="purchases" element={<Navigate to="/it" replace />} />
+                  <Route
+                    path="network"
+                    element={<Navigate to="/it/network-live" replace />}
+                  />
                   <Route path="live" element={<ItLiveDevicesPage />} />
                   <Route path="network-live" element={<ItNetworkLivePage />} />
                 </Route>
