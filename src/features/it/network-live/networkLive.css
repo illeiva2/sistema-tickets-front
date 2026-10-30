@@ -214,6 +214,32 @@
   border-color: rgba(255, 211, 93, 0.45);
   background: rgba(255, 211, 93, 0.06);
 }
+/* Enlace a la ficha del inventario (detalle del puerto, clientes Wi-Fi y lo buscado). */
+.netlive-asset-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--net-cyan);
+  font: 700 0.62rem Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.netlive-asset-link:hover,
+.netlive-asset-link:focus-visible {
+  color: var(--net-accent);
+  outline: none;
+  text-decoration: underline;
+}
+.netlive-focus .netlive-asset-link {
+  flex: none;
+  margin-top: 0;
+}
+.netlive-focus .netlive-asset-link svg {
+  color: inherit;
+}
 .netlive-focus[data-offline] > svg {
   color: var(--live-warn);
 }

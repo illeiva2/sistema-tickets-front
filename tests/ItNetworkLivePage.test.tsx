@@ -219,13 +219,13 @@ function mockApi(searchResults: unknown[] = []) {
   apiMock.patch.mockResolvedValue({ data: { success: true, data: { id: "d2", name: "SWITCH-CRS-MOLINO", alertsMuted: true } } });
 }
 
-function renderPage() {
+function renderPage(entry = "/it/network-live") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[entry]}>
         <ItNetworkLivePage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -346,6 +346,48 @@ describe("ItNetworkLivePage", () => {
 
     await user.click(screen.getByRole("button", { name: "Quitar el resaltado" }));
     expect(screen.getByTestId("lienzo")).toHaveAttribute("data-path", "");
+  });
+
+  it("lleva a la ficha del inventario del equipo buscado", async () => {
+    mockApi();
+    const base = liveView();
+    const view = {
+      ...base,
+      endpoints: base.endpoints.map((item, index) =>
+        index === 0 ? { ...item, asset: { id: "asset-41", assetTag: "PC-JPEREZ" } } : item,
+      ),
+    };
+    const fallback = apiMock.get.getMockImplementation()!;
+    apiMock.get.mockImplementation((url: string, config?: unknown) =>
+      url === "/api/it/network/live"
+        ? Promise.resolve({ data: { success: true, data: view } })
+        : fallback(url, config),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByLabelText("Buscar en la red"), "jperez");
+    await user.click(screen.getByRole("button", { name: /PC-JPEREZ/ }));
+
+    expect(screen.getByRole("link", { name: "Ver PC-JPEREZ en el inventario" })).toHaveAttribute(
+      "href",
+      "/it/inventory?activo=asset-41",
+    );
+  });
+
+  it("busca lo que llega por enlace desde la ficha del inventario", async () => {
+    mockApi();
+    renderPage("/it/network-live?buscar=AA:BB:CC:00:00:01");
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "PC-JPEREZ (usuario jperez): SWITCH-CRS-TALLER · puerto ether1",
+    );
+    expect(screen.getByLabelText("Buscar en la red")).toHaveValue("AA:BB:CC:00:00:01");
+    const canvas = screen.getByTestId("lienzo");
+    expect(canvas).toHaveAttribute("data-selected", "d1");
+    expect(canvas).toHaveAttribute("data-mac", "AA:BB:CC:00:00:01");
+    // Un solo resultado conectado: no hace falta el historial.
+    expect(apiMock.get).not.toHaveBeenCalledWith("/api/it/network/live/search", expect.anything());
   });
 
   it("ubica un cliente Wi-Fi en su AP y va directo si hay un solo resultado", async () => {

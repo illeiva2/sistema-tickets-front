@@ -104,6 +104,15 @@ export interface LiveAgentRef {
   assetId: string | null;
 }
 
+/**
+ * Ficha del inventario de un equipo de la red: la vinculada a su agente o, si no, la que tiene
+ * por etiqueta el nombre de la PC.
+ */
+export interface LiveAssetRef {
+  id: string;
+  assetTag: string;
+}
+
 /** Equipo final (PC, impresora, cámara, teléfono, cliente Wi-Fi) en su puerto de acceso. */
 export interface LiveEndpoint {
   mac: string;
@@ -121,6 +130,7 @@ export interface LiveEndpoint {
   lastSeenAt: string;
   movedAt: string | null;
   agent: LiveAgentRef | null;
+  asset?: LiveAssetRef | null;
 }
 
 /** Incidente avisado que sigue abierto: equipo caído o colector sin mandar datos. */
@@ -154,6 +164,7 @@ export interface LiveWifiClient {
   firstSeenAt: string;
   lastSeenAt: string;
   agent: LiveAgentRef | null;
+  asset?: LiveAssetRef | null;
 }
 
 export interface NetworkLiveView {
@@ -219,4 +230,29 @@ export interface LiveSearchResult extends LiveEndpoint {
 export interface LiveSearchResponse {
   query: string;
   results: LiveSearchResult[];
+}
+
+/** Un lugar donde se vio a un equipo del inventario (GET /api/it/network/live/assets/:id). */
+export interface AssetSighting {
+  mac: string;
+  ip: string | null;
+  vlan: number | null;
+  portKey: string;
+  shared: boolean;
+  /** Switch donde está conectado (o el que tiene al AP, si va por Wi-Fi). */
+  device: { id: string; name: string; role: string };
+  /** AP por el que se conecta, si va por Wi-Fi. */
+  via: { id: string; name: string } | null;
+  wifi: { ssid: string | null; band: string | null; signal: number | null } | null;
+  lastSeenAt: string;
+  /** false = es dónde se lo vio por última vez. */
+  online: boolean;
+  /** Cómo se lo reconoció: la MAC de su agente o su etiqueta como nombre de host. */
+  matchedBy: "agent" | "hostname";
+}
+
+export interface AssetNetworkLocation {
+  asset: LiveAssetRef;
+  /** El más reciente primero; vacío si nunca apareció en la red. */
+  sightings: AssetSighting[];
 }

@@ -1,5 +1,6 @@
 import api from "@/lib/api";
 import type {
+  AssetNetworkLocation,
   LiveDevice,
   LiveEventsQuery,
   LiveEventsResponse,
@@ -37,6 +38,17 @@ export async function searchNetworkLive(query: string): Promise<LiveSearchRespon
   return {
     query: response.data.data.query,
     results: response.data.data.results ?? [],
+  };
+}
+
+/** Dónde está conectado un equipo del inventario, o dónde se lo vio por última vez. */
+export async function fetchAssetNetworkLocation(assetId: string): Promise<AssetNetworkLocation> {
+  const response = await api.get<ApiEnvelope<AssetNetworkLocation>>(
+    `/api/it/network/live/assets/${encodeURIComponent(assetId)}`,
+  );
+  return {
+    asset: response.data.data.asset,
+    sightings: response.data.data.sightings ?? [],
   };
 }
 

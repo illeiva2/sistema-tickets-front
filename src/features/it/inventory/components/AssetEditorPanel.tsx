@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertTriangle, Loader2, RotateCcw, X } from "lucide-react";
 import { getInventoryErrorMessage } from "../api";
+import { AssetNetworkSection } from "./AssetNetworkSection";
 import {
   ASSET_STATUSES,
   ASSET_STATUS_LABELS,
@@ -469,6 +470,10 @@ export function AssetEditorPanel({
                   Equipos en vivo; acá no se editan.
                 </small>
               </fieldset>
+            ) : null}
+
+            {mode === "edit" && asset ? (
+              <AssetNetworkSection assetId={asset.id} />
             ) : null}
 
             <label className="inventory-form__notes">

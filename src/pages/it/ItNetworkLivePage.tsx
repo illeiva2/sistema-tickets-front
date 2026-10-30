@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
@@ -20,6 +21,7 @@ import "@/features/it/network-live/networkLive.css";
 import { useAuth } from "@/hooks/useAuth";
 import { formatHeartbeat } from "@/features/it/live/format";
 import { getNetworkLiveErrorMessage } from "@/features/it/network-live/api";
+import { AssetLink } from "@/features/it/network-live/components/AssetLink";
 import { EventsPanel } from "@/features/it/network-live/components/EventsPanel";
 import { LiveTopologyCanvas } from "@/features/it/network-live/components/LiveTopologyCanvas";
 import type { DescribedEvent } from "@/features/it/network-live/history";
@@ -35,6 +37,7 @@ import {
 import { PORT_TONE_LABELS, type PortTone } from "@/features/it/network-live/ports";
 import { buildTopology } from "@/features/it/network-live/topology";
 import type {
+  LiveAssetRef,
   LiveDevice,
   LiveEndpoint,
   LiveSearchResult,
@@ -59,6 +62,8 @@ interface Focus {
   mac: string | null;
   text: string;
   offline: boolean;
+  /** Ficha del inventario del equipo buscado, si se la reconoce. */
+  asset?: LiveAssetRef | null;
 }
 
 function summarize(view: NetworkLiveView) {
@@ -195,6 +200,7 @@ export default function ItNetworkLivePage() {
         ? `${name} no se ve desde ${formatHeartbeat(endpoint.lastSeenAt)}. La última vez estaba en ${where}.`
         : `${name}: ${where}`,
       offline,
+      asset: endpoint.asset ?? null,
     });
     setResultsOpen(false);
   };
@@ -211,6 +217,7 @@ export default function ItNetworkLivePage() {
       mac: client.mac,
       text: `${wifiTitle(client)}${user}: Wi-Fi por ${ap.name} (${wifiNetwork(client)})`,
       offline: false,
+      asset: client.asset ?? null,
     });
     setResultsOpen(false);
   };
@@ -272,6 +279,31 @@ export default function ItNetworkLivePage() {
     setResultsOpen(false);
     setFocus(null);
   };
+
+  // Desde la ficha del inventario se llega con ?buscar=<MAC o nombre>: se busca apenas se lee la
+  // red, igual que al apretar Buscar, y se saca de la URL para que no se repita.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedSearch = searchParams.get("buscar")?.trim().slice(0, 100) ?? "";
+  const handledLinkRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linkedSearch || !view || !topology || handledLinkRef.current === linkedSearch) return;
+    handledLinkRef.current = linkedSearch;
+    setSearch(linkedSearch);
+    setResultsOpen(true);
+    const direct = directHit(searchLive(view.devices, view.endpoints, linkedSearch, view.wifiClients));
+    if (direct) showHit(direct);
+    else setSubmitted(linkedSearch);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("buscar");
+        return next;
+      },
+      { replace: true },
+    );
+    // showHit se arma en cada render; lo que importa es buscar una sola vez por enlace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedSearch, view, topology, setSearchParams]);
 
   const collectorStatus = !view
     ? query.isFetching
@@ -591,6 +623,7 @@ export default function ItNetworkLivePage() {
                 <p className="netlive-focus" role="status" data-offline={focus.offline || undefined}>
                   <MapPin size={15} aria-hidden="true" />
                   <span>{focus.text}</span>
+                  {focus.asset ? <AssetLink asset={focus.asset} /> : null}
                   <button type="button" aria-label="Quitar el resaltado" onClick={() => setFocus(null)}>
                     <X size={14} />
                   </button>
