@@ -27,13 +27,15 @@ vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => (
     highlight,
     highlightMac,
     alertIds,
+    onInventory,
   }: {
-    topology: { devices: Map<string, { name: string }> };
+    topology: { devices: Map<string, { id: string; name: string }> };
     selectedId: string | null;
     selectedPort: string | null;
     highlight: { deviceIds: Set<string> } | null;
     highlightMac: string | null;
     alertIds: Set<string>;
+    onInventory: (deviceId: string, mode: "link" | "create") => void;
   }) => (
     <div
       data-testid="lienzo"
@@ -45,7 +47,13 @@ vi.mock("../src/features/it/network-live/components/LiveTopologyCanvas", () => (
     >
       <ul aria-label="lienzo">
         {[...topology.devices.values()].map((device) => (
-          <li key={device.name}>{device.name}</li>
+          <li key={device.name}>
+            {device.name}
+            {/* La fila "Inventario" del nodo: se prueba aparte. */}
+            <button type="button" onClick={() => onInventory(device.id, "create")}>
+              Dar de alta {device.name}
+            </button>
+          </li>
         ))}
       </ul>
     </div>
@@ -388,6 +396,42 @@ describe("ItNetworkLivePage", () => {
     expect(canvas).toHaveAttribute("data-mac", "AA:BB:CC:00:00:01");
     // Un solo resultado conectado: no hace falta el historial.
     expect(apiMock.get).not.toHaveBeenCalledWith("/api/it/network/live/search", expect.anything());
+  });
+
+  it("abre el equipo que llega por enlace desde la ficha de un switch", async () => {
+    mockApi();
+    renderPage("/it/network-live?equipo=d1");
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "SWITCH-CRS-TALLER: Switch · 10.0.0.3 · CRS326-24G-2S+",
+    );
+    expect(screen.getByTestId("lienzo")).toHaveAttribute("data-selected", "d1");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("avisa si el equipo del enlace ya no aparece en Red en vivo", async () => {
+    mockApi();
+    renderPage("/it/network-live?equipo=no-existe");
+
+    await screen.findByTestId("lienzo");
+    expect(toast.error).toHaveBeenCalledWith("Ese equipo ya no aparece en Red en vivo.");
+    expect(screen.getByTestId("lienzo")).toHaveAttribute("data-selected", "");
+  });
+
+  it("desde un equipo del diagrama abre la ficha del inventario para darlo de alta", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Dar de alta SWITCH-CRS-TALLER" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Inventario de SWITCH-CRS-TALLER" });
+    expect(dialog).toHaveTextContent("Switch · 10.0.0.3 · CRS326-24G-2S+");
+    expect(screen.getByRole("tab", { name: "Dar de alta" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Marca")).toHaveValue("MikroTik");
+
+    await user.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("ubica un cliente Wi-Fi en su AP y va directo si hay un solo resultado", async () => {

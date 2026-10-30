@@ -68,7 +68,33 @@ export interface LiveDevice {
   alertsMuted: boolean;
   /** Switches PoE: potencia nominal y la que está entregando, en W. */
   poe?: { budgetW: number | null; usedW: number | null } | null;
+  /** Ficha del inventario: la vinculada a mano o la que tiene su número de serie. */
+  asset?: LiveAssetRef | null;
+  assetLink?: LiveDeviceAssetLink | null;
   ports: LivePort[];
+}
+
+/** Cómo se sabe qué ficha es un router, switch o AP: vinculada a mano o por número de serie. */
+export type LiveDeviceAssetLink = "manual" | "serial";
+
+/** Respuesta al vincular, desvincular o dar de alta la ficha de un equipo de la red. */
+export interface LiveDeviceAssetResult {
+  id: string;
+  asset: LiveAssetRef | null;
+  assetLink: LiveDeviceAssetLink | null;
+}
+
+/** Alta en el inventario desde Red en vivo: un equipo de red, en depósito. */
+export interface LiveDeviceAssetDraft {
+  type: "NETWORK_DEVICE";
+  status: "IN_STOCK";
+  brand: string;
+  model: string;
+  serialNumber: string | null;
+  /** Sin etiqueta, el inventario genera una (NET-0001…). */
+  assetTag?: string;
+  location: string | null;
+  specs?: { mac: string };
 }
 
 export interface LiveLinkEnd {
@@ -251,8 +277,26 @@ export interface AssetSighting {
   matchedBy: "agent" | "hostname";
 }
 
+/** El router, switch o AP de Red en vivo que es una ficha del inventario. */
+export interface AssetLiveDevice {
+  id: string;
+  name: string;
+  role: LiveRole | string;
+  managementIp: string | null;
+  macAddress: string | null;
+  model: string | null;
+  status: LiveStatus;
+  lastPolledAt: string;
+  lastOkAt: string | null;
+  /** Ya no aparece en Red en vivo (lo reemplazaron o lo sacaron del controlador). */
+  retired: boolean;
+  matchedBy: LiveDeviceAssetLink;
+}
+
 export interface AssetNetworkLocation {
   asset: LiveAssetRef;
+  /** Si la ficha es un router, switch o AP: el equipo de Red en vivo. */
+  device: AssetLiveDevice | null;
   /** El más reciente primero; vacío si nunca apareció en la red. */
   sightings: AssetSighting[];
 }

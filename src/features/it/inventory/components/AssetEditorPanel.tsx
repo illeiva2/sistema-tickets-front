@@ -466,8 +466,8 @@ export function AssetEditorPanel({
                   ))}
                 </dl>
                 <small className="inventory-form__readonly-note">
-                  Los informa el agente cuando el equipo se da de alta desde
-                  Equipos en vivo; acá no se editan.
+                  Los informa el agente o Red en vivo cuando el equipo se da de
+                  alta desde ahí; acá no se editan.
                 </small>
               </fieldset>
             ) : null}

@@ -447,6 +447,84 @@ describe("ItInventoryPage", () => {
     expect(within(network).queryByRole("link")).toBeNull();
   });
 
+  it("en un switch dice qué equipo es en Red en vivo y lleva a él", async () => {
+    const liveDevice = {
+      id: "dev-s1",
+      name: "SWT-013",
+      role: "access",
+      managementIp: "10.0.0.13",
+      macAddress: "AA:BB:CC:00:00:13",
+      model: "TL-SG3428MP",
+      status: "ok",
+      lastPolledAt: new Date().toISOString(),
+      lastOkAt: new Date().toISOString(),
+      retired: false,
+      matchedBy: "serial",
+    };
+    const fallback = apiMock.get.getMockImplementation()!;
+    apiMock.get.mockImplementation((url: string, config?: unknown) =>
+      url === `/api/it/network/live/assets/${baseAsset.id}`
+        ? Promise.resolve({
+            data: {
+              success: true,
+              data: {
+                asset: { id: baseAsset.id, assetTag: baseAsset.assetTag },
+                device: liveDevice,
+                sightings: [],
+              },
+            },
+          })
+        : fallback(url, config),
+    );
+    renderInventory(`/it/inventory?activo=${baseAsset.id}`);
+
+    const network = await screen.findByRole("group", { name: "En la red" });
+    expect(await within(network).findByText("SWT-013")).toBeInTheDocument();
+    expect(network).toHaveTextContent("Switch");
+    expect(network).toHaveTextContent("Responde");
+    expect(network).toHaveTextContent("10.0.0.13");
+    expect(network).toHaveTextContent("Reconocido por el número de serie.");
+    expect(
+      within(network).getByRole("link", { name: /Ver en Red en vivo/ }),
+    ).toHaveAttribute("href", "/it/network-live?equipo=dev-s1");
+  });
+
+  it("no lleva a Red en vivo si el equipo de red ya no aparece", async () => {
+    const fallback = apiMock.get.getMockImplementation()!;
+    apiMock.get.mockImplementation((url: string, config?: unknown) =>
+      url === `/api/it/network/live/assets/${baseAsset.id}`
+        ? Promise.resolve({
+            data: {
+              success: true,
+              data: {
+                asset: { id: baseAsset.id, assetTag: baseAsset.assetTag },
+                device: {
+                  id: "dev-s2",
+                  name: "SWT-002",
+                  role: "access",
+                  managementIp: "10.0.0.2",
+                  macAddress: null,
+                  model: null,
+                  status: "stale",
+                  lastPolledAt: new Date(Date.now() - 86_400_000).toISOString(),
+                  lastOkAt: null,
+                  retired: true,
+                  matchedBy: "manual",
+                },
+                sightings: [],
+              },
+            },
+          })
+        : fallback(url, config),
+    );
+    renderInventory(`/it/inventory?activo=${baseAsset.id}`);
+
+    const network = await screen.findByRole("group", { name: "En la red" });
+    expect(await within(network).findByText(/Ya no aparece/)).toBeInTheDocument();
+    expect(network).toHaveTextContent("Vinculado desde Red en vivo.");
+    expect(within(network).queryByRole("link")).toBeNull();
+  });
+
   it("ignora los enlaces viejos de alta desde una compra", async () => {
     // Compras y proveedores se sacó: un enlace guardado con el origen de
     // compra abre el inventario normal, sin consultar la orden.

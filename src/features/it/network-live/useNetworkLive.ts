@@ -1,12 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { assetKeys } from "@/features/it/inventory/useAssets";
 import {
+  createDeviceAsset,
   fetchAssetNetworkLocation,
   fetchNetworkEvents,
   fetchNetworkLive,
+  linkDeviceAsset,
   searchNetworkLive,
   setDeviceAlertsMuted,
 } from "./api";
-import type { LiveEventsQuery } from "./types";
+import type { LiveDeviceAssetDraft, LiveEventsQuery } from "./types";
 
 // El colector envía cada minuto: leer cada 30 s alcanza para ver el cambio a lo sumo
 // medio minuto después de que llega.
@@ -75,5 +78,33 @@ export function useMuteDeviceAlerts() {
   return useMutation({
     mutationFn: ({ deviceId, muted }: { deviceId: string; muted: boolean }) => setDeviceAlertsMuted(deviceId, muted),
     onSuccess: () => client.invalidateQueries({ queryKey: networkLiveKeys.all }),
+  });
+}
+
+/** Después de vincular o dar de alta: la vista, la ficha ("En la red") y el inventario. */
+const refreshDeviceAsset = (client: QueryClient) =>
+  Promise.all([
+    client.invalidateQueries({ queryKey: networkLiveKeys.all }),
+    client.invalidateQueries({ queryKey: assetKeys.all }),
+    client.invalidateQueries({ queryKey: ["it", "overview"] }),
+  ]);
+
+/** Vincular (o desvincular, con null) la ficha del inventario de un router, switch o AP. */
+export function useLinkDeviceAsset() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ deviceId, assetId }: { deviceId: string; assetId: string | null }) =>
+      linkDeviceAsset(deviceId, assetId),
+    onSuccess: () => refreshDeviceAsset(client),
+  });
+}
+
+/** Dar de alta en el inventario un router, switch o AP, ya vinculado. */
+export function useCreateDeviceAsset() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ deviceId, asset }: { deviceId: string; asset: LiveDeviceAssetDraft }) =>
+      createDeviceAsset(deviceId, asset),
+    onSuccess: () => refreshDeviceAsset(client),
   });
 }

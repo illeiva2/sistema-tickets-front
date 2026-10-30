@@ -2,6 +2,8 @@ import api from "@/lib/api";
 import type {
   AssetNetworkLocation,
   LiveDevice,
+  LiveDeviceAssetDraft,
+  LiveDeviceAssetResult,
   LiveEventsQuery,
   LiveEventsResponse,
   LiveSearchResponse,
@@ -48,8 +50,27 @@ export async function fetchAssetNetworkLocation(assetId: string): Promise<AssetN
   );
   return {
     asset: response.data.data.asset,
+    device: response.data.data.device ?? null,
     sightings: response.data.data.sightings ?? [],
   };
+}
+
+/** Vincular (o desvincular, con null) la ficha del inventario de un router, switch o AP. */
+export async function linkDeviceAsset(deviceId: string, assetId: string | null): Promise<LiveDeviceAssetResult> {
+  const response = await api.put<ApiEnvelope<LiveDeviceAssetResult>>(
+    `/api/it/network/live/devices/${encodeURIComponent(deviceId)}/asset`,
+    { assetId },
+  );
+  return response.data.data;
+}
+
+/** Dar de alta en el inventario un router, switch o AP: queda vinculado. */
+export async function createDeviceAsset(deviceId: string, asset: LiveDeviceAssetDraft): Promise<LiveDeviceAssetResult> {
+  const response = await api.post<ApiEnvelope<LiveDeviceAssetResult>>(
+    `/api/it/network/live/devices/${encodeURIComponent(deviceId)}/asset`,
+    { asset },
+  );
+  return response.data.data;
 }
 
 /** Historial: lo más nuevo primero; filtrando por equipo también trae lo del otro lado. */
