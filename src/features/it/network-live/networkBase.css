@@ -1,7 +1,9 @@
 /* Base de la página de Red en vivo (marco, encabezado, botones y estados).
  * Viene de network.css de Red y topología, que se sacó en oct-2026: quedan solo
  * las reglas de las clases que usa esta página. */
-.it-network {
+/* El diálogo de la ficha del inventario se abre fuera de la página (en body): lleva los mismos colores. */
+.it-network,
+.netlive-dialog {
   --net-bg: #030709;
   --net-panel: #071014;
   --net-raised: #0b171c;
@@ -12,6 +14,8 @@
   --net-accent: #5dffcf;
   --net-cyan: #54d8ff;
   --net-red: #ff667d;
+}
+.it-network {
   position: relative;
   isolation: isolate;
   overflow: hidden;

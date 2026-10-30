@@ -7,6 +7,7 @@ import type { LiveDevice, LiveEndpoint, LiveWifiClient } from "../types";
 import { isWeak } from "../wifi";
 import { formatSpeed, formatWatts, poeUsage, portBlocks, portStats } from "../ports";
 import { STACK_HANDLE_OFFSET, type NodeSize } from "../layout";
+import { DeviceInventory, type DeviceAssetMode } from "./DeviceInventory";
 import { PortDetail } from "./PortDetail";
 import { PortPanel } from "./PortPanel";
 import { RecentEvents } from "./RecentEvents";
@@ -27,6 +28,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const PORT_PITCH = 26; // botón de 22 px + separación de 4 px
 const POE_ROW = 37; // la línea del PoE al pie del nodo (29 px) + separación de 8 px
+const INVENTORY_ROW = 39; // la línea de la ficha del inventario, con sus botones (31 px) + 8 px
 
 /**
  * Tamaño de cada nodo, el mismo que usa el diagramado: compacto, con el panel de puertos, o con
@@ -44,12 +46,14 @@ export function deviceNodeSize(device: LiveDevice, expanded: boolean, withDetail
   return {
     width: Math.min(Math.max(360, panel + 36), 960),
     // Sin puerto elegido el detalle muestra los últimos cambios del equipo (y en un AP, sus clientes Wi-Fi).
-    // Un switch PoE suma la línea de su consumo, para que no se achique el detalle.
+    // La ficha del inventario y, en un switch PoE, su consumo suman una línea cada uno, para que no
+    // se achique el detalle.
     height:
       74 +
       24 +
       rows * PORT_PITCH +
       (withDetail ? (withList ? 380 : 250) : device.role === "ap" ? 340 : 200) +
+      INVENTORY_ROW +
       (device.poe ? POE_ROW : 0),
   };
 }
@@ -86,6 +90,8 @@ export interface DeviceNodeData extends Record<string, unknown> {
   onSelectPort: (deviceId: string, portKey: string | null) => void;
   onGoTo: (deviceId: string) => void;
   onMute: (deviceId: string, muted: boolean) => void;
+  /** Vincular la ficha del inventario o dar de alta el equipo (se abre fuera del lienzo). */
+  onInventory: (deviceId: string, mode: DeviceAssetMode) => void;
 }
 
 export type DeviceFlowNode = Node<DeviceNodeData, "device">;
@@ -244,6 +250,7 @@ export const DeviceNode = memo(function DeviceNode({ data }: NodeProps<DeviceFlo
                 )}
               </dd>
             </div>
+            <DeviceInventory device={device} onOpen={data.onInventory} />
             {device.poe ? (
               <div className="netlive-node__meta-wide">
                 <dt>PoE</dt>

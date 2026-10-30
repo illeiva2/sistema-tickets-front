@@ -22,6 +22,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatHeartbeat } from "@/features/it/live/format";
 import { getNetworkLiveErrorMessage } from "@/features/it/network-live/api";
 import { AssetLink } from "@/features/it/network-live/components/AssetLink";
+import { DeviceAssetDialog } from "@/features/it/network-live/components/DeviceAssetDialog";
+import type { DeviceAssetMode } from "@/features/it/network-live/components/DeviceInventory";
 import { EventsPanel } from "@/features/it/network-live/components/EventsPanel";
 import { LiveTopologyCanvas } from "@/features/it/network-live/components/LiveTopologyCanvas";
 import type { DescribedEvent } from "@/features/it/network-live/history";
@@ -113,6 +115,8 @@ export default function ItNetworkLivePage() {
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [resultsOpen, setResultsOpen] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
+  // Ficha del inventario de un router, switch o AP: vincularla o darlo de alta.
+  const [inventoryTarget, setInventoryTarget] = useState<{ deviceId: string; mode: DeviceAssetMode } | null>(null);
   const query = useNetworkLive(paused);
   const view = query.data;
   const topology = useMemo(() => (view ? buildTopology(view) : null), [view]);
@@ -178,6 +182,12 @@ export default function ItNetworkLivePage() {
     setSelectedPort(null);
     setSelectedId(deviceId);
   }, []);
+  const onInventory = useCallback(
+    (deviceId: string, mode: DeviceAssetMode) => setInventoryTarget({ deviceId, mode }),
+    [],
+  );
+  const closeInventory = useCallback(() => setInventoryTarget(null), []);
+  const inventoryDevice = inventoryTarget ? topology?.devices.get(inventoryTarget.deviceId) : undefined;
 
   const showDevice = (device: LiveDevice) => {
     setSelectedPort(null);
@@ -304,6 +314,31 @@ export default function ItNetworkLivePage() {
     // showHit se arma en cada render; lo que importa es buscar una sola vez por enlace.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedSearch, view, topology, setSearchParams]);
+
+  // Desde la ficha de un router, switch o AP se llega con ?equipo=<id>: se lo abre y se lo resalta.
+  const linkedDevice = searchParams.get("equipo")?.trim().slice(0, 40) ?? "";
+  const handledDeviceRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linkedDevice || !topology || handledDeviceRef.current === linkedDevice) return;
+    handledDeviceRef.current = linkedDevice;
+    const device = topology.devices.get(linkedDevice);
+    if (device) {
+      setTab("diagram");
+      showDevice(device);
+    } else {
+      toast.error("Ese equipo ya no aparece en Red en vivo.");
+    }
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("equipo");
+        return next;
+      },
+      { replace: true },
+    );
+    // Igual que ?buscar=: una sola vez por enlace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedDevice, topology, setSearchParams]);
 
   const collectorStatus = !view
     ? query.isFetching
@@ -661,6 +696,7 @@ export default function ItNetworkLivePage() {
                   onSelectPort={onSelectPort}
                   onGoTo={onGoTo}
                   onMute={onMute}
+                  onInventory={onInventory}
                 />
 
                 <div className="netlive-legend" aria-label="Referencias">
@@ -703,6 +739,15 @@ export default function ItNetworkLivePage() {
           </>
         )}
       </div>
+
+      {inventoryTarget && inventoryDevice ? (
+        <DeviceAssetDialog
+          key={`${inventoryTarget.deviceId}-${inventoryTarget.mode}`}
+          device={inventoryDevice}
+          initialMode={inventoryTarget.mode}
+          onClose={closeInventory}
+        />
+      ) : null}
     </section>
   );
 }

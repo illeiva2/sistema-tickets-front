@@ -14,6 +14,7 @@ import { layoutTopology } from "../layout";
 import { linkPortLabel } from "../ports";
 import { linkedPortKeys, type Topology, type TreeEdge } from "../topology";
 import type { LiveEndpoint, LiveWifiClient } from "../types";
+import type { DeviceAssetMode } from "./DeviceInventory";
 import { edgeTypes, type PortFlowEdge } from "./PortEdge";
 import {
   WAN_NODE_SIZE,
@@ -41,6 +42,7 @@ interface LiveTopologyCanvasProps {
   onSelectPort: (deviceId: string, portKey: string | null) => void;
   onGoTo: (deviceId: string) => void;
   onMute: (deviceId: string, muted: boolean) => void;
+  onInventory: (deviceId: string, mode: DeviceAssetMode) => void;
 }
 
 const NO_ENDPOINTS = new Map<string, LiveEndpoint[]>();
@@ -90,6 +92,7 @@ function Canvas({
   onSelectPort,
   onGoTo,
   onMute,
+  onInventory,
 }: LiveTopologyCanvasProps) {
   const { fitView } = useReactFlow();
 
@@ -138,6 +141,7 @@ function Canvas({
         onSelectPort,
         onGoTo,
         onMute,
+        onInventory,
       },
     }));
 
@@ -201,6 +205,7 @@ function Canvas({
     onSelectPort,
     onGoTo,
     onMute,
+    onInventory,
   ]);
 
   // Si el lienzo aparece con un equipo ya elegido (al volver del historial), se lo centra apenas
